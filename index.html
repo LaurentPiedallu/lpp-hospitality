@@ -14,9 +14,8 @@
 <body>
   <div class="grain" aria-hidden="true"></div>
   <header class="site-header" id="top">
-    <a class="brand" href="#top" aria-label="LPP Hospitality home">
-      <span class="brand-mark">LPP</span>
-      <span class="brand-name">Hospitality</span>
+    <a class="brand brand-logo" href="#top" aria-label="LPP Hospitality home">
+      <img src="assets/lpp-logo.png" alt="LPP Hospitality" />
     </a>
     <nav class="desktop-nav" aria-label="Primary navigation">
       <a href="#positioning">Positioning</a>
@@ -50,7 +49,7 @@
         <h1>Operational clarity for ambitious hospitality assets.</h1>
         <p class="hero-copy">LPP Hospitality supports ownership groups, restaurant operators, and luxury hospitality platforms with strategy, openings, profitability, and scalable operating structures.</p>
         <div class="hero-actions">
-          <a class="button primary" href="mailto:piedallulaurent@gmail.com?subject=LPP%20Hospitality%20Inquiry">Start a conversation</a>
+          <a class="button primary" href="mailto:laurent@lpphospitality.com?subject=LPP%20Hospitality%20Inquiry">Start a conversation</a>
           <a class="button secondary" href="#services">Explore services</a>
         </div>
       </div>
@@ -156,28 +155,62 @@
     </section>
 
     <section class="section" id="about">
-      <div class="section-inner two-column principal">
-        <div>
+      <div class="section-inner principal-layout">
+        <div class="principal-copy">
           <p class="eyebrow">Principal</p>
           <h2>Led by Laurent Piedallu.</h2>
+          <div class="lead-stack compact-copy">
+            <p>Laurent Piedallu is a hospitality executive with 15+ years of international experience across luxury hotels, Michelin-recognized dining environments, and major hospitality developments.</p>
+            <p>His background includes senior leadership roles with Waldorf Astoria New York, STARR Restaurants, The Dinex Group, and Mandarin Oriental Hotel Group. His work has spanned flagship reopenings, chef-driven concepts, multi-unit hotel operations, and high-volume luxury platforms.</p>
+            <p>LPP Hospitality brings that experience into a focused advisory model for operators and ownership groups seeking sharper execution, stronger teams, and better long-term performance.</p>
+          </div>
         </div>
-        <div class="lead-stack">
-          <p>Laurent Piedallu is a hospitality executive with 15+ years of international experience across luxury hotels, Michelin-recognized dining environments, and major hospitality developments.</p>
-          <p>His background includes senior leadership roles with Waldorf Astoria New York, STARR Restaurants, The Dinex Group, and Mandarin Oriental Hotel Group. His work has spanned flagship reopenings, chef-driven concepts, multi-unit hotel operations, and high-volume luxury platforms.</p>
-          <p>LPP Hospitality brings that experience into a focused advisory model for operators and ownership groups seeking sharper execution, stronger teams, and better long-term performance.</p>
-        </div>
+        <figure class="principal-photo">
+          <img src="assets/laurent-piedallu-headshot.png" alt="Laurent Piedallu, founder of LPP Hospitality" />
+        </figure>
       </div>
     </section>
 
     <section class="section contact-section" id="contact">
-      <div class="section-inner contact-card">
-        <p class="eyebrow">Contact</p>
-        <h2>For openings, repositionings, and performance work.</h2>
-        <p>Based in New York. Available for select advisory engagements with high-end restaurants, hotel dining platforms, and hospitality ownership groups.</p>
-        <div class="contact-actions">
-          <a class="button primary" href="mailto:piedallulaurent@gmail.com?subject=LPP%20Hospitality%20Inquiry">piedallulaurent@gmail.com</a>
-          <a class="button secondary" href="https://www.linkedin.com/in/laurent-piedallu/" target="_blank" rel="noopener">LinkedIn</a>
+      <div class="section-inner contact-layout">
+        <div class="contact-intro">
+          <p class="eyebrow">Contact</p>
+          <h2>Let’s create exceptional hospitality together.</h2>
+          <p>Based in New York. Available for select advisory engagements with high-end restaurants, hotel dining platforms, and hospitality ownership groups.</p>
+          <div class="contact-list" aria-label="Contact details">
+            <a href="mailto:laurent@lpphospitality.com?subject=LPP%20Hospitality%20Inquiry">laurent@lpphospitality.com</a>
+            <span>New York, NY</span>
+            <a href="https://www.linkedin.com/in/laurent-piedallu/" target="_blank" rel="noopener">Connect on LinkedIn</a>
+          </div>
         </div>
+
+        <form class="contact-form" action="https://formspree.io/f/xrevpdkr" method="POST">
+          <input type="hidden" name="_subject" value="New LPP Hospitality inquiry" />
+          <div class="form-grid">
+            <label>
+              <span>Name</span>
+              <input type="text" name="name" autocomplete="name" placeholder="Name" required />
+            </label>
+            <label>
+              <span>Email</span>
+              <input type="email" name="email" autocomplete="email" placeholder="Email" required />
+            </label>
+            <label>
+              <span>Company</span>
+              <input type="text" name="company" autocomplete="organization" placeholder="Company" />
+            </label>
+            <label>
+              <span>Phone</span>
+              <input type="tel" name="phone" autocomplete="tel" placeholder="Phone" />
+            </label>
+          </div>
+          <label class="full-field">
+            <span>Message</span>
+            <textarea name="message" rows="6" placeholder="Message" required></textarea>
+          </label>
+          <button class="button primary form-button" type="submit">Send message</button>
+          <p class="form-note">Your information is secure and will never be shared.</p>
+        </form>
       </div>
     </section>
   </main>
