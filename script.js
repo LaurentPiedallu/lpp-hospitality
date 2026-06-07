@@ -18,7 +18,7 @@ if (toggle && mobileNav) {
   });
 }
 
-const revealTargets = document.querySelectorAll('.section-inner, .service-card, .engagement-grid article');
+const revealTargets = document.querySelectorAll('.section-inner, .problem-grid article, .engagement-list article, .approach-list article');
 const observer = new IntersectionObserver((entries) => {
   entries.forEach((entry) => {
     if (entry.isIntersecting) {
@@ -26,7 +26,7 @@ const observer = new IntersectionObserver((entries) => {
       observer.unobserve(entry.target);
     }
   });
-}, { threshold: 0.15 });
+}, { threshold: 0.12 });
 
 revealTargets.forEach((target) => {
   target.classList.add('reveal');

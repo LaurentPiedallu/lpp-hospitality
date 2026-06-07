@@ -2,9 +2,17 @@
 
 Static one-page website for LPP Hospitality.
 
-## Deploy
-Upload all files and folders to the GitHub repository connected to Cloudflare Pages. Replace existing files, including the assets folder.
+## Upload to GitHub
 
-## Contact Form
-Formspree endpoint: https://formspree.io/f/xrevpdkr
-Contact email displayed: laurent@lpphospitality.com
+Upload all files and folders in this directory to the root of the GitHub repository connected to Cloudflare Pages.
+
+Required structure:
+
+```
+index.html
+styles.css
+script.js
+assets/
+```
+
+The contact form uses Formspree endpoint: https://formspree.io/f/xrevpdkr
