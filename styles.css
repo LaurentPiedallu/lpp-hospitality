@@ -186,11 +186,17 @@ h2 { font-size: clamp(38px, 4.4vw, 66px); margin: 0; }
 .engagement-list {
   display: grid;
   gap: 0;
-  border-top: 1px solid var(--line);
 }
 .engagement-list article {
   padding: 26px 0;
   border-bottom: 1px solid var(--line);
+}
+.engagement-list article:first-child {
+  padding-top: 0;
+}
+.engagement-list article:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
 }
 .engagement-list h3 { font-size: 33px; margin: 0 0 14px; }
 .engagement-list p { margin: 0; color: var(--muted); max-width: 720px; font-size: 18px; }
