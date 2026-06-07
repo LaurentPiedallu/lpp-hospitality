@@ -1,8 +1,7 @@
 :root {
   --deep: #071516;
   --deep-2: #0b1f21;
-  --green: #14352d;
-  --green-2: #1f4a3e;
+  --green: #1f4a3e;
   --sage: #d8ded1;
   --stone: #e7dfd2;
   --paper: #f4efe6;
@@ -214,12 +213,35 @@ h2 { font-size: clamp(38px, 4.75vw, 68px); margin: 0; }
 .approach-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; text-align: center; justify-items: stretch; }
 .approach-list div { padding: 34px 28px; border: 1px solid rgba(23,20,18,.12); background: rgba(255,255,255,.28); }
 .approach-list p { color: var(--muted); font-size: 17px; margin: 0 auto; max-width: 340px; }
-.principal-layout { max-width: 940px; }
+.principal-layout { max-width: 1080px; }
+.principal-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: clamp(36px, 6vw, 78px);
+  align-items: center;
+}
+.principal-text { max-width: 740px; }
 .principal-layout h2 { margin-bottom: 30px; }
-.principal-copy { max-width: 790px; }
+.principal-copy { max-width: 760px; }
 .principal-copy p { margin: 0 0 18px; color: #3f3931; }
 .principal-copy p:last-child { margin-bottom: 0; }
-.compact-copy { font-size: clamp(17px, 1.45vw, 21px); }
+.compact-copy { font-size: clamp(17px, 1.35vw, 20px); }
+.principal-portrait {
+  margin: 0;
+  width: 100%;
+  max-width: 300px;
+  justify-self: end;
+}
+.principal-portrait img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  object-position: center top;
+  border-radius: 18px;
+  filter: saturate(.94) contrast(.98);
+  box-shadow: 0 28px 70px rgba(23,20,18,.16);
+}
 .contact-layout {
   display: grid;
   grid-template-columns: .82fr 1fr;
@@ -302,12 +324,13 @@ footer p { max-width: var(--max); margin: 0 auto; }
   .mobile-nav.open { transform: translateY(0); }
   .section { padding-top: 70px; padding-bottom: 62px; }
   .hero { min-height: 100vh; }
-  .two-column, .financial-layout, .contact-layout { grid-template-columns: 1fr; }
+  .two-column, .financial-layout, .contact-layout, .principal-content { grid-template-columns: 1fr; }
   .contact-layout { grid-template-areas: "intro" "form" "details"; }
   .service-grid, .approach-list, .engagement-grid { grid-template-columns: 1fr; }
   .financial-grid { grid-template-columns: 1fr; }
   .contact-list { grid-template-columns: 1fr; gap: 12px; }
   .contact-list > * { text-align: left !important; }
+  .principal-portrait { justify-self: start; max-width: 240px; }
 }
 @media (max-width: 560px) {
   .site-header { height: 64px; }
@@ -316,6 +339,7 @@ footer p { max-width: var(--max); margin: 0 auto; }
   .button { width: 100%; }
   .form-grid { grid-template-columns: 1fr; }
   .contact-layout { padding: 28px 20px; }
+  .principal-portrait { max-width: 210px; }
 }
 @media (max-height: 760px) and (min-width: 921px) {
   .hero { min-height: 660px; padding-top: 86px; }
