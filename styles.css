@@ -540,3 +540,22 @@ footer p { max-width: var(--max); margin: 0 auto; }
     .reveal { opacity: 1; transform: none; transition: none; }
   .button, .mobile-nav { transition: none; }
 }
+
+/* v7 refinements */
+.focus-intro {
+  margin: 24px 0 0;
+  max-width: 620px;
+  color: #5E5549;
+  font-size: 17px;
+}
+.focus-intro + .focus-list {
+  margin-top: 18px;
+}
+@media (max-width: 920px) {
+  .outcomes-layout { grid-template-columns: 1fr !important; }
+  .outcome-list article { grid-template-columns: 1fr !important; gap: 8px; }
+}
+@media (max-width: 560px) {
+  .outcomes-layout { grid-template-columns: 1fr !important; }
+  .outcome-list article { grid-template-columns: 1fr !important; gap: 8px; }
+}
