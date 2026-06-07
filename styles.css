@@ -2,7 +2,7 @@
   --near-black: #0E1110;
   --charcoal: #171C1B;
   --warm-charcoal: #202020;
-  --green: #667A6F;
+  --green: #5F766A;
   --paper: #F4EFE6;
   --stone: #E7DFD2;
   --sand: #EFE6D8;
@@ -87,23 +87,21 @@ button, input, textarea { font: inherit; }
 .hero {
   min-height: min(690px, 100vh);
   color: var(--cream);
-  background: var(--near-black);
-  padding-top: 96px;
-  padding-bottom: 46px;
-}
-.hero-image {
-  background-image: url("assets/header-nyc-restaurant.jpg");
+  background:
+    linear-gradient(90deg, rgba(8,12,12,.92) 0%, rgba(8,12,12,.72) 44%, rgba(8,12,12,.38) 100%),
+    linear-gradient(180deg, rgba(8,12,12,.14) 0%, rgba(8,12,12,.62) 100%),
+    url('assets/header-nyc-dining.jpg');
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
+  padding-top: 96px;
+  padding-bottom: 46px;
 }
 .hero-overlay {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background:
-    linear-gradient(90deg, rgba(14,17,16,.96) 0%, rgba(14,17,16,.84) 42%, rgba(14,17,16,.54) 70%, rgba(14,17,16,.48) 100%),
-    linear-gradient(180deg, rgba(14,17,16,.18) 0%, rgba(14,17,16,.78) 100%);
+  background: radial-gradient(circle at 68% 42%, rgba(255,255,255,.04), transparent 32%), linear-gradient(180deg, rgba(14,17,16,.05), rgba(14,17,16,.64));
 }
 .hero-inner { max-width: 820px; margin-left: max(0px, calc((100vw - var(--max)) / 2)); }
 .hero h1,
@@ -339,8 +337,7 @@ footer p { max-width: var(--max); margin: 0 auto; }
   }
   .mobile-nav.open { transform: translateY(0); }
   .section { padding-top: 66px; padding-bottom: 60px; }
-  .hero { min-height: 88vh; }
-  .hero-image { background-position: center center; }
+  .hero { min-height: 100vh; }
   .two-column, .financial-layout, .contact-layout, .principal-content { grid-template-columns: 1fr; }
   .contact-layout { grid-template-areas: "intro" "form" "details"; }
   .problem-grid, .approach-list { grid-template-columns: 1fr; }
@@ -365,6 +362,6 @@ footer p { max-width: var(--max); margin: 0 auto; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .reveal { opacity: 1; transform: none; transition: none; }
+    .reveal { opacity: 1; transform: none; transition: none; }
   .button, .mobile-nav { transition: none; }
 }

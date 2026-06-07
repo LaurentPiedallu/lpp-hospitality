@@ -2,17 +2,11 @@
 
 Static one-page website for LPP Hospitality.
 
-## Upload to GitHub
+## Deployment
+Upload all files in this folder to the GitHub repository connected to Cloudflare Pages. Replace existing files, including the full `assets` folder.
 
-Upload all files and folders in this directory to the root of the GitHub repository connected to Cloudflare Pages.
-
-Required structure:
-
-```
-index.html
-styles.css
-script.js
-assets/
-```
-
-The contact form uses Formspree endpoint: https://formspree.io/f/xrevpdkr
+## Latest updates
+- Hero background updated to `assets/header-nyc-dining.jpg`.
+- All Rosewood references updated to Rosewood Hotels.
+- Solutions section uses a lighter muted green background.
+- Contact form endpoint remains Formspree: https://formspree.io/f/xrevpdkr
