@@ -2,7 +2,7 @@
   --near-black: #0E1110;
   --charcoal: #171C1B;
   --warm-charcoal: #202020;
-  --green: #E3EBE5;
+  --green: #E6EAE6;
   --paper: #F4EFE6;
   --stone: #E9E2D7;
   --sand: #F0E8DC;
@@ -90,9 +90,9 @@ button, input, textarea { font: inherit; }
   min-height: min(690px, 100vh);
   color: var(--cream);
   background:
-    linear-gradient(90deg, rgba(8,12,12,.48) 0%, rgba(8,12,12,.28) 44%, rgba(8,12,12,.08) 100%),
-    linear-gradient(180deg, rgba(8,12,12,.02) 0%, rgba(8,12,12,.18) 100%),
-    url('assets/header-nyc-dining.jpg');
+    linear-gradient(90deg, rgba(8,12,12,.42) 0%, rgba(8,12,12,.22) 44%, rgba(8,12,12,.05) 100%),
+    linear-gradient(180deg, rgba(8,12,12,.01) 0%, rgba(8,12,12,.14) 100%),
+    url('assets/new-york-hospitality-advisory.jpg');
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
