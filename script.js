@@ -2,21 +2,23 @@ const toggle = document.querySelector('.menu-toggle');
 const mobileNav = document.querySelector('.mobile-nav');
 const year = document.querySelector('#year');
 
-year.textContent = new Date().getFullYear();
+if (year) year.textContent = new Date().getFullYear();
 
-toggle.addEventListener('click', () => {
-  const isOpen = mobileNav.classList.toggle('open');
-  toggle.setAttribute('aria-expanded', String(isOpen));
-});
-
-document.querySelectorAll('.mobile-nav a').forEach((link) => {
-  link.addEventListener('click', () => {
-    mobileNav.classList.remove('open');
-    toggle.setAttribute('aria-expanded', 'false');
+if (toggle && mobileNav) {
+  toggle.addEventListener('click', () => {
+    const isOpen = mobileNav.classList.toggle('open');
+    toggle.setAttribute('aria-expanded', String(isOpen));
   });
-});
 
-const revealTargets = document.querySelectorAll('.section-inner, .service-card');
+  document.querySelectorAll('.mobile-nav a').forEach((link) => {
+    link.addEventListener('click', () => {
+      mobileNav.classList.remove('open');
+      toggle.setAttribute('aria-expanded', 'false');
+    });
+  });
+}
+
+const revealTargets = document.querySelectorAll('.section-inner, .service-card, .engagement-grid article');
 const observer = new IntersectionObserver((entries) => {
   entries.forEach((entry) => {
     if (entry.isIntersecting) {
