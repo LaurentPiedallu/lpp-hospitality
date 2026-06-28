@@ -1,0 +1,15 @@
+name = "lpp-hospitality-portal"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+main = ".open-next/worker.js"
+assets = { directory = ".open-next/assets", binding = "ASSETS" }
+
+[vars]
+NEXT_PUBLIC_SITE_URL = "https://lpphospitality.com"
+R2_BUCKET = "lpp-portal-uploads"
+# R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_PUBLIC_URL
+# → set these as encrypted secrets via: wrangler secret put <NAME>
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "lpp-portal-uploads"

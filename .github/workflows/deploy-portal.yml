@@ -1,0 +1,39 @@
+name: Deploy Portal
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "portal/**"
+      - ".github/workflows/deploy-portal.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Build and deploy to Cloudflare Workers
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: portal/package-lock.json
+
+      - name: Install dependencies
+        working-directory: portal
+        run: npm ci
+
+      - name: Build (OpenNext + Cloudflare)
+        working-directory: portal
+        env:
+          NEXT_PUBLIC_SITE_URL: https://lpphospitality.com
+        run: npm run pages:build
+
+      - name: Deploy to Cloudflare Workers
+        working-directory: portal
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npm run deploy

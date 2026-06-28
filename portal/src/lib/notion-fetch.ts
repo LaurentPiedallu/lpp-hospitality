@@ -1,0 +1,109 @@
+// Edge-compatible Notion REST wrapper — no SDK, pure fetch.
+// Every function here is safe to call from edge API routes.
+
+const NOTION_VERSION = "2022-06-28";
+
+function headers() {
+  return {
+    Authorization: `Bearer ${process.env.NOTION_API_KEY}`,
+    "Notion-Version": NOTION_VERSION,
+    "Content-Type": "application/json",
+  };
+}
+
+// ─── Raw Notion page/property shape helpers ──────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type NotionPage = Record<string, any>;
+
+export function title(page: NotionPage, prop: string): string {
+  return page.properties?.[prop]?.title?.[0]?.plain_text ?? "";
+}
+
+export function richText(page: NotionPage, prop: string): string {
+  return page.properties?.[prop]?.rich_text?.[0]?.plain_text ?? "";
+}
+
+export function select(page: NotionPage, prop: string): string {
+  return page.properties?.[prop]?.select?.name ?? "";
+}
+
+export function multiSelect(page: NotionPage, prop: string): string[] {
+  return (page.properties?.[prop]?.multi_select ?? []).map((s: { name: string }) => s.name);
+}
+
+export function num(page: NotionPage, prop: string): number {
+  return page.properties?.[prop]?.number ?? 0;
+}
+
+export function email(page: NotionPage, prop: string): string {
+  return page.properties?.[prop]?.email ?? "";
+}
+
+export function url(page: NotionPage, prop: string): string {
+  return page.properties?.[prop]?.url ?? "";
+}
+
+export function checkbox(page: NotionPage, prop: string): boolean {
+  return page.properties?.[prop]?.checkbox ?? false;
+}
+
+export function relationId(page: NotionPage, prop: string): string {
+  return page.properties?.[prop]?.relation?.[0]?.id ?? "";
+}
+
+export function files(page: NotionPage, prop: string): string {
+  const f = page.properties?.[prop]?.files?.[0];
+  return f?.file?.url ?? f?.external?.url ?? "";
+}
+
+// ─── Query helper ─────────────────────────────────────────────────────────────
+
+interface QueryOptions {
+  databaseId: string;
+  filter?: unknown;
+  sorts?: unknown[];
+  pageSize?: number;
+}
+
+export async function queryDatabase(opts: QueryOptions): Promise<NotionPage[]> {
+  const results: NotionPage[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const body: Record<string, unknown> = {
+      page_size: opts.pageSize ?? 100,
+    };
+    if (opts.filter) body.filter = opts.filter;
+    if (opts.sorts) body.sorts = opts.sorts;
+    if (cursor) body.start_cursor = cursor;
+
+    const res = await fetch(
+      `https://api.notion.com/v1/databases/${opts.databaseId}/query`,
+      { method: "POST", headers: headers(), body: JSON.stringify(body) }
+    );
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Notion query failed (${res.status}): ${err}`);
+    }
+
+    const data = (await res.json()) as { results: NotionPage[]; next_cursor: string | null; has_more: boolean };
+    results.push(...data.results);
+    cursor = data.has_more && data.next_cursor ? data.next_cursor : undefined;
+  } while (cursor);
+
+  return results;
+}
+
+// Published-only filter — AND-composed with any extra filter
+export function publishedAnd(extra?: unknown): unknown {
+  const published = { property: "Publish Status", select: { equals: "Published" } };
+  if (!extra) return { and: [published] };
+  return { and: [published, extra] };
+}
+
+// Relation filter — page must have a relation to a specific page ID
+export function relationFilter(property: string, pageId: string): unknown {
+  return { property, relation: { contains: pageId } };
+}

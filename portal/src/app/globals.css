@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --color-healthy: #16a34a;
+  --color-monitor: #d97706;
+  --color-critical: #dc2626;
+  --color-reference: #2563eb;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Status border utilities */
+.border-l-healthy { border-left-color: var(--color-healthy); }
+.border-l-monitor { border-left-color: var(--color-monitor); }
+.border-l-critical { border-left-color: var(--color-critical); }
