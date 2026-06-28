@@ -8,7 +8,7 @@ interface UploadFormProps {
   onSuccess?: () => void;
 }
 
-type Stage = "idle" | "signing" | "uploading" | "recording" | "done" | "error";
+type Stage = "idle" | "uploading" | "done" | "error";
 
 const ACCEPTED = [
   "application/pdf",
@@ -58,61 +58,21 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
   const submit = async () => {
     if (!file) return;
     setErrorMsg("");
+    setStage("uploading");
+    setProgress(0);
 
     try {
-      // 1. Get presigned URL
-      setStage("signing");
-      const signRes = await fetch("/api/upload/presign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          clientId, propertyId,
-          fileName: file.name,
-          contentType: file.type || "application/octet-stream",
-        }),
-      });
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("clientId", clientId);
+      fd.append("propertyId", propertyId);
+      if (notes.trim()) fd.append("notes", notes.trim());
 
-      if (!signRes.ok) {
-        const err = await signRes.json() as { error?: string };
-        throw new Error(err.error ?? "Could not get upload URL");
-      }
+      const res = await fetch("/api/upload/presign", { method: "POST", body: fd });
 
-      const { presignedUrl, publicUrl } = await signRes.json() as {
-        presignedUrl: string;
-        publicUrl: string | null;
-      };
-
-      // 2. PUT file directly to R2
-      setStage("uploading");
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("PUT", presignedUrl);
-        xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
-        };
-        xhr.onload  = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed: ${xhr.status}`)));
-        xhr.onerror = () => reject(new Error("Network error during upload"));
-        xhr.send(file);
-      });
-
-      // 3. Record in Notion
-      setStage("recording");
-      const completeRes = await fetch("/api/upload/complete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          clientId, propertyId,
-          fileName: file.name,
-          fileUrl: publicUrl ?? presignedUrl.split("?")[0],
-          contentType: file.type,
-          notes: notes.trim() || undefined,
-        }),
-      });
-
-      if (!completeRes.ok) {
-        const err = await completeRes.json() as { error?: string };
-        throw new Error(err.error ?? "Failed to record upload");
+      if (!res.ok) {
+        const err = await res.json() as { error?: string };
+        throw new Error(err.error ?? "Upload failed");
       }
 
       setStage("done");
@@ -218,17 +178,13 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
       </div>
 
       {/* Progress bar */}
-      {(stage === "uploading" || stage === "recording") && (
+      {stage === "uploading" && (
         <div>
           <div className="flex items-center justify-between text-xs text-gray-500 mb-1.5">
-            <span>{stage === "recording" ? "Recording in system…" : `Uploading… ${progress}%`}</span>
-            <span>{progress}%</span>
+            <span>Uploading…</span>
           </div>
           <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-blue-500 rounded-full transition-all duration-200"
-              style={{ width: `${progress}%` }}
-            />
+            <div className="h-full bg-blue-500 rounded-full animate-pulse w-full" />
           </div>
         </div>
       )}
@@ -243,13 +199,10 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
       {/* Submit */}
       <button
         onClick={submit}
-        disabled={!file || stage === "signing" || stage === "uploading" || stage === "recording"}
+        disabled={!file || stage === "uploading"}
         className="w-full py-3 px-6 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
       >
-        {stage === "signing"   ? "Preparing upload…"
-          : stage === "uploading" ? `Uploading… ${progress}%`
-          : stage === "recording" ? "Saving…"
-          : "Upload file"}
+        {stage === "uploading" ? "Uploading…" : "Upload file"}
       </button>
     </div>
   );
