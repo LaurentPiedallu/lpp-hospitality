@@ -55,13 +55,12 @@ export async function POST(req: NextRequest) {
     body: JSON.stringify({
       parent: { database_id: NOTION_DBS.UPLOADS },
       properties: {
-        "File Name":      { title: [{ text: { content: file.name } }] },
-        "File URL":       { url: `r2://${key}` },
-        "Property":       { relation: [{ id: propertyId }] },
-        "Upload Date":    { date: { start: today } },
-        "Status":         { select: { name: "Pending Review" } },
-        "Publish Status": { select: { name: "Published" } },
-        ...(notes?.trim() ? { "Notes": { rich_text: [{ text: { content: notes.trim() } }] } } : {}),
+        "Upload Name":       { title: [{ text: { content: file.name } }] },
+        "Property":          { relation: [{ id: propertyId }] },
+        "Upload Date":       { date: { start: today } },
+        "Processing Status": { select: { name: "Uploaded" } },
+        "Uploaded By":       { rich_text: [{ text: { content: "Portal" } }] },
+        ...(notes?.trim() ? { "Validation Notes": { rich_text: [{ text: { content: notes.trim() } }] } } : {}),
       },
     }),
   });
