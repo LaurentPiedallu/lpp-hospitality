@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     .setExpirationTime("15m")
     .sign(SECRET);
 
-  const magicLink = `${SITE_URL}/portal/api/auth/verify?token=${token}`;
+  const magicLink = `${SITE_URL}/api/auth/verify?token=${token}`;
 
   // Send via Resend
   const res = await fetch("https://api.resend.com/emails", {
