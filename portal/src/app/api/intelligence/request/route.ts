@@ -8,8 +8,6 @@ import { getSessionFromRequest } from "@/lib/api-helpers";
 import { getProperty, getIntelligence } from "@/lib/notion-queries";
 import { isRateLimited, RATE_LIMIT_MINUTES } from "@/lib/analysis-config";
 
-export const runtime = "edge";
-
 export async function POST(req: NextRequest) {
   const session = await getSessionFromRequest(req);
   if (!session || "status" in session) {

@@ -6,8 +6,6 @@ import { getSessionFromRequest } from "@/lib/api-helpers";
 import { getProperty } from "@/lib/notion-queries";
 import { NOTION_DBS } from "@/lib/notion-ids";
 
-export const runtime = "edge";
-
 const NOTION_VERSION = "2022-06-28";
 
 async function notionPost(path: string, body: unknown): Promise<Response> {

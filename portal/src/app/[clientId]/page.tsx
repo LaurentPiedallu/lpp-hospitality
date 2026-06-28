@@ -8,8 +8,6 @@ import NavBar from "@/components/NavBar";
 import StatusBadge from "@/components/StatusBadge";
 import type { HealthColor } from "@/lib/health";
 
-export const runtime = "edge";
-
 function HealthDot({ color }: { color: HealthColor }) {
   return (
     <span className={`inline-block w-2 h-2 rounded-full ${{

@@ -4,8 +4,6 @@ import { ADMIN_EMAIL, COOKIE_NAME, SESSION_MAX_AGE } from "@/lib/auth";
 import type { SessionPayload } from "@/lib/auth";
 import { NOTION_DBS } from "@/lib/notion-ids";
 
-export const runtime = "edge";
-
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
 // Look up the client record in Notion whose "Contact Email" matches this email.

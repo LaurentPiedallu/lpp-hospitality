@@ -16,8 +16,6 @@ import Sparkline from "@/components/Sparkline";
 import type { Action, Opportunity, Risk, Intelligence, KpiMetric } from "@/types/portal";
 import type { HealthColor } from "@/lib/health";
 
-export const runtime = "edge";
-
 const SUB_PAGES = [
   { href: "financial",    icon: "📊", label: "Financial Review",   desc: "Revenue, labor, COGS, profitability" },
   { href: "commercial",   icon: "⭐", label: "Commercial Review",  desc: "Guest experience and revenue quality" },

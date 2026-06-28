@@ -8,8 +8,6 @@ import SectionHeader from "@/components/SectionHeader";
 import StatusBadge from "@/components/StatusBadge";
 import type { Brief, Upload, UploadStatus, OverallHealth } from "@/types/portal";
 
-export const runtime = "edge";
-
 // ─── Health styling ───────────────────────────────────────────────────────────
 
 const HEALTH_VARIANT: Record<OverallHealth, "green" | "amber" | "red" | "gray"> = {

@@ -11,8 +11,6 @@ import RefreshAllButton from "@/components/RefreshAllButton";
 import { ANALYSIS_CATEGORIES, isStale, relativeAge } from "@/lib/analysis-config";
 import type { Intelligence, Severity } from "@/types/portal";
 
-export const runtime = "edge";
-
 // ─── Category config — sourced from analysis-config so it stays in sync ──────
 
 const CATEGORY_ORDER = ANALYSIS_CATEGORIES.map((c) => c.id);

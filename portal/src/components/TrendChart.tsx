@@ -61,7 +61,7 @@ export default function TrendChart({
           width={unit === "$" ? 64 : 40}
         />
         <Tooltip
-          formatter={(v: number) => [formatValue(v, unit), "Value"]}
+          formatter={(v) => [formatValue(Number(v), unit), "Value"]}
           labelStyle={{ color: "#374151", fontSize: 12 }}
           contentStyle={{ fontSize: 12, border: "1px solid #e5e7eb", borderRadius: 8 }}
         />

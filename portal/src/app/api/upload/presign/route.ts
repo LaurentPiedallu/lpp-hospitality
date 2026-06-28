@@ -5,8 +5,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/api-helpers";
 import { getProperty } from "@/lib/notion-queries";
 
-export const runtime = "edge";
-
 // R2 presigning uses the S3-compatible API with AWS Signature V4.
 // We implement it with the Web Crypto API (edge-compatible).
 
@@ -29,7 +27,7 @@ async function sha256Hex(data: string): Promise<string> {
 async function deriveSigningKey(
   secret: string, date: string, region: string, service: string
 ): Promise<ArrayBuffer> {
-  const kDate    = await hmacSha256(new TextEncoder().encode("AWS4" + secret), date);
+  const kDate    = await hmacSha256(new TextEncoder().encode("AWS4" + secret).buffer as ArrayBuffer, date);
   const kRegion  = await hmacSha256(kDate, region);
   const kService = await hmacSha256(kRegion, service);
   return hmacSha256(kService, "aws4_request");

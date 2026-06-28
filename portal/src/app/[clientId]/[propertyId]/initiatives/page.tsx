@@ -7,8 +7,6 @@ import SubPageHeader from "@/components/SubPageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import type { Initiative, InitiativeStatus, InitiativeColumn } from "@/types/portal";
 
-export const runtime = "edge";
-
 // ─── Status styling ───────────────────────────────────────────────────────────
 
 const STATUS_VARIANT: Record<InitiativeStatus, "green" | "amber" | "red" | "gray" | "blue"> = {

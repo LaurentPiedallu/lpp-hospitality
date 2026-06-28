@@ -7,8 +7,6 @@ import SubPageHeader from "@/components/SubPageHeader";
 import UploadForm from "@/components/UploadForm";
 import Link from "next/link";
 
-export const runtime = "edge";
-
 export default async function UploadPage({
   params,
 }: {

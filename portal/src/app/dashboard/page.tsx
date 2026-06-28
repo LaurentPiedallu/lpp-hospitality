@@ -9,8 +9,6 @@ import StatusBadge from "@/components/StatusBadge";
 import type { Client, Property, KpiSummary } from "@/types/portal";
 import type { HealthColor } from "@/lib/health";
 
-export const runtime = "edge";
-
 // ─── Data loading ─────────────────────────────────────────────────────────────
 
 interface PropertyCard {

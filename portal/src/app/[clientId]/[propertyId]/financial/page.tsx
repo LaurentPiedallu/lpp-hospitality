@@ -12,8 +12,6 @@ import TrendChart, { buildTrendData } from "@/components/TrendChart";
 import BenchmarkGauge from "@/components/BenchmarkGauge";
 import type { KpiMetric, Intelligence, Severity } from "@/types/portal";
 
-export const runtime = "edge";
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function severityVariant(s: Severity): "green" | "amber" | "red" {

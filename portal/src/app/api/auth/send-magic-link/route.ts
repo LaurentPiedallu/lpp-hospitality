@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SignJWT } from "jose";
 
-export const runtime = "edge";
-
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://lpphospitality.com";
 
