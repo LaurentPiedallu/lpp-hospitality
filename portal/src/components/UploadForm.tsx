@@ -28,12 +28,14 @@ function formatBytes(bytes: number): string {
 }
 
 export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFormProps) {
-  const [file, setFile]       = useState<File | null>(null);
-  const [notes, setNotes]     = useState("");
-  const [stage, setStage]     = useState<Stage>("idle");
-  const [progress, setProgress] = useState(0);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [dragging, setDragging] = useState(false);
+  const [file, setFile]             = useState<File | null>(null);
+  const [uploadType, setUploadType] = useState("");
+  const [reportingPeriod, setReportingPeriod] = useState("");
+  const [notes, setNotes]           = useState("");
+  const [stage, setStage]           = useState<Stage>("idle");
+  const [progress, setProgress]     = useState(0);
+  const [errorMsg, setErrorMsg]     = useState("");
+  const [dragging, setDragging]     = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = (f: File) => {
@@ -66,7 +68,9 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
       fd.append("file", file);
       fd.append("clientId", clientId);
       fd.append("propertyId", propertyId);
-      if (notes.trim()) fd.append("notes", notes.trim());
+      if (uploadType)         fd.append("uploadType", uploadType);
+      if (reportingPeriod)    fd.append("reportingPeriod", reportingPeriod);
+      if (notes.trim())       fd.append("notes", notes.trim());
 
       const res = await fetch("/api/upload/presign", { method: "POST", body: fd });
 
@@ -87,6 +91,8 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
 
   const reset = () => {
     setFile(null);
+    setUploadType("");
+    setReportingPeriod("");
     setNotes("");
     setStage("idle");
     setProgress(0);
@@ -161,6 +167,36 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
             <p className="text-xs text-gray-400">PDF, Excel, CSV, PowerPoint, PNG, JPG · Max 50 MB</p>
           </div>
         )}
+      </div>
+
+      {/* Upload Type + Reporting Period */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1.5">
+            Upload type <span className="text-gray-400 font-normal">(optional)</span>
+          </label>
+          <select
+            value={uploadType}
+            onChange={(e) => setUploadType(e.target.value)}
+            className="w-full text-sm border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition bg-white text-gray-700"
+          >
+            <option value="">Select type…</option>
+            {["P&L","POS Sales","Labor / Payroll","Menu Mix","Budget","Guest Reviews","Reservations","Inventory","Menu Engineering","Other"].map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1.5">
+            Reporting period <span className="text-gray-400 font-normal">(optional)</span>
+          </label>
+          <input
+            type="month"
+            value={reportingPeriod}
+            onChange={(e) => setReportingPeriod(e.target.value ? e.target.value + "-01" : "")}
+            className="w-full text-sm border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition"
+          />
+        </div>
       </div>
 
       {/* Notes */}

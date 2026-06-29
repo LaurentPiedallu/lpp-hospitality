@@ -1,13 +1,14 @@
 // Accepts a file via FormData, stores it in R2 via Workers binding,
-// and records the upload in Notion. No S3 credentials required.
+// creates a Notion Uploads record, then notifies the Make.com pipeline.
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/api-helpers";
 import { getProperty } from "@/lib/notion-queries";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { NOTION_DBS } from "@/lib/notion-ids";
 
 const NOTION_VERSION = "2022-06-28";
+const UPLOADS_DB_ID  = "8206d748-6066-42f4-ac8a-c4b8b353051a";
+const MAKE_WEBHOOK   = "https://hook.us2.make.com/vzh17uueiewwg75b9g3xpmpf1wnxrgwa";
 
 export async function POST(req: NextRequest) {
   const session = await getSessionFromRequest(req);
@@ -15,11 +16,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const formData = await req.formData();
-  const file        = formData.get("file") as File | null;
-  const clientId    = formData.get("clientId") as string | null;
-  const propertyId  = formData.get("propertyId") as string | null;
-  const notes       = formData.get("notes") as string | null;
+  const formData      = await req.formData();
+  const file          = formData.get("file") as File | null;
+  const clientId      = formData.get("clientId") as string | null;
+  const propertyId    = formData.get("propertyId") as string | null;
+  const uploadType    = formData.get("uploadType") as string | null;
+  const reportingPeriod = formData.get("reportingPeriod") as string | null;
+  const notes         = formData.get("notes") as string | null;
 
   if (!file || !clientId || !propertyId) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -32,7 +35,7 @@ export async function POST(req: NextRequest) {
   const prop = await getProperty(propertyId, clientId);
   if (!prop) return NextResponse.json({ error: "Property not found" }, { status: 404 });
 
-  // Store in R2 via Workers binding
+  // 1. Store in R2 via Workers binding
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { env } = await getCloudflareContext() as any;
   const ts   = Date.now();
@@ -43,8 +46,23 @@ export async function POST(req: NextRequest) {
     httpMetadata: { contentType: file.type || "application/octet-stream" },
   });
 
-  // Record in Notion Uploads database
+  // 2. Create Notion Uploads record
   const today = new Date().toISOString().slice(0, 10);
+
+  const notionBody: Record<string, unknown> = {
+    parent: { database_id: UPLOADS_DB_ID },
+    properties: {
+      "Upload Name":       { title: [{ text: { content: file.name } }] },
+      "Client":            { relation: [{ id: clientId }] },
+      "Property":          { relation: [{ id: propertyId }] },
+      "Upload Date":       { date: { start: today } },
+      "Processing Status": { select: { name: "Uploaded" } },
+      ...(uploadType?.trim()      ? { "Upload Type":    { select: { name: uploadType.trim() } } } : {}),
+      ...(reportingPeriod?.trim() ? { "Reporting Period": { date: { start: reportingPeriod.trim() } } } : {}),
+      ...(notes?.trim()           ? { "Validation Notes": { rich_text: [{ text: { content: notes.trim() } }] } } : {}),
+    },
+  };
+
   const notionRes = await fetch("https://api.notion.com/v1/pages", {
     method: "POST",
     headers: {
@@ -52,17 +70,7 @@ export async function POST(req: NextRequest) {
       "Notion-Version": NOTION_VERSION,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      parent: { database_id: NOTION_DBS.UPLOADS },
-      properties: {
-        "Upload Name":       { title: [{ text: { content: file.name } }] },
-        "Property":          { relation: [{ id: propertyId }] },
-        "Upload Date":       { date: { start: today } },
-        "Processing Status": { select: { name: "Uploaded" } },
-        "Uploaded By":       { rich_text: [{ text: { content: "Portal" } }] },
-        ...(notes?.trim() ? { "Validation Notes": { rich_text: [{ text: { content: notes.trim() } }] } } : {}),
-      },
-    }),
+    body: JSON.stringify(notionBody),
   });
 
   if (!notionRes.ok) {
@@ -71,5 +79,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Stored in R2 but failed to record in Notion" }, { status: 502 });
   }
 
-  return NextResponse.json({ ok: true, key });
+  const notionPage = await notionRes.json() as { id: string };
+
+  // 3. Notify Make.com pipeline
+  await fetch(MAKE_WEBHOOK, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      uploadPageId: notionPage.id,
+      propertyId,
+      clientId,
+      requestedAt: today,
+    }),
+  }).catch((err) => console.error("Make webhook failed:", err));
+
+  return NextResponse.json({ ok: true, key, notionPageId: notionPage.id });
 }
