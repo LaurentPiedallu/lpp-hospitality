@@ -7,7 +7,7 @@ import { getProperty } from "@/lib/notion-queries";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 const NOTION_VERSION = "2022-06-28";
-const UPLOADS_DB_ID  = "8206d748-6066-42f4-ac8a-c4b8b353051a";
+const UPLOADS_DB_ID  = "feb50441-2d71-4ed5-9ad4-4f8d1161a201";
 const MAKE_WEBHOOK   = "https://hook.us2.make.com/vzh17uueiewwg75b9g3xpmpf1wnxrgwa";
 
 export async function POST(req: NextRequest) {
