@@ -4,11 +4,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/api-helpers";
 import { getProperty } from "@/lib/notion-queries";
+import { NOTION_DBS } from "@/lib/notion-ids";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 const NOTION_VERSION = "2022-06-28";
-const UPLOADS_DB_ID  = "feb50441-2d71-4ed5-9ad4-4f8d1161a201";
-const MAKE_WEBHOOK   = "https://hook.us2.make.com/vzh17uueiewwg75b9g3xpmpf1wnxrgwa";
+
+const WEBHOOK_CSV = "https://hook.us2.make.com/vzh17uueiewwg75b9g3xpmpf1wnxrgwa";
+const WEBHOOK_PDF = process.env.MAKE_WEBHOOK_URL_PDF ?? "https://hook.us2.make.com/6njuyc3vcs78eqro495b7ygo3ic6hjmm";
+
+type FileFormat = "CSV" | "PDF" | "Excel" | "Other";
+
+function getFileFormat(fileName: string): FileFormat {
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+  if (ext === "pdf")                return "PDF";
+  if (ext === "csv")                return "CSV";
+  if (ext === "xlsx" || ext === "xls") return "Excel";
+  return "Other";
+}
 
 export async function POST(req: NextRequest) {
   const session = await getSessionFromRequest(req);
@@ -16,13 +28,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const formData      = await req.formData();
-  const file          = formData.get("file") as File | null;
-  const clientId      = formData.get("clientId") as string | null;
-  const propertyId    = formData.get("propertyId") as string | null;
-  const uploadType    = formData.get("uploadType") as string | null;
+  const formData        = await req.formData();
+  const file            = formData.get("file") as File | null;
+  const clientId        = formData.get("clientId") as string | null;
+  const propertyId      = formData.get("propertyId") as string | null;
+  const uploadType      = formData.get("uploadType") as string | null;
   const reportingPeriod = formData.get("reportingPeriod") as string | null;
-  const notes         = formData.get("notes") as string | null;
+  const notes           = formData.get("notes") as string | null;
 
   if (!file || !clientId || !propertyId) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -47,19 +59,21 @@ export async function POST(req: NextRequest) {
   });
 
   // 2. Create Notion Uploads record
-  const today = new Date().toISOString().slice(0, 10);
+  const today      = new Date().toISOString().slice(0, 10);
+  const fileFormat = getFileFormat(file.name);
 
   const notionBody: Record<string, unknown> = {
-    parent: { database_id: UPLOADS_DB_ID },
+    parent: { database_id: NOTION_DBS.UPLOADS },
     properties: {
       "Upload Name":       { title: [{ text: { content: file.name } }] },
       "Client":            { relation: [{ id: clientId }] },
       "Property":          { relation: [{ id: propertyId }] },
       "Upload Date":       { date: { start: today } },
       "Processing Status": { select: { name: "Uploaded" } },
-      ...(uploadType?.trim()      ? { "Upload Type":    { select: { name: uploadType.trim() } } } : {}),
-      ...(reportingPeriod?.trim() ? { "Reporting Period": { date: { start: reportingPeriod.trim() } } } : {}),
-      ...(notes?.trim()           ? { "Validation Notes": { rich_text: [{ text: { content: notes.trim() } }] } } : {}),
+      "File Format":       { select: { name: fileFormat } },
+      ...(uploadType?.trim()        ? { "Upload Type":       { select:     { name: uploadType.trim() } } } : {}),
+      ...(reportingPeriod?.trim()   ? { "Reporting Period":  { date:       { start: reportingPeriod.trim() } } } : {}),
+      ...(notes?.trim()             ? { "Validation Notes":  { rich_text:  [{ text: { content: notes.trim() } }] } } : {}),
     },
   };
 
@@ -81,8 +95,10 @@ export async function POST(req: NextRequest) {
 
   const notionPage = await notionRes.json() as { id: string };
 
-  // 3. Notify Make.com pipeline
-  await fetch(MAKE_WEBHOOK, {
+  // 3. Notify Make.com pipeline — route by file format
+  const webhookUrl = fileFormat === "PDF" ? WEBHOOK_PDF : WEBHOOK_CSV;
+
+  await fetch(webhookUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

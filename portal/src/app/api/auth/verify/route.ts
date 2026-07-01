@@ -6,32 +6,56 @@ import { NOTION_DBS } from "@/lib/notion-ids";
 
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
-// Look up the client record in Notion whose "Contact Email" matches this email.
-// Returns the Notion page ID (used as clientId throughout the portal).
 async function lookupClientId(email: string): Promise<string | null> {
-  const res = await fetch(
+  const headers = {
+    Authorization: `Bearer ${process.env.NOTION_API_KEY}`,
+    "Notion-Version": "2022-06-28",
+    "Content-Type": "application/json",
+  };
+
+  // Fast path: exact match on Primary Contact Email
+  const primaryRes = await fetch(
     `https://api.notion.com/v1/databases/${NOTION_DBS.CLIENTS}/query`,
     {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.NOTION_API_KEY}`,
-        "Notion-Version": "2022-06-28",
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify({
-        filter: {
-          property: "Primary Contact Email",
-          email: { equals: email },
-        },
+        filter: { property: "Primary Contact Email", email: { equals: email } },
         page_size: 1,
       }),
     }
   );
+  if (primaryRes.ok) {
+    const data = (await primaryRes.json()) as { results: { id: string }[] };
+    if (data.results[0]) return data.results[0].id;
+  }
 
-  if (!res.ok) return null;
+  // Fallback: check "Authorized Emails" (comma-separated text) across all clients (~20 max)
+  const allRes = await fetch(
+    `https://api.notion.com/v1/databases/${NOTION_DBS.CLIENTS}/query`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ page_size: 100 }),
+    }
+  );
+  if (!allRes.ok) return null;
 
-  const data = (await res.json()) as { results: { id: string }[] };
-  return data.results[0]?.id ?? null;
+  const allData = (await allRes.json()) as {
+    results: { id: string; properties: Record<string, unknown> }[];
+  };
+  const lowerEmail = email.toLowerCase();
+
+  for (const page of allData.results) {
+    const field = page.properties["Authorized Emails"] as
+      | { rich_text: { plain_text: string }[] }
+      | undefined;
+    const raw = field?.rich_text?.[0]?.plain_text ?? "";
+    const authorized = raw.split(",").map((e) => e.trim().toLowerCase());
+    if (authorized.includes(lowerEmail)) return page.id;
+  }
+
+  return null;
 }
 
 export async function GET(req: NextRequest) {
