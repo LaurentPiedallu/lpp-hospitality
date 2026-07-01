@@ -9,6 +9,7 @@ interface UploadFormProps {
 }
 
 type Stage = "idle" | "uploading" | "done" | "error";
+type FileFormat = "CSV" | "PDF" | "Excel" | "";
 
 const ACCEPTED = [
   "application/pdf",
@@ -21,6 +22,34 @@ const ACCEPTED = [
   "image/jpeg",
 ].join(",");
 
+const FORMAT_OPTIONS: { value: FileFormat; label: string }[] = [
+  { value: "CSV",   label: "CSV" },
+  { value: "PDF",   label: "PDF" },
+  { value: "Excel", label: "Excel" },
+];
+
+function detectFormat(fileName: string): FileFormat {
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+  if (ext === "pdf")                   return "PDF";
+  if (ext === "csv")                   return "CSV";
+  if (ext === "xlsx" || ext === "xls") return "Excel";
+  return "";
+}
+
+function formatMismatch(format: FileFormat, fileName: string): string | null {
+  if (!format) return null;
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+  const allowed: Record<string, string[]> = {
+    CSV:   ["csv"],
+    PDF:   ["pdf"],
+    Excel: ["xlsx", "xls"],
+  };
+  if (!allowed[format].includes(ext)) {
+    return `You selected ${format} but the file is a .${ext}. Please correct the format or choose a different file.`;
+  }
+  return null;
+}
+
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -29,6 +58,7 @@ function formatBytes(bytes: number): string {
 
 export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFormProps) {
   const [file, setFile]             = useState<File | null>(null);
+  const [fileFormat, setFileFormat] = useState<FileFormat>("");
   const [uploadType, setUploadType] = useState("");
   const [reportingPeriod, setReportingPeriod] = useState("");
   const [notes, setNotes]           = useState("");
@@ -40,6 +70,7 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
 
   const handleFile = (f: File) => {
     setFile(f);
+    setFileFormat(detectFormat(f.name));
     setStage("idle");
     setErrorMsg("");
     setProgress(0);
@@ -59,6 +90,20 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
 
   const submit = async () => {
     if (!file) return;
+
+    // Client-side format validation
+    if (!fileFormat) {
+      setErrorMsg("Please select a file format.");
+      setStage("error");
+      return;
+    }
+    const mismatch = formatMismatch(fileFormat, file.name);
+    if (mismatch) {
+      setErrorMsg(mismatch);
+      setStage("error");
+      return;
+    }
+
     setErrorMsg("");
     setStage("uploading");
     setProgress(0);
@@ -68,6 +113,7 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
       fd.append("file", file);
       fd.append("clientId", clientId);
       fd.append("propertyId", propertyId);
+      fd.append("fileFormat", fileFormat);
       if (uploadType)         fd.append("uploadType", uploadType);
       if (reportingPeriod)    fd.append("reportingPeriod", reportingPeriod);
       if (notes.trim())       fd.append("notes", notes.trim());
@@ -91,6 +137,7 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
 
   const reset = () => {
     setFile(null);
+    setFileFormat("");
     setUploadType("");
     setReportingPeriod("");
     setNotes("");
@@ -169,8 +216,23 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
         )}
       </div>
 
-      {/* Upload Type + Reporting Period */}
+      {/* File Format + Upload Type */}
       <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1.5">
+            File format <span className="text-red-400">*</span>
+          </label>
+          <select
+            value={fileFormat}
+            onChange={(e) => setFileFormat(e.target.value as FileFormat)}
+            className="w-full text-sm border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition bg-white text-gray-700"
+          >
+            <option value="">Select format…</option>
+            {FORMAT_OPTIONS.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1.5">
             Upload type <span className="text-gray-400 font-normal">(optional)</span>
@@ -186,17 +248,19 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
             ))}
           </select>
         </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1.5">
-            Reporting period <span className="text-gray-400 font-normal">(optional)</span>
-          </label>
-          <input
-            type="month"
-            value={reportingPeriod}
-            onChange={(e) => setReportingPeriod(e.target.value ? e.target.value + "-01" : "")}
-            className="w-full text-sm border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition"
-          />
-        </div>
+      </div>
+
+      {/* Reporting Period */}
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1.5">
+          Reporting period <span className="text-gray-400 font-normal">(optional)</span>
+        </label>
+        <input
+          type="month"
+          value={reportingPeriod}
+          onChange={(e) => setReportingPeriod(e.target.value ? e.target.value + "-01" : "")}
+          className="w-full text-sm border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition"
+        />
       </div>
 
       {/* Notes */}
