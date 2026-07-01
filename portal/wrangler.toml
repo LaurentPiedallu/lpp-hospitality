@@ -5,10 +5,12 @@ main = ".open-next/worker.js"
 assets = { directory = ".open-next/assets", binding = "ASSETS" }
 
 [vars]
-NEXT_PUBLIC_SITE_URL = "https://portal.lpphospitality.com"
-R2_BUCKET = "lpp-portal-uploads"
-# R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_PUBLIC_URL
-# → set these as encrypted secrets via: wrangler secret put <NAME>
+NEXT_PUBLIC_SITE_URL    = "https://portal.lpphospitality.com"
+R2_BUCKET               = "lpp-portal-uploads"
+R2_PUBLIC_URL           = "https://uploads.lpphospitality.com"
+MAKE_WEBHOOK_URL_PDF    = "https://hook.us2.make.com/6njuyc3vcs78eqro495b7ygo3ic6hjmm"
+# Secrets (JWT_SECRET, NOTION_API_KEY, RESEND_API_KEY, MAKE_WEBHOOK_URL)
+# → set via dashboard or: wrangler secret put <NAME>
 
 [[r2_buckets]]
 binding = "R2"
