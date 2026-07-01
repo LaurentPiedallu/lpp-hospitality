@@ -84,13 +84,15 @@ async function generatePresignedGet(key: string, expireSecs = 2592000 /* 30 days
   const scope   = `${date}/${region}/s3/aws4_request`;
 
   // Canonical query string must be sorted alphabetically by key
-  const qp: [string, string][] = [
-    ["X-Amz-Algorithm",     "AWS4-HMAC-SHA256"],
-    ["X-Amz-Credential",    `${accessKeyId}/${scope}`],
-    ["X-Amz-Date",          datetime],
-    ["X-Amz-Expires",       String(expireSecs)],
-    ["X-Amz-SignedHeaders", "host"],
-  ].sort(([a], [b]) => a < b ? -1 : 1);
+  const qp = (
+    [
+      ["X-Amz-Algorithm",     "AWS4-HMAC-SHA256"],
+      ["X-Amz-Credential",    `${accessKeyId}/${scope}`],
+      ["X-Amz-Date",          datetime],
+      ["X-Amz-Expires",       String(expireSecs)],
+      ["X-Amz-SignedHeaders", "host"],
+    ] as [string, string][]
+  ).sort(([a], [b]) => a < b ? -1 : 1);
 
   const canonicalQS = qp.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
   const canonicalUri = `/${bucket}/${encodeKey(key)}`;
