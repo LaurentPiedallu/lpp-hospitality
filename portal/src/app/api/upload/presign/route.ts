@@ -223,18 +223,31 @@ export async function POST(req: NextRequest) {
   // 4. Notify Make.com — PDF uses its own scenario, everything else uses the CSV scenario
   const webhookUrl = fmt === "PDF" ? WEBHOOK_PDF : WEBHOOK_CSV;
 
-  const webhookPayload: Record<string, string> = {
+  const webhookPayload: {
+    uploadPageId: string;
+    propertyId: string;
+    clientId: string;
+    requestedAt: string;
+    fileUrl: string;
+    fileFormat: string;
+    fileBase64?: string;
+  } = {
     uploadPageId: notionPage.id,
-    propertyId,
-    clientId,
-    requestedAt: today,
-    fileUrl,
-    fileFormat: fmt,
-    ...(fmt === "PDF" ? { fileBase64: Buffer.from(fileBuffer).toString("base64") } : {}),
+    propertyId:   propertyId,
+    clientId:     clientId,
+    requestedAt:  new Date().toISOString(),
+    fileUrl:      fileUrl,
+    fileFormat:   fmt,
   };
 
-  // Fire-and-forget — Make can take 30-60s; don't block the client on it.
-  console.log("Firing Make webhook (async):", webhookUrl);
+  if (fmt === "PDF") {
+    webhookPayload.fileBase64 = Buffer.from(fileBuffer).toString("base64");
+  }
+
+  console.log("Make webhook payload:", JSON.stringify({
+    ...webhookPayload,
+    fileBase64: webhookPayload.fileBase64 ? `[base64 ${webhookPayload.fileBase64.length} chars]` : undefined,
+  }));
   fetch(webhookUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
