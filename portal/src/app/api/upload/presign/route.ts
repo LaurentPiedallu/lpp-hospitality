@@ -169,8 +169,10 @@ export async function POST(req: NextRequest) {
   const { env } = await getCloudflareContext() as any;
   const key = buildKey(clientId, propertyId, reportingPeriod, file.name);
 
+  const fileBuffer = await file.arrayBuffer();
+
   try {
-    await env.R2.put(key, await file.arrayBuffer(), {
+    await env.R2.put(key, fileBuffer, {
       httpMetadata: { contentType: file.type || "application/octet-stream" },
     });
   } catch (err) {
@@ -221,12 +223,14 @@ export async function POST(req: NextRequest) {
   // 4. Notify Make.com — PDF uses its own scenario, everything else uses the CSV scenario
   const webhookUrl = fmt === "PDF" ? WEBHOOK_PDF : WEBHOOK_CSV;
 
-  const webhookPayload = {
+  const webhookPayload: Record<string, string> = {
     uploadPageId: notionPage.id,
     propertyId,
     clientId,
     requestedAt: today,
     fileUrl,
+    fileFormat: fmt,
+    ...(fmt === "PDF" ? { fileBase64: Buffer.from(fileBuffer).toString("base64") } : {}),
   };
 
   // Fire-and-forget — Make can take 30-60s; don't block the client on it.
