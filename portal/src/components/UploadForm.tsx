@@ -115,7 +115,7 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
       fd.append("propertyId", propertyId);
       fd.append("fileFormat", fileFormat);
       if (uploadType)         fd.append("uploadType", uploadType);
-      if (reportingPeriod)    fd.append("reportingPeriod", reportingPeriod);
+      if (reportingPeriod)    fd.append("reportingPeriod", reportingPeriod + "-01");
       if (notes.trim())       fd.append("notes", notes.trim());
 
       const res = await fetch("/api/upload/presign", { method: "POST", body: fd });
@@ -258,7 +258,7 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
         <input
           type="month"
           value={reportingPeriod}
-          onChange={(e) => setReportingPeriod(e.target.value ? e.target.value + "-01" : "")}
+          onChange={(e) => setReportingPeriod(e.target.value)}
           className="w-full text-sm border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition"
         />
       </div>
