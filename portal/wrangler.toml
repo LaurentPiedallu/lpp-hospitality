@@ -6,6 +6,7 @@ assets = { directory = ".open-next/assets", binding = "ASSETS" }
 
 [vars]
 NEXT_PUBLIC_SITE_URL    = "https://portal.lpphospitality.com"
+SITE_URL                = "https://portal.lpphospitality.com"
 R2_BUCKET               = "lpp-portal-uploads"
 R2_PUBLIC_URL           = "https://uploads.lpphospitality.com"
 MAKE_WEBHOOK_URL_PDF    = "https://hook.us2.make.com/6njuyc3vcs78eqro495b7ygo3ic6hjmm"

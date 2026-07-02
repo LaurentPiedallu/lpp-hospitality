@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { SignJWT } from "jose";
 
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://lpphospitality.com";
+const SITE_URL = process.env.SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? "https://portal.lpphospitality.com";
 
 export async function POST(req: NextRequest) {
   try {
