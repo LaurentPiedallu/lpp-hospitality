@@ -221,17 +221,31 @@ export async function POST(req: NextRequest) {
   // 4. Notify Make.com — PDF uses its own scenario, everything else uses the CSV scenario
   const webhookUrl = fmt === "PDF" ? WEBHOOK_PDF : WEBHOOK_CSV;
 
-  await fetch(webhookUrl, {
+  const webhookPayload = {
+    uploadPageId: notionPage.id,
+    propertyId,
+    clientId,
+    requestedAt: today,
+    fileUrl,
+  };
+
+  console.log("Firing Make webhook:", webhookUrl, JSON.stringify(webhookPayload));
+
+  const webhookRes = await fetch(webhookUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      uploadPageId: notionPage.id,
-      propertyId,
-      clientId,
-      requestedAt: today,
-      fileUrl,
-    }),
-  }).catch((err) => console.error("Make webhook failed:", err));
+    body: JSON.stringify(webhookPayload),
+  });
 
+  if (!webhookRes.ok) {
+    const body = await webhookRes.text().catch(() => "(unreadable)");
+    console.error(`Make webhook failed — status ${webhookRes.status}:`, body);
+    return NextResponse.json(
+      { error: `Upload recorded but Make webhook failed (${webhookRes.status}): ${body}` },
+      { status: 502 }
+    );
+  }
+
+  console.log("Make webhook OK:", webhookRes.status);
   return NextResponse.json({ ok: true, key, notionPageId: notionPage.id });
 }
