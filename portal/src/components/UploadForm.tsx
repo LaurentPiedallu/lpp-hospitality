@@ -121,8 +121,10 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
       const res = await fetch("/api/upload/presign", { method: "POST", body: fd });
 
       if (!res.ok) {
-        const err = await res.json() as { error?: string };
-        throw new Error(err.error ?? "Upload failed");
+        const text = await res.text().catch(() => "");
+        let message = "Upload failed";
+        try { message = (JSON.parse(text) as { error?: string }).error ?? message; } catch { message = text || message; }
+        throw new Error(message);
       }
 
       setStage("done");
