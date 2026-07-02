@@ -11,8 +11,8 @@ const NOTION_VERSION = "2022-06-28";
 
 // ─── Webhook URLs ────────────────────────────────────────────────────────────
 
-const WEBHOOK_CSV = process.env.MAKE_WEBHOOK_URL          ?? "https://hook.us2.make.com/vzh17uueiewwg75b9g3xpmpf1wnxrgwa";
-const WEBHOOK_PDF = process.env.MAKE_WEBHOOK_URL_PDF      ?? "https://hook.us2.make.com/6njuyc3vcs78eqro495b7ygo3ic6hjmm";
+const WEBHOOK_CSV = (process.env.MAKE_WEBHOOK_URL     ?? "https://hook.us2.make.com/vzh17uueiewwg75b9g3xpmpf1wnxrgwa").trim();
+const WEBHOOK_PDF = (process.env.MAKE_WEBHOOK_URL_PDF ?? "https://hook.us2.make.com/6njuyc3vcs78eqro495b7ygo3ic6hjmm").trim();
 
 // ─── File format helpers ──────────────────────────────────────────────────────
 
