@@ -229,32 +229,13 @@ export async function POST(req: NextRequest) {
     fileUrl,
   };
 
-  console.log("Firing Make webhook:", webhookUrl, JSON.stringify(webhookPayload));
-
-  try {
-    const webhookRes = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(webhookPayload),
-    });
-
-    if (!webhookRes.ok) {
-      const body = await webhookRes.text().catch(() => "(unreadable)");
-      console.error(`Make webhook failed — status ${webhookRes.status}:`, body);
-      return NextResponse.json(
-        { error: `Upload recorded but Make webhook failed (${webhookRes.status}): ${body}` },
-        { status: 502 }
-      );
-    }
-
-    console.log("Make webhook OK:", webhookRes.status);
-  } catch (err) {
-    console.error("Make webhook fetch threw:", err);
-    return NextResponse.json(
-      { error: `Upload recorded but could not reach Make webhook: ${err instanceof Error ? err.message : String(err)}` },
-      { status: 502 }
-    );
-  }
+  // Fire-and-forget — Make can take 30-60s; don't block the client on it.
+  console.log("Firing Make webhook (async):", webhookUrl);
+  fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(webhookPayload),
+  }).catch((err) => console.error("Make webhook fire failed:", err));
 
   return NextResponse.json({ ok: true, key, notionPageId: notionPage.id });
 }
