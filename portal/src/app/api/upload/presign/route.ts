@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
 
   // 1. Store in R2 — must succeed before Notion record is created
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { env } = await getCloudflareContext() as any;
+  const { env, ctx } = await getCloudflareContext() as any;
   const key = buildKey(clientId, propertyId, reportingPeriod, file.name);
 
   const fileBuffer = await file.arrayBuffer();
@@ -248,11 +248,15 @@ export async function POST(req: NextRequest) {
     ...webhookPayload,
     fileBase64: webhookPayload.fileBase64 ? `[base64 ${webhookPayload.fileBase64.length} chars]` : undefined,
   }));
-  fetch(webhookUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(webhookPayload),
-  }).catch((err) => console.error("Make webhook fire failed:", err));
+  // ctx.waitUntil keeps the Worker alive until the fetch completes.
+  // Plain fire-and-forget is killed when the response is returned in CF Workers.
+  ctx.waitUntil(
+    fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(webhookPayload),
+    }).catch((err) => console.error("Make webhook fire failed:", err))
+  );
 
   return NextResponse.json({ ok: true, key, notionPageId: notionPage.id });
 }
