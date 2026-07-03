@@ -1,11 +1,11 @@
 name = "lpp-hospitality-portal"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
+main = ".open-next/worker.js"
+assets = { directory = ".open-next/assets", binding = "ASSETS" }
 
 [observability]
 enabled = true
-main = ".open-next/worker.js"
-assets = { directory = ".open-next/assets", binding = "ASSETS" }
 
 [vars]
 NEXT_PUBLIC_SITE_URL    = "https://portal.lpphospitality.com"
@@ -13,10 +13,9 @@ SITE_URL                = "https://portal.lpphospitality.com"
 R2_BUCKET               = "lpp-portal-uploads"
 R2_PUBLIC_URL           = "https://uploads.lpphospitality.com"
 MAKE_WEBHOOK_URL_PDF    = "https://hook.us2.make.com/6njuyc3vcs78eqro495b7ygo3ic6hjmm"
-# Secrets (JWT_SECRET, NOTION_API_KEY, RESEND_API_KEY, MAKE_WEBHOOK_URL, SITE_URL)
+# Secrets (JWT_SECRET, NOTION_API_KEY, RESEND_API_KEY, MAKE_WEBHOOK_URL)
 # → set via dashboard or: wrangler secret put <NAME>
 # MAKE_WEBHOOK_URL = https://hook.us2.make.com/vzh17uueiewwg75b9g3xpmpf1wnxrgwa  (CSV/Excel uploads)
-# MAKE_WEBHOOK_URL_PDF already set above as plaintext var
 
 [[r2_buckets]]
 binding = "R2"
