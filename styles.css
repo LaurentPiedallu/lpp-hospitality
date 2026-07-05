@@ -727,6 +727,7 @@ footer p { max-width: var(--max); margin: 0 auto; }
 /* Method section */
 .section-method { background: #F2EDE4; color: #12120F; }
 .section-method .eyebrow { color: #B8935A; }
+.section-method h2 { font-size: clamp(32px, 3.4vw, 52px); margin-bottom: 30px; }
 .section-method h2 em { font-style: italic; color: #B8935A; }
 .intelligence-grid {
   display: grid;
@@ -740,50 +741,19 @@ footer p { max-width: var(--max); margin: 0 auto; }
   line-height: 1.9;
   color: rgba(18,18,15,.55);
   max-width: 520px;
-  margin: 0 0 20px;
+  margin: 0 0 18px;
 }
-.intelligence-right { display: flex; flex-direction: column; }
+.intelligence-right { display: flex; flex-direction: column; margin-top: 40px; }
 .signal-item {
-  display: grid;
-  grid-template-columns: 44px 1fr;
-  gap: 18px;
-  align-items: start;
   padding: 26px 0;
   border-top: 1px solid rgba(18,18,15,.1);
 }
-.signal-item:last-of-type { border-bottom: 1px solid rgba(18,18,15,.1); }
-.signal-icon {
-  width: 36px;
-  height: 36px;
-  border: 1px solid rgba(184,147,90,.3);
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #B8935A;
-  font-size: 15px;
-  flex-shrink: 0;
-  transition: background .25s ease;
-}
-.signal-item:hover .signal-icon { background: rgba(184,147,90,.06); }
+.signal-item:first-of-type { border-top: none; }
 .signal-item h3 { font-family: "Cormorant Garamond", Georgia, serif; font-weight: 500; font-size: 20px; margin: 0 0 6px; color: #12120F; }
 .signal-item p { font-size: 13px; line-height: 1.75; color: rgba(18,18,15,.5); margin: 0; }
-.method-included {
-  margin-top: 32px;
-  padding-top: 24px;
-  border-top: 1px solid rgba(18,18,15,.1);
-}
-.method-included-label {
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  color: #B8935A;
-  margin: 0 0 10px;
-}
-.method-included-body { font-size: 13px; line-height: 1.9; color: rgba(18,18,15,.5); margin: 0; max-width: 480px; }
 
 @media (max-width: 920px) {
   .intelligence-grid { grid-template-columns: 1fr; }
   .intelligence-left { position: static; }
+  .intelligence-right { margin-top: 0; }
 }
