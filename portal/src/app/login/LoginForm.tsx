@@ -2,46 +2,6 @@
 
 import { useState, useEffect } from "react";
 
-const GOLD = "#B8935A";
-
-function LogoBox() {
-  return (
-    <a
-      href="https://lpphospitality.com"
-      aria-label="LPP Hospitality"
-      style={{
-        display: "inline-flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        border: "1px solid rgba(184,147,90,0.5)",
-        padding: "6px 14px 7px",
-        lineHeight: 1,
-      }}
-    >
-      <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 15, color: GOLD, letterSpacing: "0.08em" }}>
-        L.P.P.
-      </span>
-      <span style={{ fontSize: 8, letterSpacing: "0.22em", color: "rgba(184,147,90,0.55)", marginTop: 3 }}>
-        HOSPITALITY
-      </span>
-    </a>
-  );
-}
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  background: "rgba(242,237,228,0.04)",
-  border: "1px solid rgba(242,237,228,0.12)",
-  color: "rgba(242,237,228,0.85)",
-  borderRadius: 3,
-  padding: "13px 16px",
-  fontSize: 14,
-  fontFamily: "Inter, system-ui, sans-serif",
-  outline: "none",
-  transition: "border-color .2s ease",
-};
-
 export default function LoginForm({
   errorMessages,
 }: {
@@ -51,8 +11,8 @@ export default function LoginForm({
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [focused, setFocused] = useState(false);
 
+  // Read ?error= from URL on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("error");
@@ -82,105 +42,84 @@ export default function LoginForm({
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-16" style={{ background: "#12120F" }}>
-      <div className="w-full" style={{ maxWidth: 380 }}>
-        <div className="flex justify-center">
-          <LogoBox />
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="w-full max-w-md">
+        {/* Wordmark */}
+        <div className="text-center mb-10">
+          <p className="text-xs font-semibold tracking-[0.2em] uppercase text-gray-400 mb-2">
+            LPP Hospitality
+          </p>
+          <h1 className="text-2xl font-semibold text-gray-900">Client Portal</h1>
         </div>
 
-        <h1
-          className="text-center"
-          style={{
-            fontFamily: "'Cormorant Garamond', Georgia, serif",
-            fontWeight: 300,
-            fontSize: 32,
-            color: "#F2EDE4",
-            marginTop: 32,
-            marginBottom: 12,
-          }}
-        >
-          {submitted ? "Check your inbox." : "Welcome to Prometheus"}
-        </h1>
-        <p
-          className="text-center"
-          style={{ fontSize: 13, color: "rgba(242,237,228,0.45)", marginBottom: 32, lineHeight: 1.7 }}
-        >
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
           {submitted ? (
-            <>
-              We sent a sign-in link to <span style={{ color: "rgba(242,237,228,0.7)" }}>{email}</span>. The link expires in 15 minutes.
-            </>
-          ) : (
-            "Sign in to access your client intelligence portal."
-          )}
-        </p>
-
-        {submitted ? (
-          <button
-            onClick={() => { setSubmitted(false); setEmail(""); }}
-            style={{ display: "block", margin: "0 auto", fontSize: 12, color: "rgba(242,237,228,0.4)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
-          >
-            Use a different email →
-          </button>
-        ) : (
-          <>
-            {error && (
-              <div
-                className="mb-4 px-4 py-3 flex gap-3 items-start"
-                style={{ background: "rgba(192,57,43,0.08)", border: "1px solid rgba(192,57,43,0.25)", borderRadius: 3 }}
-              >
-                <svg className="shrink-0 mt-0.5" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C0392B" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <div className="text-center">
+              <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <p style={{ fontSize: 13, color: "#E8A69C" }}>{error}</p>
               </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="flex flex-col" style={{ gap: 12 }}>
-              <input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
-                placeholder="you@company.com"
-                aria-label="Email address"
-                style={{
-                  ...inputStyle,
-                  borderColor: focused ? "rgba(184,147,90,0.5)" : "rgba(242,237,228,0.12)",
-                }}
-                className="placeholder:text-[rgba(242,237,228,0.25)]"
-              />
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">Check your inbox</h2>
+              <p className="text-sm text-gray-500">
+                We sent a sign-in link to{" "}
+                <span className="font-medium text-gray-700">{email}</span>.
+                The link expires in 15 minutes.
+              </p>
               <button
-                type="submit"
-                disabled={loading}
-                style={{
-                  width: "100%",
-                  background: GOLD,
-                  color: "#12120F",
-                  border: "none",
-                  padding: "14px",
-                  fontSize: 13,
-                  textTransform: "uppercase",
-                  letterSpacing: ".18em",
-                  borderRadius: 2,
-                  cursor: loading ? "not-allowed" : "pointer",
-                  opacity: loading ? 0.6 : 1,
-                  fontFamily: "Inter, system-ui, sans-serif",
-                  fontWeight: 600,
-                }}
+                onClick={() => { setSubmitted(false); setEmail(""); }}
+                className="mt-6 text-sm text-gray-400 hover:text-gray-600 transition"
               >
-                {loading ? "Signing in…" : "Sign in"}
+                Use a different email
               </button>
-            </form>
-          </>
-        )}
+            </div>
+          ) : (
+            <>
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">Sign in</h2>
+              <p className="text-sm text-gray-500 mb-6">
+                Enter your email and we&apos;ll send you a secure link.
+              </p>
 
-        <p className="mt-8 text-center" style={{ fontSize: 11, color: "rgba(242,237,228,0.25)" }}>
-          Not a client yet?{" "}
-          <a href="https://lpphospitality.com/#contact" style={{ color: "rgba(184,147,90,0.6)" }}>
-            Get in touch →
+              {error && (
+                <div className="mb-4 flex items-start gap-2.5 bg-red-50 border border-red-100 rounded-lg px-4 py-3">
+                  <svg className="w-4 h-4 text-red-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Email address
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-gray-900 text-white text-sm font-medium py-2.5 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition"
+                >
+                  {loading ? "Sending…" : "Send sign-in link"}
+                </button>
+              </form>
+            </>
+          )}
+        </div>
+
+        <p className="text-center text-xs text-gray-400 mt-6">
+          For access, contact{" "}
+          <a href="mailto:laurent@lpphospitality.com" className="underline">
+            laurent@lpphospitality.com
           </a>
         </p>
       </div>
