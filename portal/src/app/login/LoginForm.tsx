@@ -28,22 +28,16 @@ function LoginNav() {
       <a
         href="https://lpphospitality.com"
         aria-label="LPP Hospitality"
-        style={{
-          display: "inline-flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          border: "1px solid rgba(184,147,90,0.45)",
-          padding: "4px 10px 5px",
-          lineHeight: 1,
-        }}
+        style={{ width: 144, height: 42, display: "inline-flex", alignItems: "center" }}
       >
-        <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 13, color: GOLD, letterSpacing: "0.08em" }}>
-          L.P.P.
-        </span>
-        <span style={{ fontSize: 7, letterSpacing: "0.22em", color: "rgba(184,147,90,0.5)", marginTop: 2 }}>
-          HOSPITALITY
-        </span>
+        <Image
+          src="/lpp-logo-transparent.png"
+          alt="LPP Hospitality"
+          width={144}
+          height={42}
+          style={{ width: "100%", height: "auto", objectFit: "contain" }}
+          priority
+        />
       </a>
       <a
         href="https://lpphospitality.com"
