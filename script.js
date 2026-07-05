@@ -5,6 +5,15 @@ if (siteHeader) {
   window.addEventListener('scroll', applyNavState, { passive: true });
 }
 
+const heroScroll = document.querySelector('.hero-scroll');
+if (heroScroll) {
+  const applyHeroScrollFade = () => {
+    heroScroll.style.opacity = window.scrollY >= 80 ? '0' : '1';
+  };
+  applyHeroScrollFade();
+  window.addEventListener('scroll', applyHeroScrollFade, { passive: true });
+}
+
 const toggle = document.querySelector('.menu-toggle');
 const mobileNav = document.querySelector('.mobile-nav');
 const year = document.querySelector('#year');
