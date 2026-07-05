@@ -127,7 +127,7 @@ button, input, textarea { font: inherit; }
 .hero-scroll {
   position: absolute;
   left: clamp(22px, 5vw, 62px);
-  bottom: 40px;
+  bottom: 48px;
   z-index: 2;
   display: flex;
   align-items: center;
@@ -139,7 +139,7 @@ button, input, textarea { font: inherit; }
   opacity: 1;
   transition: opacity .4s ease;
 }
-.hero-scroll-line { position: relative; overflow: hidden; width: 1px; height: 32px; background: rgba(184,147,90,.2); }
+.hero-scroll-line { position: relative; overflow: hidden; width: 1px; height: 20px; background: rgba(184,147,90,.2); }
 .hero-scroll-line::after {
   content: '';
   position: absolute;
@@ -205,7 +205,6 @@ h2 { font-size: clamp(38px, 4.4vw, 66px); margin: 0; }
   padding: 0 26px;
   min-height: 44px;
   border-radius: 0;
-  text-transform: none;
   transition: background .25s ease;
 }
 .hero-actions .button.primary:hover { background: #D4AF7A; transform: none; }
@@ -408,7 +407,6 @@ h2 { font-size: clamp(38px, 4.4vw, 66px); margin: 0; }
 .contact-intro { grid-area: intro; display: flex; flex-direction: column; justify-content: flex-start; }
 .contact-intro h2 { margin-bottom: 28px; max-width: 530px; }
 .contact-intro p:not(.eyebrow) { max-width: 540px; color: rgba(244,239,230,.72); font-size: 19px; margin: 0; }
-.contact-intro p.contact-note { font-size: 14px; color: rgba(242,237,228,.35); margin-top: 20px; }
 .contact-list {
   grid-area: details;
   display: grid;
@@ -652,12 +650,6 @@ footer p { max-width: var(--max); margin: 0 auto; }
 .perspective-copy p:last-child {
   margin-bottom: 0;
 }
-.perspective-copy .perspective-note {
-  font-family: "Cormorant Garamond", Georgia, serif;
-  font-style: italic;
-  color: rgba(18,18,15,.7);
-  margin-top: 32px;
-}
 .service-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -727,8 +719,7 @@ footer p { max-width: var(--max); margin: 0 auto; }
 /* Method section */
 .section-method { background: #F2EDE4; color: #12120F; }
 .section-method .eyebrow { color: #B8935A; }
-.section-method h2 { font-size: clamp(32px, 3.4vw, 52px); margin-bottom: 30px; }
-.section-method h2 em { font-style: italic; color: #B8935A; }
+.section-method h2 { margin-bottom: 30px; }
 .intelligence-grid {
   display: grid;
   grid-template-columns: .86fr 1.14fr;
