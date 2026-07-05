@@ -15,27 +15,30 @@ function LoginNav() {
         right: 0,
         zIndex: 10,
         height: 52,
-        background: "rgba(12,10,8,0.6)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
-        borderBottom: "1px solid rgba(242,237,228,0.06)",
+        minHeight: 52,
+        background: "transparent",
+        backdropFilter: "none",
+        WebkitBackdropFilter: "none",
+        borderBottom: "none",
+        boxShadow: "none",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         padding: "0 40px",
+        overflow: "visible",
       }}
     >
       <a
         href="https://lpphospitality.com"
         aria-label="LPP Hospitality"
-        style={{ width: 144, height: 42, display: "inline-flex", alignItems: "center" }}
+        style={{ width: 144, height: 42, display: "inline-flex", alignItems: "center", justifyContent: "center", overflow: "visible" }}
       >
         <Image
           src="/lpp-logo-transparent.png"
           alt="LPP Hospitality"
           width={144}
           height={42}
-          style={{ width: "100%", height: "auto", objectFit: "contain" }}
+          style={{ width: "100%", height: "100%", objectFit: "contain" }}
           priority
         />
       </a>
@@ -134,18 +137,20 @@ export default function LoginForm({
           justifyContent: "center",
           minHeight: "100vh",
           width: "100%",
-          padding: "80px 16px 24px",
+          paddingTop: 52,
+          paddingLeft: 16,
+          paddingRight: 16,
         }}
       >
         <div
+          className="w-full max-[479px]:w-[calc(100%-48px)] max-[479px]:mx-6"
           style={{
             background: "rgba(12,10,8,0.55)",
             backdropFilter: "blur(12px)",
             WebkitBackdropFilter: "blur(12px)",
             border: "1px solid rgba(242,237,228,0.08)",
             borderRadius: 0,
-            padding: "48px 52px",
-            width: "100%",
+            padding: "52px 52px 44px 52px",
             maxWidth: 420,
           }}
         >
@@ -201,23 +206,23 @@ export default function LoginForm({
               <h1
                 style={{
                   fontFamily: "'Cormorant Garamond', Georgia, serif",
-                  fontSize: "clamp(2rem, 3.5vw, 3rem)",
+                  fontSize: "clamp(2.4rem, 4vw, 3.2rem)",
                   fontWeight: 300,
                   color: "rgba(242,237,228,0.92)",
                   lineHeight: 1.1,
-                  marginBottom: 12,
+                  marginBottom: 16,
                 }}
               >
-                Sign in to your portal.
+                Sign in to your portal
               </h1>
               <p
                 style={{
                   fontFamily: "Inter, system-ui, sans-serif",
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: 300,
-                  color: "rgba(242,237,228,0.45)",
+                  color: "rgba(242,237,228,0.55)",
                   lineHeight: 1.7,
-                  marginBottom: 28,
+                  marginBottom: 24,
                 }}
               >
                 Your properties and performance reports are waiting.
@@ -225,8 +230,8 @@ export default function LoginForm({
               <p
                 style={{
                   fontFamily: "Inter, system-ui, sans-serif",
-                  fontSize: 12,
-                  color: "rgba(242,237,228,0.4)",
+                  fontSize: 13,
+                  color: "rgba(242,237,228,0.45)",
                   lineHeight: 1.7,
                   marginBottom: 20,
                 }}
@@ -252,9 +257,9 @@ export default function LoginForm({
                   style={{
                     fontFamily: "Inter, system-ui, sans-serif",
                     fontSize: 9,
-                    letterSpacing: "0.26em",
+                    letterSpacing: "0.28em",
                     textTransform: "uppercase",
-                    color: "rgba(242,237,228,0.35)",
+                    color: "rgba(242,237,228,0.4)",
                     marginBottom: 8,
                     display: "block",
                   }}
@@ -268,15 +273,15 @@ export default function LoginForm({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@company.com"
-                  className="focus:border-[rgba(184,147,90,0.5)] focus:bg-[rgba(242,237,228,0.07)] placeholder:text-[rgba(242,237,228,0.25)]"
+                  className="focus:border-[rgba(184,147,90,0.5)] focus:bg-[rgba(242,237,228,0.07)] placeholder:text-[rgba(242,237,228,0.3)]"
                   style={{
                     width: "100%",
                     background: "rgba(242,237,228,0.05)",
                     border: "1px solid rgba(242,237,228,0.15)",
                     borderRadius: 0,
-                    color: "rgba(242,237,228,0.85)",
+                    color: "rgba(242,237,228,0.9)",
                     fontFamily: "Inter, system-ui, sans-serif",
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: 300,
                     padding: "13px 16px",
                     outline: "none",
@@ -294,7 +299,7 @@ export default function LoginForm({
                     borderRadius: 0,
                     color: "#12120F",
                     fontFamily: "Inter, system-ui, sans-serif",
-                    fontSize: 10,
+                    fontSize: 11,
                     fontWeight: 500,
                     letterSpacing: "0.22em",
                     textTransform: "uppercase",
@@ -315,17 +320,19 @@ export default function LoginForm({
         <p
           style={{
             fontFamily: "Inter, system-ui, sans-serif",
-            fontSize: 11,
-            color: "rgba(242,237,228,0.3)",
+            fontSize: 12,
+            fontWeight: 300,
+            color: "rgba(242,237,228,0.55)",
+            letterSpacing: "0.02em",
             textAlign: "center",
-            marginTop: 20,
+            marginTop: 24,
           }}
         >
           For access, contact{" "}
           <a
             href="mailto:laurent@lpphospitality.com"
-            className="hover:text-[#B8935A]"
-            style={{ color: "rgba(184,147,90,0.65)", textDecoration: "none", transition: "color .25s ease" }}
+            className="hover:text-[#D4AF7A]"
+            style={{ color: GOLD, fontSize: 12, textDecoration: "none", transition: "color .25s ease" }}
           >
             laurent@lpphospitality.com
           </a>
