@@ -1,3 +1,10 @@
+const siteHeader = document.querySelector('.site-header');
+if (siteHeader) {
+  const applyNavState = () => siteHeader.classList.toggle('nav-solid', window.scrollY > 72);
+  applyNavState();
+  window.addEventListener('scroll', applyNavState, { passive: true });
+}
+
 const toggle = document.querySelector('.menu-toggle');
 const mobileNav = document.querySelector('.mobile-nav');
 const year = document.querySelector('#year');
