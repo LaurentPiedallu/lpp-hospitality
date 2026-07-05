@@ -73,6 +73,8 @@ button, input, textarea { font: inherit; }
 }
 .desktop-nav a { transition: color .2s ease; }
 .desktop-nav a:hover { color: var(--gold-soft); }
+.nav-prometheus { color: var(--gold) !important; }
+.nav-prometheus:hover { color: var(--gold-soft) !important; }
 .menu-toggle { display: none; width: 42px; height: 42px; background: transparent; border: 0; color: var(--cream); }
 .menu-toggle span { display: block; height: 1px; background: currentColor; margin: 9px 0; }
 .mobile-nav { display: none; }
