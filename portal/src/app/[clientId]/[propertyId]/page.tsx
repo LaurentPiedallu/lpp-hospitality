@@ -22,7 +22,8 @@ const SUB_PAGES = [
   { href: "menu",         icon: "🍽️", label: "Menu Engineering",   desc: "Item performance and pricing" },
   { href: "initiatives",  icon: "🚀", label: "Initiatives",        desc: "Now / Next / Later roadmap" },
   { href: "intelligence", icon: "✦",  label: "AI Intelligence",    desc: "Full analysis across all categories" },
-  { href: "upload",       icon: "📤", label: "Upload Data",        desc: "Submit files and view upload history" },
+  { href: "documents",    icon: "📁", label: "Documents",          desc: "Briefs, reports, and files" },
+  { href: "upload",       icon: "📤", label: "Upload Data",        desc: "Submit your monthly data" },
 ] as const;
 
 function HealthDot({ color }: { color: HealthColor }) {
@@ -103,18 +104,13 @@ export default async function PropertyPage({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <NavBar session={session} clientId={clientId} propertyId={propertyId} />
+      <NavBar session={session} />
 
       {/* Banner */}
       <div className="w-full bg-gray-900 px-4 sm:px-6 md:px-10 py-10 md:py-14">
         <div className="max-w-5xl mx-auto">
           <p className="text-sm text-white/50 mb-1">{property.location || property.conceptType}</p>
-          <h1
-            className="text-4xl md:text-5xl text-white mb-3"
-            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontWeight: 400, letterSpacing: "-.02em", lineHeight: 1.05 }}
-          >
-            {property.name}
-          </h1>
+          <h1 className="text-3xl md:text-4xl font-semibold text-white mb-3">{property.name}</h1>
           <div className="flex flex-wrap items-center gap-3">
             <span className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${
               healthBgClass(health.color).replace("ring-", "ring-1 ring-")

@@ -2,40 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500&family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --paper:      #F4EFE6;
-  --gold:       #C2A064;
-  --gold-soft:  #E8D3AB;
-  --near-black: #0E1110;
-  --charcoal:   #171C1B;
-  --ink:        #171412;
-  --cream:      #F3EFE8;
-  --muted:      #6F675C;
-  --stone:      #9B9489;
-
-  --color-healthy:   #16a34a;
-  --color-monitor:   #d97706;
-  --color-critical:  #dc2626;
+  --color-healthy: #16a34a;
+  --color-monitor: #d97706;
+  --color-critical: #dc2626;
   --color-reference: #2563eb;
 }
 
 body {
   font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
-  background-color: var(--paper);
-  color: var(--ink);
 }
 
 /* Status border utilities */
-.border-l-healthy  { border-left-color: var(--color-healthy); }
-.border-l-monitor  { border-left-color: var(--color-monitor); }
+.border-l-healthy { border-left-color: var(--color-healthy); }
+.border-l-monitor { border-left-color: var(--color-monitor); }
 .border-l-critical { border-left-color: var(--color-critical); }
-
-/* Serif heading utility */
-.font-serif-lpp {
-  font-family: 'Cormorant Garamond', Georgia, serif;
-  font-weight: 500;
-  letter-spacing: -0.02em;
-}

@@ -38,10 +38,7 @@ export default function SubPageHeader({
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">{title}</h1>
-            <p className="text-sm text-gray-500 mt-0.5 truncate">
-              <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontWeight: 400, fontSize: "15px" }}>{property.name}</span>
-              {" "}· {period}
-            </p>
+            <p className="text-sm text-gray-500 mt-0.5 truncate">{property.name} · {period}</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap">
             <span className={`text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap ${CONFIDENCE_BADGE[property.dataConfidence]}`}>
