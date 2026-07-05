@@ -128,7 +128,7 @@ export default async function IntelligencePage({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <NavBar session={session} />
+      <NavBar session={session} clientId={clientId} propertyId={propertyId} />
       <SubPageHeader
         title="AI Intelligence"
         property={property}

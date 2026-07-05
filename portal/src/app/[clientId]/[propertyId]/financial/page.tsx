@@ -8,7 +8,8 @@ import SectionHeader from "@/components/SectionHeader";
 import CalloutBlock from "@/components/CalloutBlock";
 import KpiCard from "@/components/KpiCard";
 import StatusBadge from "@/components/StatusBadge";
-import TrendChart, { buildTrendData } from "@/components/TrendChart";
+import TrendChart from "@/components/TrendChart";
+import { buildTrendData } from "@/lib/format";
 import BenchmarkGauge from "@/components/BenchmarkGauge";
 import type { KpiMetric, Intelligence, Severity } from "@/types/portal";
 
@@ -227,7 +228,7 @@ export default async function FinancialPage({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <NavBar session={session} />
+      <NavBar session={session} clientId={clientId} propertyId={propertyId} />
       <SubPageHeader
         title="Financial Review"
         property={property}

@@ -8,7 +8,8 @@ import SectionHeader from "@/components/SectionHeader";
 import CalloutBlock from "@/components/CalloutBlock";
 import KpiCard from "@/components/KpiCard";
 import StatusBadge from "@/components/StatusBadge";
-import TrendChart, { buildTrendData } from "@/components/TrendChart";
+import TrendChart from "@/components/TrendChart";
+import { buildTrendData } from "@/lib/format";
 import BenchmarkGauge from "@/components/BenchmarkGauge";
 import type { KpiMetric, Intelligence, Opportunity, Severity } from "@/types/portal";
 
@@ -286,7 +287,7 @@ export default async function CommercialPage({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <NavBar session={session} />
+      <NavBar session={session} clientId={clientId} propertyId={propertyId} />
       <SubPageHeader
         title="Commercial Review"
         property={property}

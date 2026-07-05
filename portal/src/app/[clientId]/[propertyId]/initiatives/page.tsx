@@ -175,7 +175,7 @@ export default async function InitiativesPage({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <NavBar session={session} />
+      <NavBar session={session} clientId={clientId} propertyId={propertyId} />
       <SubPageHeader
         title="Initiatives"
         property={property}

@@ -20,6 +20,9 @@ const HEALTH_VARIANT: Record<OverallHealth, "green" | "amber" | "red" | "gray"> 
 // ─── Upload status styling ────────────────────────────────────────────────────
 
 const UPLOAD_VARIANT: Record<UploadStatus, "gray" | "amber" | "green"> = {
+  "Pending":        "amber",
+  "Processing":     "amber",
+  "Processed":      "green",
   "Pending Review": "amber",
   "Reviewed":       "green",
   "Archived":       "gray",
@@ -124,7 +127,7 @@ export default async function DocumentsPage({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <NavBar session={session} />
+      <NavBar session={session} clientId={clientId} propertyId={propertyId} />
       <SubPageHeader
         title="Documents"
         property={property}
