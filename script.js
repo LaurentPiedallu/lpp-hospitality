@@ -18,7 +18,7 @@ if (toggle && mobileNav) {
   });
 }
 
-const revealTargets = document.querySelectorAll('.section-inner, .problem-grid article, .engagement-list article, .approach-list article, .prometheus-inner, .prometheus-card');
+const revealTargets = document.querySelectorAll('.section-inner, .problem-grid article, .engagement-list article, .approach-list article');
 const observer = new IntersectionObserver((entries) => {
   entries.forEach((entry) => {
     if (entry.isIntersecting) {
