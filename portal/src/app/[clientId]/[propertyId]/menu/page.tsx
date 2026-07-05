@@ -8,8 +8,7 @@ import SectionHeader from "@/components/SectionHeader";
 import CalloutBlock from "@/components/CalloutBlock";
 import KpiCard from "@/components/KpiCard";
 import StatusBadge from "@/components/StatusBadge";
-import TrendChart from "@/components/TrendChart";
-import { buildTrendData } from "@/lib/format";
+import TrendChart, { buildTrendData } from "@/components/TrendChart";
 import BenchmarkGauge from "@/components/BenchmarkGauge";
 import type { KpiMetric, Intelligence, Benchmark, Severity } from "@/types/portal";
 
@@ -359,7 +358,7 @@ export default async function MenuPage({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <NavBar session={session} clientId={clientId} propertyId={propertyId} />
+      <NavBar session={session} />
       <SubPageHeader
         title="Menu Engineering"
         property={property}
