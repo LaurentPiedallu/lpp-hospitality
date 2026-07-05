@@ -1,6 +1,67 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
+
+const GOLD = "#B8935A";
+
+function LoginNav() {
+  return (
+    <header
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 10,
+        height: 52,
+        background: "rgba(12,10,8,0.6)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+        borderBottom: "1px solid rgba(242,237,228,0.06)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "0 40px",
+      }}
+    >
+      <a
+        href="https://lpphospitality.com"
+        aria-label="LPP Hospitality"
+        style={{
+          display: "inline-flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          border: "1px solid rgba(184,147,90,0.45)",
+          padding: "4px 10px 5px",
+          lineHeight: 1,
+        }}
+      >
+        <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 13, color: GOLD, letterSpacing: "0.08em" }}>
+          L.P.P.
+        </span>
+        <span style={{ fontSize: 7, letterSpacing: "0.22em", color: "rgba(184,147,90,0.5)", marginTop: 2 }}>
+          HOSPITALITY
+        </span>
+      </a>
+      <a
+        href="https://lpphospitality.com"
+        className="hover:text-[rgba(242,237,228,0.6)]"
+        style={{
+          fontSize: 10,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: "rgba(242,237,228,0.3)",
+          textDecoration: "none",
+          transition: "color .25s ease",
+        }}
+      >
+        lpphospitality.com
+      </a>
+    </header>
+  );
+}
 
 export default function LoginForm({
   errorMessages,
@@ -12,7 +73,6 @@ export default function LoginForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Read ?error= from URL on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("error");
@@ -42,72 +102,214 @@ export default function LoginForm({
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md">
-        {/* Wordmark */}
-        <div className="text-center mb-10">
-          <p className="text-xs font-semibold tracking-[0.2em] uppercase text-gray-400 mb-2">
-            LPP Hospitality
-          </p>
-          <h1 className="text-2xl font-semibold text-gray-900">Client Portal</h1>
-        </div>
+    <div style={{ position: "relative", minHeight: "100vh", width: "100%" }}>
+      {/* Background image */}
+      <div style={{ position: "fixed", inset: 0, zIndex: 0 }} aria-hidden="true">
+        <Image
+          src="/lpp-login-bg.png"
+          alt=""
+          fill
+          priority
+          style={{ objectFit: "cover", objectPosition: "center" }}
+        />
+      </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+      {/* Overlay */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 1,
+          pointerEvents: "none",
+          background:
+            "radial-gradient(ellipse 50% 60% at 40% 55%, rgba(12,10,8,0.25) 0%, transparent 70%), linear-gradient(to top, rgba(12,10,8,0.7) 0%, transparent 40%), rgba(12,10,8,0.55)",
+        }}
+      />
+
+      <LoginNav />
+
+      {/* Content */}
+      <div
+        style={{
+          position: "relative",
+          zIndex: 2,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "100vh",
+          width: "100%",
+          padding: "80px 16px 24px",
+        }}
+      >
+        <div
+          style={{
+            background: "rgba(12,10,8,0.55)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            border: "1px solid rgba(242,237,228,0.08)",
+            borderRadius: 0,
+            padding: "48px 52px",
+            width: "100%",
+            maxWidth: 420,
+          }}
+        >
           {submitted ? (
-            <div className="text-center">
-              <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">Check your inbox</h2>
-              <p className="text-sm text-gray-500">
-                We sent a sign-in link to{" "}
-                <span className="font-medium text-gray-700">{email}</span>.
-                The link expires in 15 minutes.
+            <div style={{ textAlign: "center" }}>
+              <p
+                style={{
+                  fontFamily: "'Cormorant Garamond', Georgia, serif",
+                  fontSize: "clamp(2rem, 3.5vw, 3rem)",
+                  fontWeight: 300,
+                  color: "rgba(242,237,228,0.92)",
+                  lineHeight: 1.1,
+                  marginBottom: 12,
+                }}
+              >
+                Check your inbox.
+              </p>
+              <p style={{ fontFamily: "Inter, system-ui, sans-serif", fontSize: 13, color: "rgba(242,237,228,0.45)", lineHeight: 1.7 }}>
+                We sent a sign-in link to <span style={{ color: "rgba(242,237,228,0.7)" }}>{email}</span>. The link expires in 15 minutes.
               </p>
               <button
                 onClick={() => { setSubmitted(false); setEmail(""); }}
-                className="mt-6 text-sm text-gray-400 hover:text-gray-600 transition"
+                className="hover:text-[rgba(242,237,228,0.6)]"
+                style={{
+                  marginTop: 20,
+                  fontFamily: "Inter, system-ui, sans-serif",
+                  fontSize: 12,
+                  color: "rgba(242,237,228,0.35)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: 0,
+                  transition: "color .25s ease",
+                }}
               >
                 Use a different email
               </button>
             </div>
           ) : (
             <>
-              <h2 className="text-lg font-semibold text-gray-900 mb-1">Sign in</h2>
-              <p className="text-sm text-gray-500 mb-6">
-                Enter your email and we&apos;ll send you a secure link.
+              <p
+                style={{
+                  fontFamily: "Inter, system-ui, sans-serif",
+                  fontSize: 9,
+                  letterSpacing: "0.32em",
+                  textTransform: "uppercase",
+                  color: GOLD,
+                  marginBottom: 14,
+                }}
+              >
+                Client Portal
+              </p>
+              <h1
+                style={{
+                  fontFamily: "'Cormorant Garamond', Georgia, serif",
+                  fontSize: "clamp(2rem, 3.5vw, 3rem)",
+                  fontWeight: 300,
+                  color: "rgba(242,237,228,0.92)",
+                  lineHeight: 1.1,
+                  marginBottom: 12,
+                }}
+              >
+                Sign in to your portal.
+              </h1>
+              <p
+                style={{
+                  fontFamily: "Inter, system-ui, sans-serif",
+                  fontSize: 13,
+                  fontWeight: 300,
+                  color: "rgba(242,237,228,0.45)",
+                  lineHeight: 1.7,
+                  marginBottom: 28,
+                }}
+              >
+                Your properties and performance reports are waiting.
+              </p>
+              <p
+                style={{
+                  fontFamily: "Inter, system-ui, sans-serif",
+                  fontSize: 12,
+                  color: "rgba(242,237,228,0.4)",
+                  lineHeight: 1.7,
+                  marginBottom: 20,
+                }}
+              >
+                Enter your email and we&apos;ll send a secure sign-in link. No password needed.
               </p>
 
               {error && (
-                <div className="mb-4 flex items-start gap-2.5 bg-red-50 border border-red-100 rounded-lg px-4 py-3">
-                  <svg className="w-4 h-4 text-red-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <div
+                  className="mb-4 px-4 py-3 flex gap-3 items-start"
+                  style={{ background: "rgba(192,57,43,0.1)", border: "1px solid rgba(192,57,43,0.3)" }}
+                >
+                  <svg className="shrink-0 mt-0.5" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E8A69C" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <p className="text-sm text-red-700">{error}</p>
+                  <p style={{ fontFamily: "Inter, system-ui, sans-serif", fontSize: 13, color: "#E8A69C" }}>{error}</p>
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Email address
-                  </label>
-                  <input
-                    id="email"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition"
-                  />
-                </div>
+              <form onSubmit={handleSubmit}>
+                <label
+                  htmlFor="email"
+                  style={{
+                    fontFamily: "Inter, system-ui, sans-serif",
+                    fontSize: 9,
+                    letterSpacing: "0.26em",
+                    textTransform: "uppercase",
+                    color: "rgba(242,237,228,0.35)",
+                    marginBottom: 8,
+                    display: "block",
+                  }}
+                >
+                  Email address
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@company.com"
+                  className="focus:border-[rgba(184,147,90,0.5)] focus:bg-[rgba(242,237,228,0.07)] placeholder:text-[rgba(242,237,228,0.25)]"
+                  style={{
+                    width: "100%",
+                    background: "rgba(242,237,228,0.05)",
+                    border: "1px solid rgba(242,237,228,0.15)",
+                    borderRadius: 0,
+                    color: "rgba(242,237,228,0.85)",
+                    fontFamily: "Inter, system-ui, sans-serif",
+                    fontSize: 13,
+                    fontWeight: 300,
+                    padding: "13px 16px",
+                    outline: "none",
+                    transition: "border-color .25s ease, background .25s ease",
+                  }}
+                />
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-gray-900 text-white text-sm font-medium py-2.5 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition"
+                  className="hover:bg-[#D4AF7A]"
+                  style={{
+                    width: "100%",
+                    background: GOLD,
+                    border: "none",
+                    borderRadius: 0,
+                    color: "#12120F",
+                    fontFamily: "Inter, system-ui, sans-serif",
+                    fontSize: 10,
+                    fontWeight: 500,
+                    letterSpacing: "0.22em",
+                    textTransform: "uppercase",
+                    padding: 15,
+                    cursor: loading ? "not-allowed" : "pointer",
+                    opacity: loading ? 0.6 : 1,
+                    marginTop: 12,
+                    transition: "background .25s ease",
+                  }}
                 >
                   {loading ? "Sending…" : "Send sign-in link"}
                 </button>
@@ -116,9 +318,21 @@ export default function LoginForm({
           )}
         </div>
 
-        <p className="text-center text-xs text-gray-400 mt-6">
+        <p
+          style={{
+            fontFamily: "Inter, system-ui, sans-serif",
+            fontSize: 11,
+            color: "rgba(242,237,228,0.3)",
+            textAlign: "center",
+            marginTop: 20,
+          }}
+        >
           For access, contact{" "}
-          <a href="mailto:laurent@lpphospitality.com" className="underline">
+          <a
+            href="mailto:laurent@lpphospitality.com"
+            className="hover:text-[#B8935A]"
+            style={{ color: "rgba(184,147,90,0.65)", textDecoration: "none", transition: "color .25s ease" }}
+          >
             laurent@lpphospitality.com
           </a>
         </p>
