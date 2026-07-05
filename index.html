@@ -14,6 +14,7 @@
   <meta name="theme-color" content="#0E1110" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://videos.pexels.com">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="preload" as="image" href="assets/new-york-hospitality-advisory.jpg" />
   <link rel="stylesheet" href="styles.css" />
@@ -105,6 +106,7 @@
       <a href="#perspective">Perspective</a>
       <a href="#services">Services</a>
       <a href="#audiences">Clients</a>
+      <a href="#intelligence">Intelligence</a>
       <a href="#principal">Principal</a>
       <a href="#contact">Contact</a>
       <a href="https://portal.lpphospitality.com" class="nav-prometheus">Prometheus</a>
@@ -118,14 +120,20 @@
     <a href="#perspective">Perspective</a>
     <a href="#services">Services</a>
     <a href="#audiences">Clients</a>
+    <a href="#intelligence">Intelligence</a>
     <a href="#principal">Principal</a>
     <a href="#contact">Contact</a>
     <a href="https://portal.lpphospitality.com" class="nav-prometheus">Prometheus</a>
   </nav>
 
   <main>
-    <section class="hero section" aria-label="LPP Hospitality introduction">
-      <div class="hero-overlay"></div>
+    <section class="hero" aria-label="LPP Hospitality introduction">
+      <div class="hero-video-wrap">
+        <video autoplay muted loop playsinline preload="auto" poster="assets/new-york-hospitality-advisory.jpg">
+          <source src="https://videos.pexels.com/video-files/3753381/3753381-uhd_2560_1440_25fps.mp4" type="video/mp4">
+        </video>
+      </div>
+      <div class="hero-vline"></div>
       <div class="section-inner hero-inner">
         <p class="eyebrow">New York Hospitality Advisory</p>
         <h1>Grounded in operations<br />Focused on results</h1>
@@ -134,6 +142,10 @@
           <a class="button primary" href="mailto:laurent@lpphospitality.com?subject=LPP%20Hospitality%20Inquiry">Start a conversation</a>
           <a class="button secondary" href="https://www.linkedin.com/in/laurent-piedallu/" target="_blank" rel="noopener">Connect on LinkedIn</a>
         </div>
+      </div>
+      <div class="hero-scroll">
+        <div class="hero-scroll-line"></div>
+        Scroll
       </div>
     </section>
 
@@ -196,6 +208,63 @@
             <h3>Ownership Groups</h3>
             <p>Investors and developers who want an experienced operator in the conversation, not just a consultant.</p>
           </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-intelligence" id="intelligence">
+      <div class="section-inner intelligence-grid">
+        <div class="intelligence-left">
+          <p class="eyebrow">Client Intelligence</p>
+          <h2>What you get<br />access to.</h2>
+          <p class="intelligence-body">Active LPP clients get access to Prometheus — a private intelligence platform that synthesizes every signal from your operation. Financial performance, guest feedback, menu behaviour and more. Not raw data. Interpreted insight, with clear next steps.</p>
+          <p class="intelligence-body">The platform works continuously in the background, surfacing what matters before it becomes a problem. Your advisor doesn’t wait for a monthly call to flag something — the system does it the moment a signal warrants attention.</p>
+          <blockquote class="intelligence-quote">You’ll never wonder where your business stands.</blockquote>
+          <div class="intelligence-cta">
+            <a class="button secondary" href="#contact">Request access</a>
+            <p class="intelligence-cta-note">Available to active LPP clients.<br />Discussed during engagement.</p>
+          </div>
+        </div>
+        <div class="intelligence-right">
+          <div class="signal-item">
+            <div class="signal-icon">$</div>
+            <div>
+              <h3>Financial performance</h3>
+              <p>P&amp;L analysis across revenue, COGS, payroll and margin — interpreted against your specific operation, not a generic benchmark.</p>
+              <span class="signal-tag">Monthly · per property</span>
+            </div>
+          </div>
+          <div class="signal-item">
+            <div class="signal-icon">★</div>
+            <div>
+              <h3>Guest feedback</h3>
+              <p>Review synthesis across platforms, surfaced as operational themes — what guests are consistently saying and what it points to.</p>
+              <span class="signal-tag">Continuous · all platforms</span>
+            </div>
+          </div>
+          <div class="signal-item">
+            <div class="signal-icon">◈</div>
+            <div>
+              <h3>Menu intelligence</h3>
+              <p>Engineering signals across your menu: what’s performing, what isn’t, and where the opportunity lies between margin and guest preference.</p>
+              <span class="signal-tag">Per reporting period</span>
+            </div>
+          </div>
+          <div class="signal-item">
+            <div class="signal-icon">!</div>
+            <div>
+              <h3>Action flags</h3>
+              <p>System-generated alerts triggered automatically when a metric crosses a threshold that warrants attention — before issues compound.</p>
+              <span class="signal-tag">Real-time · system-generated</span>
+            </div>
+          </div>
+          <div class="prometheus-reveal">
+            <div>
+              <p class="prometheus-reveal-label">The platform</p>
+              <strong class="prometheus-reveal-name">Prometheus</strong>
+            </div>
+            <a href="https://portal.lpphospitality.com" class="button primary">Access Prometheus</a>
+          </div>
         </div>
       </div>
     </section>

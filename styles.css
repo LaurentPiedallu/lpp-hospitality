@@ -89,25 +89,50 @@ button, input, textarea { font: inherit; }
 .section-inner { width: 100%; max-width: var(--max); margin: 0 auto; position: relative; z-index: 1; }
 
 .hero {
+  height: 100vh;
   min-height: min(690px, 100vh);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
   color: var(--cream);
-  background:
-    linear-gradient(90deg, rgba(8,12,12,.42) 0%, rgba(8,12,12,.22) 44%, rgba(8,12,12,.05) 100%),
-    linear-gradient(180deg, rgba(8,12,12,.01) 0%, rgba(8,12,12,.14) 100%),
-    url('assets/new-york-hospitality-advisory.jpg');
-  background-size: cover;
-  background-position: center center;
-  background-repeat: no-repeat;
-  padding-top: 96px;
-  padding-bottom: 46px;
+  padding: 0 clamp(22px, 5vw, 62px) 80px;
 }
-.hero-overlay {
+.hero-video-wrap { position: absolute; inset: 0; z-index: 0; }
+.hero-video-wrap video { width: 100%; height: 100%; object-fit: cover; filter: brightness(.5) saturate(.7); }
+.hero-video-wrap::after {
+  content: '';
   position: absolute;
   inset: 0;
-  z-index: 0;
-  background: radial-gradient(circle at 68% 42%, rgba(255,255,255,.03), transparent 32%), linear-gradient(180deg, rgba(14,17,16,.01), rgba(14,17,16,.18));
+  background:
+    linear-gradient(135deg, rgba(14,17,16,.72) 0%, rgba(14,17,16,.22) 50%, rgba(14,17,16,.5) 100%),
+    linear-gradient(to top, rgba(14,17,16,.9) 0%, transparent 55%),
+    linear-gradient(to right, rgba(14,17,16,.6) 0%, transparent 50%);
 }
-.hero-inner { max-width: 820px; margin-left: max(0px, calc((100vw - var(--max)) / 2)); }
+.hero-vline {
+  position: absolute;
+  left: clamp(22px, 5vw, 62px);
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, rgba(194,160,100,.22) 30%, rgba(194,160,100,.22) 70%, transparent);
+  z-index: 1;
+}
+.hero-scroll {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 44px;
+  font-size: 9px;
+  letter-spacing: .24em;
+  text-transform: uppercase;
+  color: rgba(194,160,100,.5);
+}
+.hero-scroll-line { width: 1px; height: 32px; background: linear-gradient(to bottom, var(--gold), transparent); }
+.hero-inner { position: relative; z-index: 2; max-width: 820px; margin-left: max(0px, calc((100vw - var(--max)) / 2)); }
 .hero h1,
 h2,
 .service-card h3,
@@ -548,7 +573,7 @@ footer p { max-width: var(--max); margin: 0 auto; }
   .principal-portrait { max-width: 210px; }
 }
 @media (max-height: 760px) and (min-width: 921px) {
-  .hero { min-height: 650px; padding-top: 86px; }
+  .hero { height: auto; min-height: 650px; padding-bottom: 56px; }
   .hero h1 { font-size: clamp(46px, 5.7vw, 82px); }
   .hero-copy { font-size: 18px; margin-bottom: 24px; }
 }
@@ -669,4 +694,88 @@ footer p { max-width: var(--max); margin: 0 auto; }
   .section { padding-top: 78px; padding-bottom: 78px; }
   .perspective-copy { font-size: 18px; }
   .service-grid h3 { font-size: 30px; }
+}
+
+/* Intelligence section */
+.section-intelligence { background: var(--near-black); color: var(--cream); }
+.intelligence-grid {
+  display: grid;
+  grid-template-columns: .86fr 1.14fr;
+  gap: clamp(40px, 7vw, 88px);
+  align-items: start;
+}
+.intelligence-left { position: sticky; top: 100px; }
+.intelligence-body {
+  font-size: 16px;
+  line-height: 1.85;
+  color: rgba(244,239,230,.7);
+  max-width: 520px;
+  margin: 0 0 20px;
+}
+.intelligence-quote {
+  border-left: 2px solid var(--gold);
+  background: rgba(194,160,100,.06);
+  padding: 14px 20px;
+  margin: 8px 0 28px;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-style: italic;
+  font-size: 19px;
+  line-height: 1.6;
+  color: rgba(244,239,230,.78);
+}
+.intelligence-cta { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.intelligence-cta-note { font-size: 11px; font-style: italic; color: rgba(244,239,230,.35); line-height: 1.6; margin: 0; }
+.intelligence-right { display: flex; flex-direction: column; }
+.signal-item {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 18px;
+  align-items: start;
+  padding: 26px 0;
+  border-top: 1px solid var(--line-light);
+}
+.signal-item:last-of-type { border-bottom: 1px solid var(--line-light); }
+.signal-icon {
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(194,160,100,.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gold-soft);
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.signal-item h3 { font-family: "Cormorant Garamond", Georgia, serif; font-weight: 500; font-size: 20px; margin: 0 0 6px; color: var(--cream); }
+.signal-item p { font-size: 13px; line-height: 1.75; color: rgba(244,239,230,.55); margin: 0; }
+.signal-tag {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: rgba(194,160,100,.6);
+  border: 1px solid rgba(194,160,100,.2);
+  padding: 3px 8px;
+}
+.prometheus-reveal {
+  margin-top: 32px;
+  padding: 22px 26px;
+  border: 1px solid rgba(194,160,100,.2);
+  background: rgba(194,160,100,.04);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.prometheus-reveal-label { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: rgba(194,160,100,.55); margin: 0 0 4px; }
+.prometheus-reveal-name { font-family: "Cormorant Garamond", Georgia, serif; font-weight: 500; font-size: 24px; color: var(--cream); letter-spacing: .03em; }
+
+@media (max-width: 920px) {
+  .intelligence-grid { grid-template-columns: 1fr; }
+  .intelligence-left { position: static; }
+}
+@media (max-width: 560px) {
+  .prometheus-reveal { flex-direction: column; align-items: flex-start; }
 }
