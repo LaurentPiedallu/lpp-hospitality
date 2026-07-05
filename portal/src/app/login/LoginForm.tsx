@@ -44,12 +44,14 @@ function LoginNav() {
       </a>
       <a
         href="https://lpphospitality.com"
-        className="hover:text-[rgba(242,237,228,0.6)]"
+        className="hover:text-[rgba(242,237,228,0.7)]"
         style={{
+          fontFamily: "Inter, system-ui, sans-serif",
           fontSize: 10,
-          letterSpacing: "0.14em",
+          fontWeight: 400,
+          letterSpacing: "0.18em",
           textTransform: "uppercase",
-          color: "rgba(242,237,228,0.3)",
+          color: "rgba(242,237,228,0.45)",
           textDecoration: "none",
           transition: "color .25s ease",
         }}
