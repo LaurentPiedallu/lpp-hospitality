@@ -24,7 +24,7 @@ function LoginNav() {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "0 40px",
+        padding: "0 clamp(22px, 5vw, 62px)",
         overflow: "visible",
       }}
     >
@@ -38,20 +38,20 @@ function LoginNav() {
           alt="LPP Hospitality"
           width={144}
           height={42}
-          style={{ width: "100%", height: "100%", objectFit: "contain" }}
+          style={{ width: "100%", height: "auto", objectFit: "contain" }}
           priority
         />
       </a>
       <a
         href="https://lpphospitality.com"
-        className="hover:text-[rgba(242,237,228,0.7)]"
+        className="hover:text-[rgba(242,237,228,0.55)]"
         style={{
           fontFamily: "Inter, system-ui, sans-serif",
-          fontSize: 10,
-          fontWeight: 400,
-          letterSpacing: "0.18em",
+          fontSize: 11,
+          fontWeight: 800,
+          letterSpacing: "0.105em",
           textTransform: "uppercase",
-          color: "rgba(242,237,228,0.45)",
+          color: "rgba(242,237,228,0.3)",
           textDecoration: "none",
           transition: "color .25s ease",
         }}
