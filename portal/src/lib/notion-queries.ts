@@ -68,6 +68,7 @@ export async function getKpiMetrics(propertyId: string): Promise<KpiMetric[]> {
     kpiRecord: title(p, "KPI Record"),
     category: select(p, "KPI Category"),
     metricName: richText(p, "Metric Name"),
+    lppMetricKey: (select(p, "LPP Metric Key") || null) as import("@/types/portal").LppMetricKey | null,
     metricValue: num(p, "Metric Value"),
     unit: select(p, "Unit"),
     severity: (select(p, "Severity") || "Monitor") as Severity,
@@ -98,13 +99,13 @@ export function buildKpiSummary(metrics: KpiMetric[]): KpiSummary | null {
     ? metrics.filter((m) => m.periodStart === latestPeriod)
     : metrics;
 
-  const byCategory = (cat: string) => current.filter((m) => m.category === cat);
-  const find = (cat: string, unit: string) =>
-    byCategory(cat).find((m) => m.unit === unit)?.metricValue ?? null;
-  const findByName = (cat: string, nameFragment: string) =>
-    byCategory(cat).find((m) =>
-      m.metricName.toLowerCase().includes(nameFragment.toLowerCase())
-    )?.metricValue ?? null;
+  // Lookup strictly by the canonical LPP Metric Key. No fallback matching by
+  // category/unit/display name — that heuristic was silently pairing the
+  // wrong record (e.g. an avg-check row) with a metric whenever a property's
+  // KPI Records didn't have LPP Metric Key populated, producing bogus values
+  // like a $46 "total revenue". Missing key -> null -> renders as "—", which
+  // is the honest result when the source data isn't tagged correctly.
+  const byKey = (key: string) => current.find((m) => m.lppMetricKey === key)?.metricValue ?? null;
 
   // Derive worst financial severity
   const severityRank: Record<Severity, number> = {
@@ -116,21 +117,21 @@ export function buildKpiSummary(metrics: KpiMetric[]): KpiSummary | null {
 
   return {
     period: latestPeriod ?? "",
-    revenue: find("Revenue", "$") ?? findByName("Revenue", "revenue"),
-    covers: find("Revenue", "Count") ?? findByName("Revenue", "cover"),
-    avgSpend: findByName("Revenue", "spend") ?? findByName("Revenue", "check"),
-    laborDollars: find("Labor", "$"),
-    laborPct: find("Labor", "%"),
-    cogsDollars: find("COGS", "$"),
-    cogsPct: find("COGS", "%"),
-    opexDollars: find("OpEx", "$"),
-    opexPct: find("OpEx", "%"),
-    netProfitDollars: find("Profitability", "$"),
-    netProfitPct: find("Profitability", "%"),
-    guestOverall: findByName("Guest Experience", "overall") ?? find("Guest Experience", "Rating"),
-    guestFood: findByName("Guest Experience", "food"),
-    guestService: findByName("Guest Experience", "service"),
-    guestAmbiance: findByName("Guest Experience", "ambiance"),
+    revenue:         byKey("total_revenue"),
+    covers:          byKey("covers"),
+    avgSpend:        byKey("avg_spend"),
+    laborDollars:    byKey("total_payroll"),
+    laborPct:        byKey("labor_pct"),
+    cogsDollars:     byKey("total_cogs"),
+    cogsPct:         byKey("cogs_pct"),
+    opexDollars:     byKey("opex"),
+    opexPct:         byKey("opex_pct"),
+    netProfitDollars: byKey("net_profit"),
+    netProfitPct:    byKey("net_profit_pct"),
+    guestOverall:    byKey("guest_overall"),
+    guestFood:       byKey("guest_food"),
+    guestService:    byKey("guest_service"),
+    guestAmbiance:   byKey("guest_ambiance"),
     financialSeverity,
   };
 }
