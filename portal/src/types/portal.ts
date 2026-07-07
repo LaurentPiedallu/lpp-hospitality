@@ -27,6 +27,13 @@ export interface Property {
   dataConfidence: DataConfidence;
 }
 
+export type LppMetricKey =
+  | "total_revenue" | "total_cogs" | "total_payroll" | "net_profit"
+  | "covers" | "avg_spend" | "avg_check"
+  | "labor_pct" | "cogs_pct" | "net_profit_pct"
+  | "opex" | "opex_pct"
+  | "guest_overall" | "guest_food" | "guest_service" | "guest_ambiance";
+
 // KPI Records are one row per metric — we work with them individually
 export interface KpiMetric {
   id: string;
@@ -34,6 +41,7 @@ export interface KpiMetric {
   kpiRecord: string;       // title
   category: string;        // Revenue | Labor | COGS | OpEx | Profitability | Guest Experience | ...
   metricName: string;
+  lppMetricKey: LppMetricKey | null;
   metricValue: number;
   unit: string;            // $ | % | Count | Rating | Days | Text
   severity: Severity;
