@@ -88,54 +88,63 @@ function PropertyHealthCard({ card, clientId }: { card: PropertyCard; clientId: 
 
   return (
     <Link href={`/${clientId}/${property.id}`} className="block group">
-      <div className="bg-white rounded-2xl border border-gray-100 p-14 hover:border-gray-300 hover:shadow-md transition-all">
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 hover:border-gray-300 hover:shadow-md transition-all">
         {/* Header */}
-        <div className="flex items-start justify-between mb-10">
+        <div className="flex items-start justify-between mb-4">
           <div>
-            <p className="text-lg text-gray-400 mb-1">{property.location || property.conceptType}</p>
-            <h3 className="text-4xl font-semibold text-gray-900 group-hover:text-gray-700">{property.name}</h3>
+            <p className="text-xs text-gray-400 mb-0.5">{property.location || property.conceptType}</p>
+            <h3 className="text-xl font-semibold text-gray-900 group-hover:text-gray-700">{property.name}</h3>
           </div>
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-base font-medium whitespace-nowrap shrink-0 ${healthBgClass(health.color)}`}>
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap shrink-0 ${healthBgClass(health.color)}`}>
             <HealthDot color={health.color} />
             <span className={healthColorClass(health.color)}>{health.status}</span>
           </div>
         </div>
 
         {unpublishedFinancialData && (
-          <div className="mb-6 px-4 py-2.5 rounded-lg bg-red-50 ring-1 ring-red-200 text-sm text-red-700">
+          <div className="mb-4 px-3 py-2 rounded-lg bg-red-50 ring-1 ring-red-200 text-xs text-red-700">
             Admin only: financial data exists in Notion for this property but isn&apos;t Published — it won&apos;t appear until published.
           </div>
         )}
 
         {/* KPI grid */}
         {kpi ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 mb-10">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
             <div>
-              <p className="text-base text-gray-400 mb-1">Total Revenue</p>
-              <p className="text-3xl font-semibold text-gray-900">
+              <p className="text-xs text-gray-400 mb-0.5">Total Revenue</p>
+              <p className="text-lg font-semibold text-gray-900">
                 {kpi.revenue != null ? compact(kpi.revenue) : "—"}
               </p>
+              {kpi.covers != null && (
+                <p className="text-xs text-gray-400">{kpi.covers.toLocaleString()} covers</p>
+              )}
             </div>
             <div>
-              <p className="text-base text-gray-400 mb-1">COGS %</p>
-              <p className={`text-3xl font-semibold ${kpi.cogsPct != null && kpi.cogsPct > 32 ? "text-amber-600" : "text-gray-900"}`}>
+              <p className="text-xs text-gray-400 mb-0.5">COGS</p>
+              <p className={`text-lg font-semibold ${kpi.cogsPct != null && kpi.cogsPct > 32 ? "text-amber-600" : "text-gray-900"}`}>
                 {kpi.cogsPct != null ? pct(kpi.cogsPct) : "—"}
               </p>
+              {kpi.cogsDollars != null && (
+                <p className="text-xs text-gray-400">{compact(kpi.cogsDollars)}</p>
+              )}
             </div>
             <div>
-              <p className="text-base text-gray-400 mb-1">Labor %</p>
-              <p className={`text-3xl font-semibold ${kpi.laborPct != null && kpi.laborPct > 40 ? "text-amber-600" : "text-gray-900"}`}>
+              <p className="text-xs text-gray-400 mb-0.5">Labor</p>
+              <p className={`text-lg font-semibold ${kpi.laborPct != null && kpi.laborPct > 40 ? "text-amber-600" : "text-gray-900"}`}>
                 {kpi.laborPct != null ? pct(kpi.laborPct) : "—"}
               </p>
+              {kpi.laborDollars != null && (
+                <p className="text-xs text-gray-400">{compact(kpi.laborDollars)}</p>
+              )}
             </div>
             <div>
-              <p className="text-base text-gray-400 mb-1">Total Profit</p>
-              <div className="flex items-center gap-2">
-                <p className={`text-3xl font-semibold ${kpi.netProfitDollars != null && kpi.netProfitDollars < 0 ? "text-amber-600" : "text-gray-900"}`}>
+              <p className="text-xs text-gray-400 mb-0.5">Total Profit</p>
+              <div className="flex items-center gap-1.5">
+                <p className={`text-lg font-semibold ${kpi.netProfitDollars != null && kpi.netProfitDollars < 0 ? "text-amber-600" : "text-gray-900"}`}>
                   {kpi.netProfitDollars != null ? compact(kpi.netProfitDollars) : "—"}
                 </p>
                 {kpi.financialSeverity && (
-                  <span className={`text-lg ${
+                  <span className={`text-sm ${
                     kpi.financialSeverity === "Healthy" ? "text-green-500" :
                     kpi.financialSeverity === "Critical" || kpi.financialSeverity === "Action Required" ? "text-red-500" :
                     "text-amber-500"
@@ -145,16 +154,19 @@ function PropertyHealthCard({ card, clientId }: { card: PropertyCard; clientId: 
                   </span>
                 )}
               </div>
+              {kpi.netProfitPct != null && (
+                <p className="text-xs text-gray-400">{pct(kpi.netProfitPct)}</p>
+              )}
             </div>
           </div>
         ) : (
-          <div className="mb-10 py-8 text-base text-gray-400 text-center bg-gray-50 rounded-lg">
+          <div className="mb-4 py-4 text-sm text-gray-400 text-center bg-gray-50 rounded-lg">
             No KPI data published
           </div>
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-6 border-t border-gray-50">
+        <div className="flex items-center justify-between pt-3 border-t border-gray-50">
           {openActions > 0 ? (
             <StatusBadge label={`${openActions} action${openActions !== 1 ? "s" : ""} needed`} variant="red" />
           ) : (
@@ -185,7 +197,7 @@ function ClientSection({ group }: { group: ClientGroup }) {
           <p className="text-sm text-gray-400">No properties found for this client.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6">
+        <div className="grid grid-cols-1 gap-4">
           {group.cards.map((card) => (
             <PropertyHealthCard key={card.property.id} card={card} clientId={group.client.id} />
           ))}
@@ -202,19 +214,15 @@ export default async function DashboardPage() {
   if (!session) redirect("/login");
 
   const groups = await loadDashboard(session);
-  const totalProperties = groups.reduce((n, g) => n + g.cards.length, 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
       <NavBar session={session} />
-      <main className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-10">
-        <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-gray-900 mb-1">
+      <main className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6">
+        <div className="mb-5">
+          <h1 className="text-2xl font-semibold text-gray-900">
             {session.role === "admin" ? "Portfolio Overview" : "Your Properties"}
           </h1>
-          <p className="text-sm text-gray-500">
-            {totalProperties} propert{totalProperties !== 1 ? "ies" : "y"} across {groups.length} client{groups.length !== 1 ? "s" : ""}
-          </p>
         </div>
         {groups.length === 0 ? (
           <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-16 text-center">
