@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
-import { getClients, getClient, getProperties, getLatestKpiSummary, getActions } from "@/lib/notion-queries";
+import { getClients, getClient, getProperties, getLatestKpiSummary, getActions, hasUnpublishedFinancialData } from "@/lib/notion-queries";
 import { deriveHealth, healthColorClass, healthBgClass } from "@/lib/health";
 import { compact, pct } from "@/lib/format";
 import NavBar from "@/components/NavBar";
@@ -16,6 +16,7 @@ interface PropertyCard {
   kpi: KpiSummary | null;
   openActions: number;
   health: ReturnType<typeof deriveHealth>;
+  unpublishedFinancialData: boolean;
 }
 
 interface ClientGroup {
@@ -42,11 +43,25 @@ async function loadDashboard(session: Awaited<ReturnType<typeof getSession>>): P
             getLatestKpiSummary(property.id),
             getActions(property.id),
           ]);
+
+          // Admin-only signal: financial numbers are all missing even though
+          // a summary exists — check whether that's because real data is
+          // sitting unpublished in Notion, rather than never having arrived.
+          const financialFieldsAllNull =
+            kpi != null &&
+            kpi.revenue == null && kpi.cogsPct == null &&
+            kpi.laborPct == null && kpi.netProfitDollars == null;
+          const unpublishedFinancialData =
+            session.role === "admin" && financialFieldsAllNull
+              ? await hasUnpublishedFinancialData(property.id)
+              : false;
+
           return {
             property,
             kpi,
             openActions: actions.filter((a) => a.status !== "Complete").length,
             health: deriveHealth(kpi),
+            unpublishedFinancialData,
           };
         })
       );
@@ -69,7 +84,7 @@ function HealthDot({ color }: { color: HealthColor }) {
 }
 
 function PropertyHealthCard({ card, clientId }: { card: PropertyCard; clientId: string }) {
-  const { property, kpi, openActions, health } = card;
+  const { property, kpi, openActions, health, unpublishedFinancialData } = card;
 
   return (
     <Link href={`/${clientId}/${property.id}`} className="block group">
@@ -80,15 +95,21 @@ function PropertyHealthCard({ card, clientId }: { card: PropertyCard; clientId: 
             <p className="text-lg text-gray-400 mb-1">{property.location || property.conceptType}</p>
             <h3 className="text-4xl font-semibold text-gray-900 group-hover:text-gray-700">{property.name}</h3>
           </div>
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-base font-medium ${healthBgClass(health.color)}`}>
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-base font-medium whitespace-nowrap shrink-0 ${healthBgClass(health.color)}`}>
             <HealthDot color={health.color} />
             <span className={healthColorClass(health.color)}>{health.status}</span>
           </div>
         </div>
 
+        {unpublishedFinancialData && (
+          <div className="mb-6 px-4 py-2.5 rounded-lg bg-red-50 ring-1 ring-red-200 text-sm text-red-700">
+            Admin only: financial data exists in Notion for this property but isn&apos;t Published — it won&apos;t appear until published.
+          </div>
+        )}
+
         {/* KPI grid */}
         {kpi ? (
-          <div className="grid grid-cols-2 gap-8 mb-10">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 mb-10">
             <div>
               <p className="text-base text-gray-400 mb-1">Total Revenue</p>
               <p className="text-3xl font-semibold text-gray-900">
@@ -164,7 +185,7 @@ function ClientSection({ group }: { group: ClientGroup }) {
           <p className="text-sm text-gray-400">No properties found for this client.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 gap-6">
           {group.cards.map((card) => (
             <PropertyHealthCard key={card.property.id} card={card} clientId={group.client.id} />
           ))}

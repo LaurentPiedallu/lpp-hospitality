@@ -1,14 +1,14 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getProperty, getKpiMetrics, getIntelligence } from "@/lib/notion-queries";
-import { usd, pct, formatPeriod } from "@/lib/format";
+import { usd, pct, formatPeriod, buildTrendData } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import SubPageHeader from "@/components/SubPageHeader";
 import SectionHeader from "@/components/SectionHeader";
 import CalloutBlock from "@/components/CalloutBlock";
 import KpiCard from "@/components/KpiCard";
 import StatusBadge from "@/components/StatusBadge";
-import TrendChart, { buildTrendData } from "@/components/TrendChart";
+import TrendChart from "@/components/TrendChart";
 import BenchmarkGauge from "@/components/BenchmarkGauge";
 import type { KpiMetric, Intelligence, Severity } from "@/types/portal";
 

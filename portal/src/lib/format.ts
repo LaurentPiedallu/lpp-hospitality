@@ -21,3 +21,21 @@ export function compact(value: number): string {
   if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
   return usd(value);
 }
+
+export interface TrendDataPoint {
+  period: string;
+  value: number;
+  label: string;
+}
+
+export function buildTrendData(
+  metrics: { periodStart: string | null; metricValue: number }[]
+): TrendDataPoint[] {
+  return metrics
+    .filter((m) => m.periodStart != null)
+    .map((m) => ({
+      period: m.periodStart!,
+      value: m.metricValue,
+      label: formatPeriod(m.periodStart),
+    }));
+}

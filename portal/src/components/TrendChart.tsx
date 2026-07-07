@@ -6,11 +6,8 @@ import {
 } from "recharts";
 import { formatPeriod } from "@/lib/format";
 
-interface DataPoint {
-  period: string;   // ISO date
-  value: number;
-  label: string;    // formatted period
-}
+import type { TrendDataPoint } from "@/lib/format";
+type DataPoint = TrendDataPoint;
 
 interface TrendChartProps {
   data: DataPoint[];
@@ -86,15 +83,3 @@ export default function TrendChart({
   );
 }
 
-// Helper: build DataPoint array from raw KPI metrics filtered to one metric name/category
-export function buildTrendData(
-  metrics: { periodStart: string | null; metricValue: number }[]
-): DataPoint[] {
-  return metrics
-    .filter((m) => m.periodStart != null)
-    .map((m) => ({
-      period: m.periodStart!,
-      value: m.metricValue,
-      label: formatPeriod(m.periodStart),
-    }));
-}

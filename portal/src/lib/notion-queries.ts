@@ -3,7 +3,7 @@
 
 import {
   queryDatabase, publishedAnd, relationFilter,
-  title, richText, select, num, email, url, checkbox, files,
+  title, richText, select, num, email, url, checkbox,
 } from "./notion-fetch";
 import { NOTION_DBS } from "./notion-ids";
 import type {
@@ -139,6 +139,32 @@ export function buildKpiSummary(metrics: KpiMetric[]): KpiSummary | null {
 export async function getLatestKpiSummary(propertyId: string): Promise<KpiSummary | null> {
   const metrics = await getKpiMetrics(propertyId);
   return buildKpiSummary(metrics);
+}
+
+// True when a property has financial KPI Records in Notion that exist but
+// aren't Published (e.g. stuck in Draft/LPP Review/Archived) — the case where
+// data was uploaded and processed but silently never surfaced in the portal.
+// Call this only when a summary's financial fields are unexpectedly all null;
+// most properties always have *some* non-Published rows from re-processed
+// uploads, so this isn't a signal on its own.
+export async function hasUnpublishedFinancialData(propertyId: string): Promise<boolean> {
+  const pages = await queryDatabase({
+    databaseId: NOTION_DBS.KPI_RECORDS,
+    filter: {
+      and: [
+        relationFilter("Property", propertyId),
+        { property: "Publish Status", select: { does_not_equal: "Published" } },
+        {
+          or: ["Revenue", "Labor", "COGS", "OpEx", "Profitability"].map((cat) => ({
+            property: "KPI Category",
+            select: { equals: cat },
+          })),
+        },
+      ],
+    },
+    pageSize: 1,
+  });
+  return pages.length > 0;
 }
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
@@ -312,17 +338,18 @@ export async function getBenchmarks(conceptType?: string): Promise<Benchmark[]> 
 export async function getUploads(clientId: string, propertyId: string): Promise<Upload[]> {
   const pages = await queryDatabase({
     databaseId: NOTION_DBS.UPLOADS,
-    filter: publishedAnd(relationFilter("Property", propertyId)),
+    // Uploads have no Publish Status — filter only by property relation
+    filter: relationFilter("Property", propertyId),
     sorts: [{ property: "Upload Date", direction: "descending" }],
   });
   return pages.map((p) => ({
     id: p.id,
     clientId,
     propertyId,
-    fileName: title(p, "File Name"),
-    fileUrl: files(p, "File") ?? url(p, "File URL") ?? "",
+    fileName: title(p, "Upload Name"),
+    fileUrl: url(p, "File URL") ?? "",
     uploadedAt: p.properties?.["Upload Date"]?.date?.start ?? null,
-    status: (select(p, "Status") || "Pending Review") as Upload["status"],
-    notes: richText(p, "Notes"),
+    status: (select(p, "Processing Status") || "Pending") as Upload["status"],
+    notes: richText(p, "Validation Notes"),
   }));
 }

@@ -163,7 +163,9 @@ export interface Benchmark {
   unit: string;
 }
 
-export type UploadStatus = "Pending Review" | "Reviewed" | "Archived";
+export type UploadStatus =
+  | "Uploaded" | "Pending" | "Processing" | "In Progress"
+  | "Needs Review" | "Processed" | "Published" | "Failed" | "Archived";
 
 export interface Upload {
   id: string;

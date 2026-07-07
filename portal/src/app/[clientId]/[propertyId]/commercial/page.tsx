@@ -1,14 +1,14 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getProperty, getKpiMetrics, getIntelligence, getOpportunities } from "@/lib/notion-queries";
-import { usd, pct, formatPeriod } from "@/lib/format";
+import { usd, pct, formatPeriod, buildTrendData } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import SubPageHeader from "@/components/SubPageHeader";
 import SectionHeader from "@/components/SectionHeader";
 import CalloutBlock from "@/components/CalloutBlock";
 import KpiCard from "@/components/KpiCard";
 import StatusBadge from "@/components/StatusBadge";
-import TrendChart, { buildTrendData } from "@/components/TrendChart";
+import TrendChart from "@/components/TrendChart";
 import BenchmarkGauge from "@/components/BenchmarkGauge";
 import type { KpiMetric, Intelligence, Opportunity, Severity } from "@/types/portal";
 
@@ -211,7 +211,7 @@ function OpportunitiesPanel({ opportunities }: { opportunities: Opportunity[] })
 
 // ─── Guest experience rating bar ──────────────────────────────────────────────
 
-function RatingBar({ label, value, max = 5 }: { label: string; value: number | null; max?: number }) {
+function RatingBar({ label, value, max = 100 }: { label: string; value: number | null; max?: number }) {
   if (value == null) return null;
   const pctWidth = Math.min(100, (value / max) * 100);
   const color = value / max >= 0.8 ? "bg-green-400" : value / max >= 0.6 ? "bg-amber-400" : "bg-red-400";
@@ -310,7 +310,7 @@ export default async function CommercialPage({
               key="gOverall"
               label="Overall Rating"
               value={overallRating.metricValue.toFixed(1)}
-              sub={`/ ${overallRating.benchmarkHigh ?? 5}`}
+              sub={`/ ${overallRating.benchmarkHigh ?? 100}`}
               variant={severityVariant(overallRating.severity)}
             />
           )}
@@ -322,7 +322,7 @@ export default async function CommercialPage({
                 key={g.id}
                 label={g.metricName || g.kpiRecord}
                 value={g.metricValue.toFixed(1)}
-                sub={`/ ${g.benchmarkHigh ?? 5}`}
+                sub={`/ ${g.benchmarkHigh ?? 100}`}
                 variant={severityVariant(g.severity)}
               />
             ))}
@@ -337,7 +337,7 @@ export default async function CommercialPage({
                 key={g.id}
                 label={g.metricName || g.kpiRecord}
                 value={g.metricValue}
-                max={g.benchmarkHigh ?? 5}
+                max={g.benchmarkHigh ?? 100}
               />
             ))}
           </div>

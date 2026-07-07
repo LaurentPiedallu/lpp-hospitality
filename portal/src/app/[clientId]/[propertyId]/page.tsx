@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import {
   getProperty, getLatestKpiSummary, getKpiMetrics, getActions,
-  getOpportunities, getRisks, getIntelligence,
+  getOpportunities, getRisks, getIntelligence, hasUnpublishedFinancialData,
 } from "@/lib/notion-queries";
 import { deriveHealth, healthColorClass, healthBgClass } from "@/lib/health";
 import { usd, pct, compact, formatPeriod } from "@/lib/format";
@@ -22,8 +22,7 @@ const SUB_PAGES = [
   { href: "menu",         icon: "🍽️", label: "Menu Engineering",   desc: "Item performance and pricing" },
   { href: "initiatives",  icon: "🚀", label: "Initiatives",        desc: "Now / Next / Later roadmap" },
   { href: "intelligence", icon: "✦",  label: "AI Intelligence",    desc: "Full analysis across all categories" },
-  { href: "documents",    icon: "📁", label: "Documents",          desc: "Briefs, reports, and files" },
-  { href: "upload",       icon: "📤", label: "Upload Data",        desc: "Submit your monthly data" },
+  { href: "upload",       icon: "📤", label: "Upload Data",        desc: "Briefs, files, and monthly submissions" },
 ] as const;
 
 function HealthDot({ color }: { color: HealthColor }) {
@@ -71,6 +70,17 @@ export default async function PropertyPage({
   const openActions = (actions as Action[]).filter((a) => a.status !== "Complete");
   const activeRisks = (risks as Risk[]).filter((r) => r.status !== "Closed" && r.status !== "Archived");
   const annualOpportunity = (opportunities as Opportunity[]).reduce((s, o) => s + o.estimatedAnnualImpact, 0);
+
+  // Admin-only signal: financial numbers are all missing even though a
+  // summary exists — check whether real data is sitting unpublished in Notion.
+  const financialFieldsAllNull =
+    kpi != null &&
+    kpi.revenue == null && kpi.cogsPct == null &&
+    kpi.laborPct == null && kpi.netProfitDollars == null;
+  const unpublishedFinancialData =
+    session.role === "admin" && financialFieldsAllNull
+      ? await hasUnpublishedFinancialData(propertyId)
+      : false;
 
   // Build sparkline series from multi-period KPI data
   function trendSeries(cat: string, unit: string, hint?: string): { period: string; value: number }[] {
@@ -214,6 +224,11 @@ export default async function PropertyPage({
                 <span className="text-xs text-gray-400">{formatPeriod(latestPeriod)}</span>
               )}
             </div>
+            {unpublishedFinancialData && (
+              <div className="mb-4 px-4 py-2.5 rounded-lg bg-red-50 ring-1 ring-red-200 text-sm text-red-700">
+                Admin only: financial data exists in Notion for this property but isn&apos;t Published — it won&apos;t appear until published.
+              </div>
+            )}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {/* Revenue */}
               <div className="bg-white rounded-xl border border-gray-100 p-5">
@@ -298,12 +313,12 @@ export default async function PropertyPage({
               ].filter(({ value }) => value != null).map(({ label, value }) => (
                 <div key={label} className="bg-white rounded-xl border border-gray-100 p-5">
                   <p className="text-xs text-gray-400 mb-1">{label}</p>
-                  <p className={`text-xl sm:text-2xl font-semibold mb-2 ${value! >= 4.3 ? "text-green-600" : value! >= 4.0 ? "text-amber-600" : "text-red-600"}`}>
-                    {value!.toFixed(1)}<span className="text-sm text-gray-300 font-normal"> / 5.0</span>
+                  <p className={`text-xl sm:text-2xl font-semibold mb-2 ${value! >= 90 ? "text-green-600" : value! >= 80 ? "text-amber-600" : "text-red-600"}`}>
+                    {value!.toFixed(1)}<span className="text-sm text-gray-300 font-normal"> / 100</span>
                   </p>
                   <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${value! >= 4.3 ? "bg-green-500" : value! >= 4.0 ? "bg-amber-500" : "bg-red-500"}`}
-                      style={{ width: `${(value! / 5) * 100}%` }} />
+                    <div className={`h-full rounded-full ${value! >= 90 ? "bg-green-500" : value! >= 80 ? "bg-amber-500" : "bg-red-500"}`}
+                      style={{ width: `${Math.min(100, value!)}%` }} />
                   </div>
                 </div>
               ))}
