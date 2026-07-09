@@ -3,78 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
 import type { SessionPayload } from "@/lib/auth";
 
-const JOST = "'Jost', 'Inter', system-ui, sans-serif";
-const CREAM = "rgba(242,237,228,0.9)";
-
-function useNavContext(pathname: string) {
-  // Property-scoped routes look like /{clientId}/{propertyId}/{tab}
-  const parts = pathname.split("/").filter(Boolean);
-  const isPropertyRoute = parts.length >= 2 && parts[0] !== "dashboard" && parts[0] !== "login";
-  const clientId = isPropertyRoute ? parts[0] : null;
-  const propertyId = isPropertyRoute && parts.length >= 2 ? parts[1] : null;
-  return { clientId, propertyId };
-}
-
-function NavLink({
-  href,
-  active,
-  color,
-  activeColor,
-  hoverColor,
-  children,
-  onClick,
-}: {
-  href: string;
-  active: boolean;
-  color?: string;
-  activeColor?: string;
-  hoverColor?: string;
-  children: React.ReactNode;
-  onClick?: () => void;
-}) {
-  const base = color ?? "rgba(242,237,228,0.5)";
-  const activeC = activeColor ?? CREAM;
-  const hover = hoverColor ?? "rgba(242,237,228,0.8)";
-  return (
-    <Link
-      href={href}
-      onClick={onClick}
-      style={{
-        fontFamily: JOST,
-        fontSize: 10,
-        fontWeight: 600,
-        letterSpacing: "0.14em",
-        textTransform: "uppercase",
-        color: active ? activeC : base,
-        textDecoration: "none",
-        transition: "color 0.25s ease",
-        whiteSpace: "nowrap",
-      }}
-      onMouseEnter={(e) => {
-        if (!active) e.currentTarget.style.color = hover;
-      }}
-      onMouseLeave={(e) => {
-        if (!active) e.currentTarget.style.color = base;
-      }}
-    >
-      {children}
-    </Link>
-  );
-}
-
 export default function NavBar({ session }: { session: SessionPayload }) {
-  const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { clientId, propertyId } = useNavContext(pathname);
-
-  const sectionLinks: { href: string; label: string; active: boolean }[] = [];
-  if (clientId && propertyId) {
-    const uploadHref = `/${clientId}/${propertyId}/upload`;
-    sectionLinks.push({ href: uploadHref, label: "Upload", active: pathname === uploadHref });
-  }
 
   return (
     <header
@@ -83,46 +15,41 @@ export default function NavBar({ session }: { session: SessionPayload }) {
         top: 0,
         left: 0,
         right: 0,
-        height: 52,
+        zIndex: 100,
+        height: 68,
+        minHeight: 68,
         background: "#12120F",
         borderBottom: "1px solid rgba(184,147,90,0.1)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "0 40px",
-        zIndex: 100,
+        padding: "0 clamp(22px, 5vw, 62px)",
+        overflow: "visible",
       }}
     >
-      {/* Logo */}
+      {/* Logo — exact box/sizing copied from the login page nav */}
       <Link
         href="/dashboard"
         aria-label="LPP Hospitality"
-        style={{ height: 52, display: "inline-flex", alignItems: "center", flexShrink: 0 }}
+        style={{ width: 144, height: 42, display: "inline-flex", alignItems: "center", justifyContent: "center", overflow: "visible" }}
       >
         <Image
           src="/lpp-logo-transparent.png"
           alt="LPP Hospitality"
-          width={1251}
-          height={454}
-          style={{ height: 38, width: "auto", objectFit: "contain" }}
+          width={144}
+          height={42}
+          style={{ width: "100%", height: "auto", objectFit: "contain" }}
           priority
         />
       </Link>
 
-      {/* Everything else — grouped together on the right, like the main site */}
-      <div className="hidden md:flex" style={{ alignItems: "center", gap: 28 }}>
-        {sectionLinks.map((link) => (
-          <NavLink key={link.href} href={link.href} active={link.active}>
-            {link.label}
-          </NavLink>
-        ))}
-
+      {/* Right side — desktop only */}
+      <div className="hidden md:flex" style={{ alignItems: "center", gap: 20 }}>
         <span
           style={{
+            fontFamily: "Inter, system-ui, sans-serif",
             fontSize: 11,
-            fontWeight: 400,
             color: "rgba(242,237,228,0.3)",
-            fontFamily: JOST,
             maxWidth: 200,
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -134,19 +61,17 @@ export default function NavBar({ session }: { session: SessionPayload }) {
 
         <a
           href="/api/auth/logout"
+          className="hover:text-[rgba(242,237,228,0.55)]"
           style={{
-            fontFamily: JOST,
-            fontSize: 10,
-            fontWeight: 600,
-            letterSpacing: "0.14em",
+            fontFamily: "Inter, system-ui, sans-serif",
+            fontSize: 11,
+            fontWeight: 800,
+            letterSpacing: "0.105em",
             textTransform: "uppercase",
-            color: "rgba(242,237,228,0.4)",
+            color: "rgba(242,237,228,0.3)",
             textDecoration: "none",
-            transition: "color 0.25s ease",
-            cursor: "pointer",
+            transition: "color .25s ease",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(242,237,228,0.8)")}
-          onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(242,237,228,0.4)")}
         >
           Sign out
         </a>
@@ -178,7 +103,7 @@ export default function NavBar({ session }: { session: SessionPayload }) {
           className="md:hidden"
           style={{
             position: "fixed",
-            top: 52,
+            top: 68,
             left: 0,
             right: 0,
             background: "#12120F",
@@ -190,27 +115,23 @@ export default function NavBar({ session }: { session: SessionPayload }) {
             zIndex: 100,
           }}
         >
-          {sectionLinks.map((link) => (
-            <NavLink key={link.href} href={link.href} active={link.active} onClick={() => setDrawerOpen(false)}>
-              {link.label}
-            </NavLink>
-          ))}
-
-          <span style={{ fontSize: 11, color: "rgba(242,237,228,0.3)", fontFamily: JOST }}>
+          <span style={{ fontFamily: "Inter, system-ui, sans-serif", fontSize: 11, color: "rgba(242,237,228,0.3)" }}>
             {session.email}
           </span>
 
           <a
             href="/api/auth/logout"
+            className="hover:text-[rgba(242,237,228,0.55)]"
             style={{
-              fontFamily: JOST,
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: "0.14em",
+              fontFamily: "Inter, system-ui, sans-serif",
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: "0.105em",
               textTransform: "uppercase",
-              color: "rgba(242,237,228,0.4)",
+              color: "rgba(242,237,228,0.3)",
               textDecoration: "none",
               width: "fit-content",
+              transition: "color .25s ease",
             }}
           >
             Sign out
