@@ -155,18 +155,15 @@ function PropertyOverviewCard({ card, clientId }: { card: PropertyCard; clientId
   return (
     <Link
       href={`/${clientId}/${property.id}`}
-      className="group block"
+      className="group block border border-[rgba(18,18,15,0.08)] hover:border-[rgba(184,147,90,0.25)]"
       style={{
         background: "#FFFFFF",
-        border: `1px solid ${INK_BORDER}`,
         borderRadius: 0,
         padding: "28px 32px",
         marginBottom: 12,
         transition: "border-color 0.25s ease",
         textDecoration: "none",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "rgba(184,147,90,0.25)")}
-      onMouseLeave={(e) => (e.currentTarget.style.borderColor = INK_BORDER)}
     >
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between" style={{ marginBottom: 20 }}>
