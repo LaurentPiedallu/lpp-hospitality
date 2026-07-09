@@ -22,14 +22,23 @@ function useNavContext(pathname: string) {
 function NavLink({
   href,
   active,
+  color,
+  activeColor,
+  hoverColor,
   children,
   onClick,
 }: {
   href: string;
   active: boolean;
+  color?: string;
+  activeColor?: string;
+  hoverColor?: string;
   children: React.ReactNode;
   onClick?: () => void;
 }) {
+  const base = color ?? "rgba(242,237,228,0.5)";
+  const activeC = activeColor ?? CREAM;
+  const hover = hoverColor ?? "rgba(242,237,228,0.8)";
   return (
     <Link
       href={href}
@@ -37,17 +46,19 @@ function NavLink({
       style={{
         fontFamily: JOST,
         fontSize: 10,
-        letterSpacing: "0.18em",
+        fontWeight: 600,
+        letterSpacing: "0.14em",
         textTransform: "uppercase",
-        color: active ? CREAM : "rgba(242,237,228,0.5)",
+        color: active ? activeC : base,
         textDecoration: "none",
         transition: "color 0.25s ease",
+        whiteSpace: "nowrap",
       }}
       onMouseEnter={(e) => {
-        if (!active) e.currentTarget.style.color = "rgba(242,237,228,0.8)";
+        if (!active) e.currentTarget.style.color = hover;
       }}
       onMouseLeave={(e) => {
-        if (!active) e.currentTarget.style.color = "rgba(242,237,228,0.5)";
+        if (!active) e.currentTarget.style.color = base;
       }}
     >
       {children}
@@ -60,12 +71,12 @@ export default function NavBar({ session }: { session: SessionPayload }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { clientId, propertyId } = useNavContext(pathname);
 
-  const centerLinks: { href: string; label: string; active: boolean }[] = [
+  const sectionLinks: { href: string; label: string; active: boolean }[] = [
     { href: "/dashboard", label: "Dashboard", active: pathname === "/dashboard" },
   ];
   if (clientId && propertyId) {
     const uploadHref = `/${clientId}/${propertyId}/upload`;
-    centerLinks.push({ href: uploadHref, label: "Upload", active: pathname === uploadHref });
+    sectionLinks.push({ href: uploadHref, label: "Upload", active: pathname === uploadHref });
   }
 
   return (
@@ -89,53 +100,39 @@ export default function NavBar({ session }: { session: SessionPayload }) {
       <Link
         href="/dashboard"
         aria-label="LPP Hospitality"
-        style={{ width: 144, height: 42, display: "inline-flex", alignItems: "center", justifyContent: "center", overflow: "visible" }}
+        style={{ height: 52, display: "inline-flex", alignItems: "center", flexShrink: 0 }}
       >
         <Image
           src="/lpp-logo-transparent.png"
           alt="LPP Hospitality"
-          width={144}
-          height={42}
-          style={{ width: "100%", height: "auto", objectFit: "contain" }}
+          width={1251}
+          height={454}
+          style={{ height: 30, width: "auto", objectFit: "contain" }}
           priority
         />
       </Link>
 
-      {/* Center — desktop only */}
-      <nav className="hidden md:flex" style={{ alignItems: "center", gap: 28 }} aria-label="Portal section navigation">
-        {centerLinks.map((link) => (
+      {/* Everything else — grouped together on the right, like the main site */}
+      <div className="hidden md:flex" style={{ alignItems: "center", gap: 28 }}>
+        {sectionLinks.map((link) => (
           <NavLink key={link.href} href={link.href} active={link.active}>
             {link.label}
           </NavLink>
         ))}
-      </nav>
 
-      {/* Right side — desktop only */}
-      <div className="hidden md:flex" style={{ alignItems: "center" }}>
-        <a
+        <NavLink
           href="https://lpphospitality.com"
-          style={{
-            fontSize: 10,
-            letterSpacing: "0.14em",
-            textTransform: "uppercase",
-            color: "rgba(184,147,90,0.5)",
-            textDecoration: "none",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            transition: "color 0.25s ease",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = GOLD)}
-          onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(184,147,90,0.5)")}
+          active={false}
+          color="rgba(184,147,90,0.5)"
+          hoverColor={GOLD}
         >
           ← LPP
-        </a>
-
-        <span style={{ width: 1, height: 16, background: "rgba(242,237,228,0.1)", margin: "0 16px" }} />
+        </NavLink>
 
         <span
           style={{
             fontSize: 11,
+            fontWeight: 400,
             color: "rgba(242,237,228,0.3)",
             fontFamily: JOST,
             maxWidth: 200,
@@ -147,31 +144,21 @@ export default function NavBar({ session }: { session: SessionPayload }) {
           {session.email}
         </span>
 
-        <span style={{ width: 1, height: 16, background: "rgba(242,237,228,0.1)", margin: "0 16px" }} />
-
         <a
           href="/api/auth/logout"
           style={{
+            fontFamily: JOST,
             fontSize: 10,
-            letterSpacing: "0.12em",
+            fontWeight: 600,
+            letterSpacing: "0.14em",
             textTransform: "uppercase",
-            color: "rgba(242,237,228,0.28)",
-            border: "1px solid rgba(242,237,228,0.1)",
-            padding: "5px 10px",
-            background: "transparent",
-            borderRadius: 0,
-            cursor: "pointer",
-            transition: "all 0.25s ease",
+            color: "rgba(242,237,228,0.4)",
             textDecoration: "none",
+            transition: "color 0.25s ease",
+            cursor: "pointer",
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = "rgba(242,237,228,0.6)";
-            e.currentTarget.style.borderColor = "rgba(242,237,228,0.2)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = "rgba(242,237,228,0.28)";
-            e.currentTarget.style.borderColor = "rgba(242,237,228,0.1)";
-          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(242,237,228,0.8)")}
+          onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(242,237,228,0.4)")}
         >
           Sign out
         </a>
@@ -215,25 +202,21 @@ export default function NavBar({ session }: { session: SessionPayload }) {
             zIndex: 100,
           }}
         >
-          {centerLinks.map((link) => (
+          {sectionLinks.map((link) => (
             <NavLink key={link.href} href={link.href} active={link.active} onClick={() => setDrawerOpen(false)}>
               {link.label}
             </NavLink>
           ))}
 
-          <a
+          <NavLink
             href="https://lpphospitality.com"
-            style={{
-              fontSize: 10,
-              letterSpacing: "0.14em",
-              textTransform: "uppercase",
-              color: GOLD,
-              textDecoration: "none",
-              marginTop: 8,
-            }}
+            active={false}
+            color="rgba(184,147,90,0.5)"
+            activeColor={GOLD}
+            hoverColor={GOLD}
           >
             ← Back to LPP
-          </a>
+          </NavLink>
 
           <span style={{ fontSize: 11, color: "rgba(242,237,228,0.3)", fontFamily: JOST }}>
             {session.email}
@@ -242,17 +225,14 @@ export default function NavBar({ session }: { session: SessionPayload }) {
           <a
             href="/api/auth/logout"
             style={{
+              fontFamily: JOST,
               fontSize: 10,
-              letterSpacing: "0.12em",
+              fontWeight: 600,
+              letterSpacing: "0.14em",
               textTransform: "uppercase",
-              color: "rgba(242,237,228,0.28)",
-              border: "1px solid rgba(242,237,228,0.1)",
-              padding: "5px 10px",
-              background: "transparent",
-              borderRadius: 0,
-              cursor: "pointer",
-              width: "fit-content",
+              color: "rgba(242,237,228,0.4)",
               textDecoration: "none",
+              width: "fit-content",
             }}
           >
             Sign out
