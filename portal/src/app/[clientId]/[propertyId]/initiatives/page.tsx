@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { getProperty, getInitiatives } from "@/lib/notion-queries";
 import { usd, formatPeriod } from "@/lib/format";
 import NavBar from "@/components/NavBar";
+import PageWrapper from "@/components/PageWrapper";
 import SubPageHeader from "@/components/SubPageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import type { Initiative, InitiativeStatus, InitiativeColumn } from "@/types/portal";
@@ -174,7 +175,7 @@ export default async function InitiativesPage({
   const archived = initiatives.filter((i) => i.status === "Archived");
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <PageWrapper>
       <NavBar session={session} />
       <SubPageHeader
         title="Initiatives"
@@ -213,6 +214,6 @@ export default async function InitiativesPage({
         )}
 
       </div>
-    </div>
+    </PageWrapper>
   );
 }

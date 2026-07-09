@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { getProperty, getBriefs, getUploads } from "@/lib/notion-queries";
 import { formatPeriod } from "@/lib/format";
 import NavBar from "@/components/NavBar";
+import PageWrapper from "@/components/PageWrapper";
 import SubPageHeader from "@/components/SubPageHeader";
 import SectionHeader from "@/components/SectionHeader";
 import StatusBadge from "@/components/StatusBadge";
@@ -129,7 +130,7 @@ export default async function UploadPage({
   const archivedUploads = uploads.filter((u) => u.status === "Archived");
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <PageWrapper>
       <NavBar session={session} />
       <SubPageHeader
         title="Upload Data"
@@ -242,6 +243,6 @@ export default async function UploadPage({
         </section>
 
       </div>
-    </div>
+    </PageWrapper>
   );
 }

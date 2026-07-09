@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { getProperty, getIntelligence } from "@/lib/notion-queries";
 import { formatPeriod } from "@/lib/format";
 import NavBar from "@/components/NavBar";
+import PageWrapper from "@/components/PageWrapper";
 import SubPageHeader from "@/components/SubPageHeader";
 import SectionHeader from "@/components/SectionHeader";
 import StatusBadge from "@/components/StatusBadge";
@@ -127,7 +128,7 @@ export default async function IntelligencePage({
     .reverse()[0] ?? null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <PageWrapper>
       <NavBar session={session} />
       <SubPageHeader
         title="AI Intelligence"
@@ -215,6 +216,6 @@ export default async function IntelligencePage({
         )}
 
       </div>
-    </div>
+    </PageWrapper>
   );
 }

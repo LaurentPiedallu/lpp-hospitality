@@ -5,6 +5,7 @@ import { getClients, getClient, getProperties, getLatestKpiSummary, getActions, 
 import { deriveHealth, healthColorClass, healthBgClass } from "@/lib/health";
 import { compact, pct } from "@/lib/format";
 import NavBar from "@/components/NavBar";
+import PageWrapper from "@/components/PageWrapper";
 import StatusBadge from "@/components/StatusBadge";
 import type { Client, Property, KpiSummary } from "@/types/portal";
 import type { HealthColor } from "@/lib/health";
@@ -216,7 +217,7 @@ export default async function DashboardPage() {
   const groups = await loadDashboard(session);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <PageWrapper>
       <NavBar session={session} />
       <main className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6">
         <div className="mb-5">
@@ -232,6 +233,6 @@ export default async function DashboardPage() {
           groups.map((group) => <ClientSection key={group.client.id} group={group} />)
         )}
       </main>
-    </div>
+    </PageWrapper>
   );
 }

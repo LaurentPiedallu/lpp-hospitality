@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { getProperty, getKpiMetrics, getIntelligence, getBenchmarks } from "@/lib/notion-queries";
 import { usd, pct, formatPeriod, buildTrendData } from "@/lib/format";
 import NavBar from "@/components/NavBar";
+import PageWrapper from "@/components/PageWrapper";
 import SubPageHeader from "@/components/SubPageHeader";
 import SectionHeader from "@/components/SectionHeader";
 import CalloutBlock from "@/components/CalloutBlock";
@@ -357,7 +358,7 @@ export default async function MenuPage({
   const executionIntel = intel("Execution");
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <PageWrapper>
       <NavBar session={session} />
       <SubPageHeader
         title="Menu Engineering"
@@ -483,6 +484,6 @@ export default async function MenuPage({
         )}
 
       </div>
-    </div>
+    </PageWrapper>
   );
 }

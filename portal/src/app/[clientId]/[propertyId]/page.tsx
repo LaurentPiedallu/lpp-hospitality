@@ -8,6 +8,7 @@ import {
 import { deriveHealth, healthColorClass, healthBgClass } from "@/lib/health";
 import { usd, pct, compact, formatPeriod } from "@/lib/format";
 import NavBar from "@/components/NavBar";
+import PageWrapper from "@/components/PageWrapper";
 import KpiCard from "@/components/KpiCard";
 import SectionHeader from "@/components/SectionHeader";
 import CalloutBlock from "@/components/CalloutBlock";
@@ -113,7 +114,7 @@ export default async function PropertyPage({
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <PageWrapper>
       <NavBar session={session} />
 
       {/* Banner */}
@@ -368,6 +369,6 @@ export default async function PropertyPage({
         </section>
 
       </div>
-    </div>
+    </PageWrapper>
   );
 }

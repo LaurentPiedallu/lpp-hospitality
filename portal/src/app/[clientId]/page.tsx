@@ -5,6 +5,7 @@ import { getClient, getProperties, getLatestKpiSummary } from "@/lib/notion-quer
 import { deriveHealth, healthBgClass, healthColorClass } from "@/lib/health";
 import { compact, pct } from "@/lib/format";
 import NavBar from "@/components/NavBar";
+import PageWrapper from "@/components/PageWrapper";
 import StatusBadge from "@/components/StatusBadge";
 import type { HealthColor } from "@/lib/health";
 
@@ -45,7 +46,7 @@ export default async function ClientOverviewPage({
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <PageWrapper>
       <NavBar session={session} />
 
       {/* Header */}
@@ -138,6 +139,6 @@ export default async function ClientOverviewPage({
           </div>
         )}
       </main>
-    </div>
+    </PageWrapper>
   );
 }

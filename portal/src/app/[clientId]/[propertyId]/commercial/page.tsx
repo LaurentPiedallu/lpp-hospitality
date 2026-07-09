@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { getProperty, getKpiMetrics, getIntelligence, getOpportunities } from "@/lib/notion-queries";
 import { usd, pct, formatPeriod, buildTrendData } from "@/lib/format";
 import NavBar from "@/components/NavBar";
+import PageWrapper from "@/components/PageWrapper";
 import SubPageHeader from "@/components/SubPageHeader";
 import SectionHeader from "@/components/SectionHeader";
 import CalloutBlock from "@/components/CalloutBlock";
@@ -285,7 +286,7 @@ export default async function CommercialPage({
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <PageWrapper>
       <NavBar session={session} />
       <SubPageHeader
         title="Commercial Review"
@@ -459,6 +460,6 @@ export default async function CommercialPage({
         )}
 
       </div>
-    </div>
+    </PageWrapper>
   );
 }
