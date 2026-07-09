@@ -8,7 +8,6 @@ import type { SessionPayload } from "@/lib/auth";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 const CREAM = "rgba(242,237,228,0.9)";
-const GOLD = "#B8935A";
 
 function useNavContext(pathname: string) {
   // Property-scoped routes look like /{clientId}/{propertyId}/{tab}
@@ -71,9 +70,7 @@ export default function NavBar({ session }: { session: SessionPayload }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { clientId, propertyId } = useNavContext(pathname);
 
-  const sectionLinks: { href: string; label: string; active: boolean }[] = [
-    { href: "/dashboard", label: "Dashboard", active: pathname === "/dashboard" },
-  ];
+  const sectionLinks: { href: string; label: string; active: boolean }[] = [];
   if (clientId && propertyId) {
     const uploadHref = `/${clientId}/${propertyId}/upload`;
     sectionLinks.push({ href: uploadHref, label: "Upload", active: pathname === uploadHref });
@@ -107,7 +104,7 @@ export default function NavBar({ session }: { session: SessionPayload }) {
           alt="LPP Hospitality"
           width={1251}
           height={454}
-          style={{ height: 30, width: "auto", objectFit: "contain" }}
+          style={{ height: 38, width: "auto", objectFit: "contain" }}
           priority
         />
       </Link>
@@ -119,15 +116,6 @@ export default function NavBar({ session }: { session: SessionPayload }) {
             {link.label}
           </NavLink>
         ))}
-
-        <NavLink
-          href="https://lpphospitality.com"
-          active={false}
-          color="rgba(184,147,90,0.5)"
-          hoverColor={GOLD}
-        >
-          ← LPP
-        </NavLink>
 
         <span
           style={{
@@ -207,16 +195,6 @@ export default function NavBar({ session }: { session: SessionPayload }) {
               {link.label}
             </NavLink>
           ))}
-
-          <NavLink
-            href="https://lpphospitality.com"
-            active={false}
-            color="rgba(184,147,90,0.5)"
-            activeColor={GOLD}
-            hoverColor={GOLD}
-          >
-            ← Back to LPP
-          </NavLink>
 
           <span style={{ fontSize: 11, color: "rgba(242,237,228,0.3)", fontFamily: JOST }}>
             {session.email}
