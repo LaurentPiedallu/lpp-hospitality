@@ -17,24 +17,69 @@ import CalloutBlock from "@/components/CalloutBlock";
 import StatusBadge from "@/components/StatusBadge";
 import Sparkline from "@/components/Sparkline";
 import type { Action, Opportunity, Risk, Intelligence, KpiMetric } from "@/types/portal";
-import type { HealthColor } from "@/lib/health";
 
-function HealthDot({ color }: { color: HealthColor }) {
-  return <span className={`w-2 h-2 rounded-full shrink-0 mt-1 ${{
-    green: "bg-green-500", amber: "bg-amber-500", red: "bg-red-500",
-  }[color]}`} />;
-}
+const JOST = "'Jost', 'Inter', system-ui, sans-serif";
+const SERIF = "'Cormorant Garamond', Georgia, serif";
 
-function actionBorderClass(action: Action): string {
-  if (action.status === "Waiting on Client" || action.priority === "Critical") return "border-l-red-500";
-  if (action.status === "Not Started" && action.decisionRequired) return "border-l-red-500";
-  return "border-l-green-500";
+function isUrgentAction(action: Action): boolean {
+  return (
+    action.status === "Waiting on Client" ||
+    action.priority === "Critical" ||
+    (action.status === "Not Started" && action.decisionRequired)
+  );
 }
 
 function actionBadgeVariant(action: Action): "red" | "green" | "amber" {
-  if (action.status === "Waiting on Client" || action.priority === "Critical") return "red";
+  if (isUrgentAction(action)) return "red";
   if (action.status === "In Progress") return "amber";
   return "green";
+}
+
+// ─── Action flag — per Change 10 spec, used for urgent open actions ──────────
+
+function ActionFlag({ action }: { action: Action }) {
+  return (
+    <div
+      style={{
+        background: "rgba(192,57,43,0.04)",
+        border: "1px solid rgba(192,57,43,0.12)",
+        borderLeft: "3px solid #C0392B",
+        borderRadius: 0,
+        padding: "16px 20px",
+        marginBottom: 12,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#C0392B", flexShrink: 0 }} />
+          <span style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", color: "#C0392B" }}>
+            Action Required
+          </span>
+        </div>
+        <StatusBadge label={action.status} variant={actionBadgeVariant(action)} />
+      </div>
+      <div style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.65)", lineHeight: 1.7, fontWeight: 300 }}>
+        <p style={{ color: "#12120F", fontWeight: 400, marginBottom: action.notes ? 4 : 0 }}>{action.title}</p>
+        {action.notes && <p>{action.notes}</p>}
+        {action.owner && <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 4 }}>Owner: {action.owner}</p>}
+      </div>
+    </div>
+  );
+}
+
+function ActionCard({ action }: { action: Action }) {
+  return (
+    <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "16px 20px", marginBottom: 12 }}>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p style={{ fontFamily: JOST, fontSize: 13, color: "#12120F" }}>{action.title}</p>
+          {action.notes && <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.5)", marginTop: 2 }}>{action.notes}</p>}
+          {action.owner && <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.35)", marginTop: 4 }}>Owner: {action.owner}</p>}
+        </div>
+        <StatusBadge label={action.status} variant={actionBadgeVariant(action)} />
+      </div>
+    </div>
+  );
 }
 
 export default async function PropertyPage({
@@ -145,19 +190,12 @@ export default async function PropertyPage({
         {openActions.length > 0 && (
           <section>
             <SectionHeader title="Actions Needed From You" />
-            <div className="space-y-3">
-              {openActions.map((action) => (
-                <div key={action.id} className={`bg-white rounded-xl border border-gray-100 border-l-4 px-5 py-4 ${actionBorderClass(action)}`}>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900 mb-0.5">{action.title}</p>
-                      {action.notes && <p className="text-sm text-gray-500">{action.notes}</p>}
-                      {action.owner && <p className="text-xs text-gray-400 mt-1">Owner: {action.owner}</p>}
-                    </div>
-                    <StatusBadge label={action.status} variant={actionBadgeVariant(action)} />
-                  </div>
-                </div>
-              ))}
+            <div>
+              {openActions.map((action) =>
+                isUrgentAction(action)
+                  ? <ActionFlag key={action.id} action={action} />
+                  : <ActionCard key={action.id} action={action} />
+              )}
             </div>
           </section>
         )}
@@ -166,17 +204,17 @@ export default async function PropertyPage({
         {(opportunities as Opportunity[]).length > 0 && (
           <section>
             <SectionHeader title="Value Creation" />
-            <div className="space-y-3">
+            <div>
               {(opportunities as Opportunity[]).map((opp) => (
-                <div key={opp.id} className="bg-white rounded-xl border border-gray-100 px-5 py-4">
+                <div key={opp.id} style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "16px 20px", marginBottom: 12 }}>
                   <div className="flex items-center justify-between gap-4">
                     <div>
-                      <p className="font-medium text-gray-900">{opp.title}</p>
-                      {opp.category && <p className="text-xs text-gray-400 mt-0.5">{opp.category}</p>}
+                      <p style={{ fontFamily: JOST, fontSize: 13, color: "#12120F" }}>{opp.title}</p>
+                      {opp.category && <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 2 }}>{opp.category}</p>}
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       {opp.estimatedAnnualImpact > 0 && (
-                        <span className="text-sm font-semibold text-gray-900">{compact(opp.estimatedAnnualImpact)}/yr</span>
+                        <span style={{ fontFamily: SERIF, fontSize: "1.1rem", color: "#12120F" }}>{compact(opp.estimatedAnnualImpact)}/yr</span>
                       )}
                       <StatusBadge
                         label={opp.stage || "Identified"}
@@ -193,82 +231,82 @@ export default async function PropertyPage({
         {/* Financial snapshot */}
         {kpi && (
           <section>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between" style={{ marginBottom: 20 }}>
               <SectionHeader title="Financial Snapshot" />
               {latestPeriod && (
-                <span className="text-xs text-gray-400">{formatPeriod(latestPeriod)}</span>
+                <span style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.4)" }}>{formatPeriod(latestPeriod)}</span>
               )}
             </div>
             {unpublishedFinancialData && (
-              <div className="mb-4 px-4 py-2.5 rounded-lg bg-red-50 ring-1 ring-red-200 text-sm text-red-700">
+              <div style={{ marginBottom: 16, padding: "10px 16px", background: "rgba(192,57,43,0.06)", border: "1px solid rgba(192,57,43,0.15)", fontFamily: JOST, fontSize: 13, color: "#C0392B" }}>
                 Admin only: financial data exists in Notion for this property but isn&apos;t Published — it won&apos;t appear until published.
               </div>
             )}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {/* Revenue */}
-              <div className="bg-white rounded-xl border border-gray-100 p-5">
-                <p className="text-xs text-gray-400 mb-1">Revenue</p>
-                <p className="text-xl sm:text-2xl font-semibold text-gray-900 mb-1">
+              <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "24px 28px" }}>
+                <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 8 }}>Revenue</p>
+                <p style={{ fontFamily: SERIF, fontSize: "2.2rem", fontWeight: 400, color: "#12120F", lineHeight: 1 }}>
                   {kpi.revenue != null ? compact(kpi.revenue) : "—"}
                 </p>
-                {kpi.covers != null && <p className="text-xs text-gray-400">{kpi.covers.toLocaleString()} covers</p>}
+                {kpi.covers != null && <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 6 }}>{kpi.covers.toLocaleString()} covers</p>}
                 {revenueTrend.length >= 2 && (
                   <div className="mt-3">
-                    <Sparkline data={revenueTrend.map((d) => d.value)} color="#2563eb" />
+                    <Sparkline data={revenueTrend.map((d) => d.value)} color="#B8935A" />
                   </div>
                 )}
               </div>
 
               {/* Labor */}
-              <div className="bg-white rounded-xl border border-gray-100 p-5">
-                <p className="text-xs text-gray-400 mb-1">Labor</p>
-                <p className={`text-xl sm:text-2xl font-semibold mb-1 ${kpi.laborPct == null ? "text-gray-900" : kpi.laborPct <= 38 ? "text-green-600" : kpi.laborPct <= 42 ? "text-amber-600" : "text-red-600"}`}>
+              <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "24px 28px" }}>
+                <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 8 }}>Labor</p>
+                <p style={{ fontFamily: SERIF, fontSize: "2.2rem", fontWeight: 400, lineHeight: 1, color: kpi.laborPct == null ? "#12120F" : kpi.laborPct <= 42 ? "#12120F" : "#C0392B" }}>
                   {kpi.laborPct != null ? pct(kpi.laborPct) : "—"}
                 </p>
-                {kpi.laborDollars != null && <p className="text-xs text-gray-400">{usd(kpi.laborDollars)}</p>}
+                {kpi.laborDollars != null && <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 6 }}>{usd(kpi.laborDollars)}</p>}
                 {laborPctTrend.length >= 2 && (
                   <div className="mt-3">
-                    <Sparkline data={laborPctTrend.map((d) => d.value)}
-                      color={kpi.laborPct != null && kpi.laborPct <= 38 ? "#16a34a" : kpi.laborPct != null && kpi.laborPct <= 42 ? "#d97706" : "#dc2626"} />
+                    <Sparkline data={laborPctTrend.map((d) => d.value)} color="#B8935A" />
                   </div>
                 )}
               </div>
 
               {/* COGS */}
-              <div className="bg-white rounded-xl border border-gray-100 p-5">
-                <p className="text-xs text-gray-400 mb-1">Food COGS</p>
-                <p className={`text-xl sm:text-2xl font-semibold mb-1 ${kpi.cogsPct == null ? "text-gray-900" : kpi.cogsPct <= 30 ? "text-green-600" : kpi.cogsPct <= 34 ? "text-amber-600" : "text-red-600"}`}>
+              <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "24px 28px" }}>
+                <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 8 }}>Food COGS</p>
+                <p style={{ fontFamily: SERIF, fontSize: "2.2rem", fontWeight: 400, lineHeight: 1, color: kpi.cogsPct == null ? "#12120F" : kpi.cogsPct <= 34 ? "#12120F" : "#C0392B" }}>
                   {kpi.cogsPct != null ? pct(kpi.cogsPct) : "—"}
                 </p>
-                {kpi.cogsDollars != null && <p className="text-xs text-gray-400">{usd(kpi.cogsDollars)}</p>}
+                {kpi.cogsDollars != null && <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 6 }}>{usd(kpi.cogsDollars)}</p>}
                 {cogsPctTrend.length >= 2 && (
                   <div className="mt-3">
-                    <Sparkline data={cogsPctTrend.map((d) => d.value)}
-                      color={kpi.cogsPct != null && kpi.cogsPct <= 30 ? "#16a34a" : kpi.cogsPct != null && kpi.cogsPct <= 34 ? "#d97706" : "#dc2626"} />
+                    <Sparkline data={cogsPctTrend.map((d) => d.value)} color="#B8935A" />
                   </div>
                 )}
               </div>
 
               {/* Net profit */}
-              <div className="bg-white rounded-xl border border-gray-100 p-5">
-                <p className="text-xs text-gray-400 mb-1">Net Profit</p>
-                <p className={`text-xl sm:text-2xl font-semibold mb-1 ${kpi.netProfitPct == null ? "text-gray-900" : kpi.netProfitPct >= 10 ? "text-green-600" : kpi.netProfitPct >= 6 ? "text-amber-600" : "text-red-600"}`}>
+              <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "24px 28px" }}>
+                <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 8 }}>Net Profit</p>
+                <p style={{ fontFamily: SERIF, fontSize: "2.2rem", fontWeight: 400, lineHeight: 1, color: kpi.netProfitPct == null ? "#12120F" : kpi.netProfitPct >= 6 ? "#12120F" : "#C0392B" }}>
                   {kpi.netProfitPct != null ? pct(kpi.netProfitPct) : "—"}
                 </p>
-                {kpi.netProfitDollars != null && <p className="text-xs text-gray-400">{usd(kpi.netProfitDollars)}</p>}
+                {kpi.netProfitDollars != null && <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 6 }}>{usd(kpi.netProfitDollars)}</p>}
                 {profitPctTrend.length >= 2 && (
                   <div className="mt-3">
-                    <Sparkline data={profitPctTrend.map((d) => d.value)}
-                      color={kpi.netProfitPct != null && kpi.netProfitPct >= 10 ? "#16a34a" : kpi.netProfitPct != null && kpi.netProfitPct >= 6 ? "#d97706" : "#dc2626"} />
+                    <Sparkline data={profitPctTrend.map((d) => d.value)} color="#B8935A" />
                   </div>
                 )}
               </div>
             </div>
 
             {/* Deep-dive link */}
-            <div className="mt-3 text-right">
-              <Link href={`/${clientId}/${propertyId}/financial`}
-                className="text-xs text-blue-600 hover:text-blue-700 transition font-medium">
+            <div className="text-right" style={{ marginTop: 12 }}>
+              <Link
+                href={`/${clientId}/${propertyId}/financial`}
+                className="hover:text-[#D4AF7A]"
+                style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#B8935A", textDecoration: "none", transition: "color 0.25s ease" }}
+              >
                 Full financial review →
               </Link>
             </div>
@@ -279,21 +317,19 @@ export default async function PropertyPage({
         {kpi && (kpi.guestOverall || kpi.guestFood || kpi.guestService || kpi.guestAmbiance) && (
           <section>
             <SectionHeader title="Guest Experience" />
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
                 { label: "Overall",  value: kpi.guestOverall },
                 { label: "Food",     value: kpi.guestFood },
                 { label: "Service",  value: kpi.guestService },
                 { label: "Ambiance", value: kpi.guestAmbiance },
               ].filter(({ value }) => value != null).map(({ label, value }) => (
-                <div key={label} className="bg-white rounded-xl border border-gray-100 p-5">
-                  <p className="text-xs text-gray-400 mb-1">{label}</p>
-                  <p className={`text-xl sm:text-2xl font-semibold mb-2 ${value! >= 90 ? "text-green-600" : value! >= 80 ? "text-amber-600" : "text-red-600"}`}>
-                    {value!.toFixed(1)}<span className="text-sm text-gray-300 font-normal"> / 100</span>
+                <div key={label} style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "24px 28px" }}>
+                  <p style={{ fontFamily: SERIF, fontSize: "2.2rem", fontWeight: 400, lineHeight: 1, color: value! >= 80 ? "#12120F" : "#C0392B" }}>
+                    {value!.toFixed(1)}<span style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.3)", fontWeight: 300 }}> / 100</span>
                   </p>
-                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${value! >= 90 ? "bg-green-500" : value! >= 80 ? "bg-amber-500" : "bg-red-500"}`}
-                      style={{ width: `${Math.min(100, value!)}%` }} />
+                  <div style={{ height: 3, background: "rgba(18,18,15,0.08)", overflow: "hidden", marginTop: 10 }}>
+                    <div style={{ height: "100%", width: `${Math.min(100, value!)}%`, background: value! >= 80 ? "#B8935A" : "#C0392B" }} />
                   </div>
                 </div>
               ))}
@@ -305,22 +341,30 @@ export default async function PropertyPage({
         {activeRisks.length > 0 && (
           <section>
             <SectionHeader title="Active Risks" />
-            <div className="space-y-3">
-              {activeRisks.map((risk) => (
-                <div key={risk.id} className="bg-white rounded-xl border border-gray-100 px-5 py-4">
-                  <div className="flex items-start gap-3">
-                    <HealthDot color={risk.status === "Open" || risk.status === "Escalated" ? "red" : "amber"} />
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between gap-4">
-                        <p className="font-medium text-gray-900">{risk.title}</p>
-                        <StatusBadge label={risk.status} variant={risk.status === "Open" || risk.status === "Escalated" ? "red" : "amber"} />
-                      </div>
-                      {risk.mitigationPlan && <p className="text-sm text-gray-500 mt-0.5">{risk.mitigationPlan}</p>}
-                      {risk.category && <p className="text-xs text-gray-400 mt-1">{risk.category} · {risk.impact} impact</p>}
+            <div>
+              {activeRisks.map((risk) => {
+                const urgent = risk.status === "Open" || risk.status === "Escalated";
+                return (
+                  <div
+                    key={risk.id}
+                    style={{
+                      background: urgent ? "rgba(192,57,43,0.04)" : "#FFFFFF",
+                      border: urgent ? "1px solid rgba(192,57,43,0.12)" : "1px solid rgba(18,18,15,0.08)",
+                      borderLeft: urgent ? "3px solid #C0392B" : "1px solid rgba(18,18,15,0.08)",
+                      borderRadius: 0,
+                      padding: "16px 20px",
+                      marginBottom: 12,
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <p style={{ fontFamily: JOST, fontSize: 13, color: "#12120F" }}>{risk.title}</p>
+                      <StatusBadge label={risk.status} variant={urgent ? "red" : "amber"} />
                     </div>
+                    {risk.mitigationPlan && <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.5)", marginTop: 4 }}>{risk.mitigationPlan}</p>}
+                    {risk.category && <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.35)", marginTop: 4 }}>{risk.category} · {risk.impact} impact</p>}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}
