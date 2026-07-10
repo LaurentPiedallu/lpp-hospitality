@@ -13,7 +13,11 @@ import StatusBadge from "@/components/StatusBadge";
 import TrendChart from "@/components/TrendChart";
 import BenchmarkGauge from "@/components/BenchmarkGauge";
 import RequestAnalysisButton from "@/components/RequestAnalysisButton";
+import EmptyState from "@/components/EmptyState";
 import type { KpiMetric, Intelligence, Opportunity, Severity } from "@/types/portal";
+
+const JOST = "'Jost', 'Inter', system-ui, sans-serif";
+const SERIF = "'Cormorant Garamond', Georgia, serif";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -56,6 +60,7 @@ function CommercialSection({
   metrics,
   allMetrics,
   trendUnit,
+  hideCallout,
   children,
 }: {
   heading: string;
@@ -63,6 +68,7 @@ function CommercialSection({
   metrics: KpiMetric[];
   allMetrics: KpiMetric[];
   trendUnit?: string;
+  hideCallout?: boolean;
   children: React.ReactNode;
 }) {
   const severity = intelligence?.severity ?? (metrics[0]?.severity ?? "Monitor");
@@ -72,7 +78,7 @@ function CommercialSection({
     <section className="space-y-4">
       <SectionHeader title={heading} />
 
-      {intelligence?.currentRead ? (
+      {hideCallout ? null : intelligence?.currentRead ? (
         <CalloutBlock>
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <p>{intelligence.currentRead}</p>
@@ -85,14 +91,14 @@ function CommercialSection({
         </CalloutBlock>
       ) : null}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{children}</div>
+      {children}
 
       {allMetrics.length >= 2 && (() => {
         const trendData = buildTrendData(allMetrics);
         const bLow = allMetrics[0]?.benchmarkLow;
         const bHigh = allMetrics[0]?.benchmarkHigh;
         return (
-          <div className="bg-white rounded-xl border border-gray-100 p-4">
+          <div className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] p-4">
             <p className="text-xs text-gray-400 mb-3 uppercase tracking-widest">Trend</p>
             <TrendChart data={trendData} unit={unit} benchmarkLow={bLow} benchmarkHigh={bHigh} color="#7c3aed" />
           </div>
@@ -100,7 +106,7 @@ function CommercialSection({
       })()}
 
       {(intelligence?.whyItMatters || intelligence?.suggestedDecision) && (
-        <details className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden">
           <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between select-none hover:bg-gray-50 transition">
             <span>Commentary</span>
             <span className="text-gray-400 text-xs">▼</span>
@@ -123,7 +129,7 @@ function CommercialSection({
       )}
 
       {metrics.length > 0 && (
-        <details className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden">
           <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between select-none hover:bg-gray-50 transition">
             <span>Supporting detail</span>
             <span className="text-gray-400 text-xs">▼</span>
@@ -183,7 +189,7 @@ function OpportunitiesPanel({ opportunities }: { opportunities: Opportunity[] })
       <SectionHeader title="Value Creation Opportunities" />
       <div className="grid gap-3 md:grid-cols-2">
         {opportunities.map((opp) => (
-          <div key={opp.id} className="bg-white rounded-xl border border-gray-100 p-5">
+          <div key={opp.id} className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] p-5">
             <div className="flex items-start justify-between gap-3 mb-2">
               <p className="text-sm font-medium text-gray-900 leading-snug">{opp.title}</p>
               <StatusBadge
@@ -206,21 +212,63 @@ function OpportunitiesPanel({ opportunities }: { opportunities: Opportunity[] })
   );
 }
 
-// ─── Guest experience rating bar ──────────────────────────────────────────────
+// ─── Guest sentiment — overall rating number + theme cards ───────────────────
 
-function RatingBar({ label, value, max = 100 }: { label: string; value: number | null; max?: number }) {
-  if (value == null) return null;
-  const pctWidth = Math.min(100, (value / max) * 100);
-  const color = value / max >= 0.8 ? "bg-green-400" : value / max >= 0.6 ? "bg-amber-400" : "bg-red-400";
+function GuestSentimentBlock({ overallRating, summary }: { overallRating: KpiMetric | null; summary: string | null }) {
+  if (!overallRating) return null;
   return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-xs text-gray-600">{label}</span>
-        <span className="text-xs font-medium text-gray-900">{value.toFixed(1)} / {max}</span>
+    <div className="flex flex-col sm:flex-row sm:items-center gap-6">
+      <div style={{ flexShrink: 0 }}>
+        <p style={{ fontFamily: SERIF, fontSize: "3rem", fontWeight: 300, color: "#B8935A", lineHeight: 1 }}>
+          {overallRating.metricValue.toFixed(1)}
+        </p>
+        <p style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(18,18,15,0.4)", marginTop: 6 }}>
+          Average rating
+        </p>
       </div>
-      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${pctWidth}%` }} />
-      </div>
+      {summary && (
+        <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.6)", lineHeight: 1.7 }}>{summary}</p>
+      )}
+    </div>
+  );
+}
+
+type Sentiment = "Positive" | "Neutral" | "Negative";
+
+function sentimentFromValue(value: number, max: number): Sentiment {
+  const ratio = value / max;
+  if (ratio >= 0.85) return "Positive";
+  if (ratio >= 0.65) return "Neutral";
+  return "Negative";
+}
+
+const SENTIMENT_STYLE: Record<Sentiment, React.CSSProperties> = {
+  Positive: { background: "rgba(18,18,15,0.06)", color: "rgba(18,18,15,0.5)" },
+  Neutral: { background: "rgba(184,147,90,0.08)", color: "rgba(184,147,90,0.8)" },
+  Negative: { background: "rgba(192,57,43,0.06)", color: "#C0392B" },
+};
+
+function ThemeCard({ label, value, max }: { label: string; value: number; max: number }) {
+  const sentiment = sentimentFromValue(value, max);
+  return (
+    <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "20px 24px" }}>
+      <h3 style={{ fontFamily: SERIF, fontSize: "1.1rem", fontWeight: 400, color: "#12120F", marginBottom: 8 }}>{label}</h3>
+      <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.6)", marginBottom: 12 }}>
+        {value.toFixed(1)} / {max}
+      </p>
+      <span
+        style={{
+          fontFamily: JOST,
+          fontSize: 10,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          padding: "3px 10px",
+          borderRadius: 0,
+          ...SENTIMENT_STYLE[sentiment],
+        }}
+      >
+        {sentiment}
+      </span>
     </div>
   );
 }
@@ -302,44 +350,25 @@ export default async function CommercialPage({
           metrics={guestRatings}
           allMetrics={trendFor("Guest Experience", "Rating", "overall")}
           trendUnit="Rating"
+          hideCallout
         >
-          {overallRating && (
-            <KpiCard
-              key="gOverall"
-              label="Overall Rating"
-              value={overallRating.metricValue.toFixed(1)}
-              sub={`/ ${overallRating.benchmarkHigh ?? 100}`}
-              variant={severityVariant(overallRating.severity)}
-            />
-          )}
-          {guestRatings
-            .filter((g) => !g.metricName.toLowerCase().includes("overall"))
-            .slice(0, 3)
-            .map((g) => (
-              <KpiCard
-                key={g.id}
-                label={g.metricName || g.kpiRecord}
-                value={g.metricValue.toFixed(1)}
-                sub={`/ ${g.benchmarkHigh ?? 100}`}
-                variant={severityVariant(g.severity)}
-              />
-            ))}
-        </CommercialSection>
+          <GuestSentimentBlock overallRating={overallRating} summary={intel("Guest")?.currentRead ?? null} />
 
-        {/* Rating bars — visual breakdown */}
-        {guestRatings.length > 1 && (
-          <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">
-            <p className="text-xs text-gray-400 uppercase tracking-widest mb-2">Ratings Breakdown</p>
-            {guestRatings.map((g) => (
-              <RatingBar
-                key={g.id}
-                label={g.metricName || g.kpiRecord}
-                value={g.metricValue}
-                max={g.benchmarkHigh ?? 100}
-              />
-            ))}
-          </div>
-        )}
+          {guestRatings.filter((g) => !g.metricName.toLowerCase().includes("overall")).length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {guestRatings
+                .filter((g) => !g.metricName.toLowerCase().includes("overall"))
+                .map((g) => (
+                  <ThemeCard
+                    key={g.id}
+                    label={g.metricName || g.kpiRecord}
+                    value={g.metricValue}
+                    max={g.benchmarkHigh ?? 100}
+                  />
+                ))}
+            </div>
+          )}
+        </CommercialSection>
 
         {/* ── Volume & Conversion ──────────────────────────────────────── */}
         <CommercialSection
@@ -349,30 +378,32 @@ export default async function CommercialPage({
           allMetrics={trendFor("Revenue", "Count")}
           trendUnit="Count"
         >
-          {coversMetric && (
-            <KpiCard
-              key="covers"
-              label="Covers / Guests"
-              value={coversMetric.metricValue.toLocaleString()}
-              variant={severityVariant(coversMetric.severity)}
-            />
-          )}
-          {conversionMetric && (
-            <KpiCard
-              key="conv"
-              label="Conversion"
-              value={pct(conversionMetric.metricValue)}
-              variant={severityVariant(conversionMetric.severity)}
-            />
-          )}
-          {channelMetrics.slice(0, 2).map((c) => (
-            <KpiCard
-              key={c.id}
-              label={c.metricName || c.kpiRecord}
-              value={c.unit === "%" ? pct(c.metricValue) : c.unit === "$" ? usd(c.metricValue) : c.metricValue.toLocaleString()}
-              variant={severityVariant(c.severity)}
-            />
-          ))}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {coversMetric && (
+              <KpiCard
+                key="covers"
+                label="Covers / Guests"
+                value={coversMetric.metricValue.toLocaleString()}
+                variant={severityVariant(coversMetric.severity)}
+              />
+            )}
+            {conversionMetric && (
+              <KpiCard
+                key="conv"
+                label="Conversion"
+                value={pct(conversionMetric.metricValue)}
+                variant={severityVariant(conversionMetric.severity)}
+              />
+            )}
+            {channelMetrics.slice(0, 2).map((c) => (
+              <KpiCard
+                key={c.id}
+                label={c.metricName || c.kpiRecord}
+                value={c.unit === "%" ? pct(c.metricValue) : c.unit === "$" ? usd(c.metricValue) : c.metricValue.toLocaleString()}
+                variant={severityVariant(c.severity)}
+              />
+            ))}
+          </div>
         </CommercialSection>
 
         {/* ── Revenue Drivers ──────────────────────────────────────────── */}
@@ -384,32 +415,34 @@ export default async function CommercialPage({
             allMetrics={trendFor("Revenue", "$")}
             trendUnit="$"
           >
-            {[
-              m("Revenue", "$") && (
-                <KpiCard key="rev" label="Total Revenue" value={usd(m("Revenue", "$")!.metricValue)}
-                  variant={severityVariant(m("Revenue", "$")!.severity)} />
-              ),
-              m("Revenue", "$", "spend") && (
-                <KpiCard key="asp" label="Avg Spend" value={usd(m("Revenue", "$", "spend")!.metricValue)}
-                  variant={severityVariant(m("Revenue", "$", "spend")!.severity)} />
-              ),
-              m("Revenue", "$", "check") && (
-                <KpiCard key="avc" label="Avg Check" value={usd(m("Revenue", "$", "check")!.metricValue)}
-                  variant={severityVariant(m("Revenue", "$", "check")!.severity)} />
-              ),
-              m("Revenue", "$", "adr") && (
-                <KpiCard key="adr" label="ADR" value={usd(m("Revenue", "$", "adr")!.metricValue)}
-                  variant={severityVariant(m("Revenue", "$", "adr")!.severity)} />
-              ),
-              m("Revenue", "$", "revpar") && (
-                <KpiCard key="rev" label="RevPAR" value={usd(m("Revenue", "$", "revpar")!.metricValue)}
-                  variant={severityVariant(m("Revenue", "$", "revpar")!.severity)} />
-              ),
-              m("Revenue", "%", "occupancy") && (
-                <KpiCard key="occ" label="Occupancy" value={pct(m("Revenue", "%", "occupancy")!.metricValue)}
-                  variant={severityVariant(m("Revenue", "%", "occupancy")!.severity)} />
-              ),
-            ].filter(Boolean)}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                m("Revenue", "$") && (
+                  <KpiCard key="rev" label="Total Revenue" value={usd(m("Revenue", "$")!.metricValue)}
+                    variant={severityVariant(m("Revenue", "$")!.severity)} />
+                ),
+                m("Revenue", "$", "spend") && (
+                  <KpiCard key="asp" label="Avg Spend" value={usd(m("Revenue", "$", "spend")!.metricValue)}
+                    variant={severityVariant(m("Revenue", "$", "spend")!.severity)} />
+                ),
+                m("Revenue", "$", "check") && (
+                  <KpiCard key="avc" label="Avg Check" value={usd(m("Revenue", "$", "check")!.metricValue)}
+                    variant={severityVariant(m("Revenue", "$", "check")!.severity)} />
+                ),
+                m("Revenue", "$", "adr") && (
+                  <KpiCard key="adr" label="ADR" value={usd(m("Revenue", "$", "adr")!.metricValue)}
+                    variant={severityVariant(m("Revenue", "$", "adr")!.severity)} />
+                ),
+                m("Revenue", "$", "revpar") && (
+                  <KpiCard key="rev" label="RevPAR" value={usd(m("Revenue", "$", "revpar")!.metricValue)}
+                    variant={severityVariant(m("Revenue", "$", "revpar")!.severity)} />
+                ),
+                m("Revenue", "%", "occupancy") && (
+                  <KpiCard key="occ" label="Occupancy" value={pct(m("Revenue", "%", "occupancy")!.metricValue)}
+                    variant={severityVariant(m("Revenue", "%", "occupancy")!.severity)} />
+                ),
+              ].filter(Boolean)}
+            </div>
           </CommercialSection>
         )}
 
@@ -423,7 +456,7 @@ export default async function CommercialPage({
           return (
             <section className="space-y-4">
               <SectionHeader title="Performance vs Benchmarks" />
-              <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              <div className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] p-6">
                 <p className="text-xs text-gray-400 mb-5">
                   Grey zone = industry benchmark range · ★ = top quartile · dot = your value
                 </p>
@@ -450,10 +483,12 @@ export default async function CommercialPage({
 
         {/* Empty state */}
         {allMetrics.length === 0 && opportunities.length === 0 && (
-          <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-16 text-center">
-            <p className="text-sm text-gray-400">No commercial data published for this property yet.</p>
-            <p className="text-xs text-gray-300 mt-1">Data appears here once uploaded and reviewed by LPP.</p>
-          </div>
+          <EmptyState
+            title="No guest feedback yet"
+            body="Guest feedback synthesis will appear here once review data has been uploaded and processed."
+            ctaLabel="Go to Upload →"
+            ctaHref={`/${clientId}/${propertyId}/upload`}
+          />
         )}
 
       </div>
