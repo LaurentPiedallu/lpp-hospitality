@@ -1,5 +1,6 @@
 // Accepts a file via FormData, validates format, stores in R2,
-// creates a Notion Uploads record, then notifies the Make.com pipeline.
+// creates a Notion Uploads record (status: Pending), then triggers the
+// Make extraction webhook so processing starts automatically.
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/api-helpers";
@@ -8,11 +9,6 @@ import { NOTION_DBS } from "@/lib/notion-ids";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 const NOTION_VERSION = "2022-06-28";
-
-// ─── Webhook URLs ────────────────────────────────────────────────────────────
-
-const WEBHOOK_CSV = (process.env.MAKE_WEBHOOK_URL     ?? "https://hook.us2.make.com/vzh17uueiewwg75b9g3xpmpf1wnxrgwa").trim();
-const WEBHOOK_PDF = (process.env.MAKE_WEBHOOK_URL_PDF ?? "https://hook.us2.make.com/6njuyc3vcs78eqro495b7ygo3ic6hjmm").trim();
 
 // ─── File format helpers ──────────────────────────────────────────────────────
 
@@ -166,7 +162,7 @@ export async function POST(req: NextRequest) {
 
   // 1. Store in R2 — must succeed before Notion record is created
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { env, ctx } = await getCloudflareContext() as any;
+  const { env } = await getCloudflareContext() as any;
   const key = buildKey(clientId, propertyId, reportingPeriod, file.name);
 
   const fileBuffer = await file.arrayBuffer();
@@ -193,7 +189,7 @@ export async function POST(req: NextRequest) {
       "Client":            { relation:  [{ id: clientId }] },
       "Property":          { relation:  [{ id: propertyId }] },
       "Upload Date":       { date:      { start: today } },
-      "Processing Status": { select:    { name: "Uploaded" } },
+      "Processing Status": { select:    { name: "Pending" } },
       "File Format":       { select:    { name: fmt } },
       "File URL":          { url:       fileUrl },
       ...(uploadType?.trim()       ? { "Upload Type":      { select:    { name: uploadType.trim() } } } : {}),
@@ -220,43 +216,29 @@ export async function POST(req: NextRequest) {
 
   const notionPage = await notionRes.json() as { id: string };
 
-  // 4. Notify Make.com — PDF uses its own scenario, everything else uses the CSV scenario
-  const webhookUrl = fmt === "PDF" ? WEBHOOK_PDF : WEBHOOK_CSV;
-
-  const webhookPayload: {
-    uploadPageId: string;
-    propertyId: string;
-    clientId: string;
-    requestedAt: string;
-    fileUrl: string;
-    fileFormat: string;
-    fileBase64?: string;
-  } = {
-    uploadPageId: notionPage.id,
-    propertyId:   propertyId,
-    clientId:     clientId,
-    requestedAt:  new Date().toISOString(),
-    fileUrl:      fileUrl,
-    fileFormat:   fmt,
-  };
-
-  if (fmt === "PDF") {
-    webhookPayload.fileBase64 = Buffer.from(fileBuffer).toString("base64");
+  // 4. Trigger the KPI extraction pipeline for this Upload record.
+  // Processing Status in Notion is just a label — this webhook is the only
+  // thing that actually kicks off extraction, so a failure here means the
+  // upload is stored correctly but sits inert until someone retries it.
+  let extractionTriggered = false;
+  const extractionWebhook = process.env.MAKE_WEBHOOK_URL_EXTRACTION;
+  if (extractionWebhook) {
+    try {
+      const webhookRes = await fetch(extractionWebhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: { id: notionPage.id } }),
+      });
+      extractionTriggered = webhookRes.ok;
+      if (!webhookRes.ok) {
+        console.error("Extraction webhook failed:", webhookRes.status, await webhookRes.text().catch(() => ""));
+      }
+    } catch (err) {
+      console.error("Extraction webhook request failed:", err);
+    }
+  } else {
+    console.error("MAKE_WEBHOOK_URL_EXTRACTION is not configured — upload recorded but extraction was not triggered");
   }
 
-  console.log("Make webhook payload:", JSON.stringify({
-    ...webhookPayload,
-    fileBase64: webhookPayload.fileBase64 ? `[base64 ${webhookPayload.fileBase64.length} chars]` : undefined,
-  }));
-  // ctx.waitUntil keeps the Worker alive until the fetch completes.
-  // Plain fire-and-forget is killed when the response is returned in CF Workers.
-  ctx.waitUntil(
-    fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(webhookPayload),
-    }).catch((err) => console.error("Make webhook fire failed:", err))
-  );
-
-  return NextResponse.json({ ok: true, key, notionPageId: notionPage.id });
+  return NextResponse.json({ ok: true, key, notionPageId: notionPage.id, extractionTriggered });
 }
