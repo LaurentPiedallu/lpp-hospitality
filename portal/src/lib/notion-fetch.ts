@@ -52,6 +52,18 @@ export function relationId(page: NotionPage, prop: string): string {
   return page.properties?.[prop]?.relation?.[0]?.id ?? "";
 }
 
+export function relationIds(page: NotionPage, prop: string): string[] {
+  return (page.properties?.[prop]?.relation ?? []).map((r: { id: string }) => r.id);
+}
+
+// Rollup properties nest their value under `.rollup`, typed by the rollup's
+// own function (number/date/array). We only need the "number" shape here.
+export function rollupNumber(page: NotionPage, prop: string): number | null {
+  const rollup = page.properties?.[prop]?.rollup;
+  if (!rollup || rollup.type !== "number") return null;
+  return rollup.number ?? null;
+}
+
 export function files(page: NotionPage, prop: string): string {
   const f = page.properties?.[prop]?.files?.[0];
   return f?.file?.url ?? f?.external?.url ?? "";
@@ -94,6 +106,28 @@ export async function queryDatabase(opts: QueryOptions): Promise<NotionPage[]> {
   } while (cursor);
 
   return results;
+}
+
+// Update a single select property on an existing page. Returns the updated
+// page as returned by Notion, so the caller can read back the confirmed
+// value rather than assuming the write applied as requested.
+export async function updateSelectProperty(
+  pageId: string,
+  property: string,
+  value: string
+): Promise<NotionPage> {
+  const res = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+    method: "PATCH",
+    headers: headers(),
+    body: JSON.stringify({ properties: { [property]: { select: { name: value } } } }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Notion update failed (${res.status}): ${errText}`);
+  }
+
+  return res.json() as Promise<NotionPage>;
 }
 
 // Published-only filter — AND-composed with any extra filter

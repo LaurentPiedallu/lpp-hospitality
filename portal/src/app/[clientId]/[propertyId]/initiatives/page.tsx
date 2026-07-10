@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { getProperty, getInitiatives, getLatestKpiSummary } from "@/lib/notion-queries";
+import { getProperty, getInitiatives, getActions, getLatestKpiSummary } from "@/lib/notion-queries";
 import { usd } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
@@ -8,7 +8,8 @@ import PropertyHeader from "@/components/PropertyHeader";
 import PropertyTabs from "@/components/PropertyTabs";
 import StatusBadge from "@/components/StatusBadge";
 import EmptyState from "@/components/EmptyState";
-import type { Initiative, InitiativeStatus, InitiativeColumn } from "@/types/portal";
+import InitiativeProgress from "@/components/InitiativeProgress";
+import type { Initiative, InitiativeStatus, InitiativeColumn, Action } from "@/types/portal";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 const SERIF = "'Cormorant Garamond', Georgia, serif";
@@ -43,7 +44,19 @@ const COLUMNS: { id: InitiativeColumn; label: string; description: string }[] = 
 
 // ─── Initiative card ──────────────────────────────────────────────────────────
 
-function InitiativeCard({ initiative: i }: { initiative: Initiative }) {
+function InitiativeCard({
+  initiative: i,
+  actions,
+  clientId,
+  propertyId,
+}: {
+  initiative: Initiative;
+  actions: Action[];
+  clientId: string;
+  propertyId: string;
+}) {
+  const linkedActions = actions.filter((a) => i.actionIds.includes(a.id));
+
   return (
     <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: 16 }} className="space-y-3">
       <div className="flex items-start justify-between gap-2">
@@ -82,6 +95,8 @@ function InitiativeCard({ initiative: i }: { initiative: Initiative }) {
           )}
         </div>
       )}
+
+      <InitiativeProgress clientId={clientId} propertyId={propertyId} actions={linkedActions} />
     </div>
   );
 }
@@ -91,9 +106,15 @@ function InitiativeCard({ initiative: i }: { initiative: Initiative }) {
 function KanbanColumn({
   column,
   initiatives,
+  actions,
+  clientId,
+  propertyId,
 }: {
   column: typeof COLUMNS[number];
   initiatives: Initiative[];
+  actions: Action[];
+  clientId: string;
+  propertyId: string;
 }) {
   const active = initiatives.filter((i) => i.status !== "Archived");
   const totalImpact = active.reduce((sum, i) => sum + (i.expectedImpact ?? 0), 0);
@@ -121,7 +142,9 @@ function KanbanColumn({
         {active.length === 0 ? (
           <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.3)", textAlign: "center", marginTop: 32, fontStyle: "italic" }}>No initiatives</p>
         ) : (
-          active.map((i) => <InitiativeCard key={i.id} initiative={i} />)
+          active.map((i) => (
+            <InitiativeCard key={i.id} initiative={i} actions={actions} clientId={clientId} propertyId={propertyId} />
+          ))
         )}
       </div>
     </div>
@@ -169,9 +192,10 @@ export default async function InitiativesPage({
   const { clientId, propertyId } = await params;
   if (session.role !== "admin" && session.clientId !== clientId) redirect("/dashboard");
 
-  const [property, initiatives, kpi] = await Promise.all([
+  const [property, initiatives, actions, kpi] = await Promise.all([
     getProperty(propertyId, clientId),
     getInitiatives(propertyId),
+    getActions(propertyId),
     getLatestKpiSummary(propertyId),
   ]);
 
@@ -193,7 +217,14 @@ export default async function InitiativesPage({
         {initiatives.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {COLUMNS.map((col) => (
-              <KanbanColumn key={col.id} column={col} initiatives={byColumn(col.id)} />
+              <KanbanColumn
+                key={col.id}
+                column={col}
+                initiatives={byColumn(col.id)}
+                actions={actions}
+                clientId={clientId}
+                propertyId={propertyId}
+              />
             ))}
           </div>
         ) : (
@@ -210,7 +241,9 @@ export default async function InitiativesPage({
               <span className="text-gray-400 text-xs">▼</span>
             </summary>
             <div className="p-4 border-t border-gray-50 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-              {archived.map((i) => <InitiativeCard key={i.id} initiative={i} />)}
+              {archived.map((i) => (
+                <InitiativeCard key={i.id} initiative={i} actions={actions} clientId={clientId} propertyId={propertyId} />
+              ))}
             </div>
           </details>
         )}

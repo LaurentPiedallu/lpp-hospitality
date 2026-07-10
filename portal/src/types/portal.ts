@@ -136,6 +136,8 @@ export interface Initiative {
   column: InitiativeColumn; // derived from priority
   expectedImpact: number;
   nextMilestone: string;
+  actionIds: string[];        // linked Actions relation
+  completionPct: number | null; // 0-100, from Notion's Completion % rollup
 }
 
 export interface Brief {

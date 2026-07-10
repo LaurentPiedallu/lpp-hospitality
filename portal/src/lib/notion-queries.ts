@@ -4,6 +4,7 @@
 import {
   queryDatabase, publishedAnd, relationFilter,
   title, richText, select, num, email, url, checkbox,
+  relationIds, rollupNumber, updateSelectProperty,
 } from "./notion-fetch";
 import { NOTION_DBS } from "./notion-ids";
 import type {
@@ -263,6 +264,7 @@ export async function getInitiatives(propertyId: string): Promise<Initiative[]> 
   });
   return pages.map((p) => {
     const priority = select(p, "Priority") || "Medium";
+    const completionFraction = rollupNumber(p, "Completion %");
     return {
       id: p.id,
       propertyId,
@@ -275,8 +277,21 @@ export async function getInitiatives(propertyId: string): Promise<Initiative[]> 
       column: priorityToColumn(priority),
       expectedImpact: num(p, "Expected Impact"),
       nextMilestone: richText(p, "Next Milestone"),
+      actionIds: relationIds(p, "Actions"),
+      completionPct: completionFraction != null ? Math.round(completionFraction * 100) : null,
     };
   });
+}
+
+// Update an Action's Status in Notion and return the confirmed value from
+// Notion's response — the caller should trust this over whatever it optimistically
+// assumed, since it's read back from the actual write result.
+export async function updateActionStatus(
+  actionId: string,
+  status: Action["status"]
+): Promise<Action["status"]> {
+  const page = await updateSelectProperty(actionId, "Status", status);
+  return (select(page, "Status") || status) as Action["status"];
 }
 
 // ─── Briefs ───────────────────────────────────────────────────────────────────
