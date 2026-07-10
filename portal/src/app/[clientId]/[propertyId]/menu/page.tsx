@@ -13,6 +13,7 @@ import StatusBadge from "@/components/StatusBadge";
 import TrendChart from "@/components/TrendChart";
 import BenchmarkGauge from "@/components/BenchmarkGauge";
 import RequestAnalysisButton from "@/components/RequestAnalysisButton";
+import EmptyState from "@/components/EmptyState";
 import type { KpiMetric, Intelligence, Benchmark, Severity } from "@/types/portal";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -94,7 +95,7 @@ function MenuSection({
         const bLow = allMetrics[0]?.benchmarkLow;
         const bHigh = allMetrics[0]?.benchmarkHigh;
         return (
-          <div className="bg-white rounded-xl border border-gray-100 p-4">
+          <div className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] p-4">
             <p className="text-xs text-gray-400 mb-3 uppercase tracking-widest">Trend</p>
             <TrendChart data={trendData} unit={unit} benchmarkLow={bLow} benchmarkHigh={bHigh} color="#059669" />
           </div>
@@ -102,7 +103,7 @@ function MenuSection({
       })()}
 
       {(intelligence?.whyItMatters || intelligence?.suggestedDecision) && (
-        <details className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden">
           <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between select-none hover:bg-gray-50 transition">
             <span>Commentary</span>
             <span className="text-gray-400 text-xs">▼</span>
@@ -125,7 +126,7 @@ function MenuSection({
       )}
 
       {metrics.length > 0 && (
-        <details className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden">
           <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between select-none hover:bg-gray-50 transition">
             <span>Supporting detail</span>
             <span className="text-gray-400 text-xs">▼</span>
@@ -233,7 +234,7 @@ function BenchmarkTable({
 
       {/* Gauges for benchmarks that match a current KPI value */}
       {withValue.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-6">
+        <div className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] p-6">
           <p className="text-xs text-gray-400 mb-5">
             Grey zone = industry range · ★ = top quartile · dot = your value
           </p>
@@ -256,7 +257,7 @@ function BenchmarkTable({
 
       {/* Reference-only table for benchmarks without a matched KPI metric */}
       {referenceOnly.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-50 bg-gray-50">
             <p className="text-xs text-gray-400 font-medium">Industry Reference Ranges</p>
           </div>
@@ -397,7 +398,7 @@ export default async function MenuPage({
         {menuMix.length > 0 && (
           <section className="space-y-4">
             <SectionHeader title="Category Mix" />
-            <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">
+            <div className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] p-6 space-y-4">
               {menuMix.map((mix, i) => (
                 <MixBar
                   key={mix.id}
@@ -445,7 +446,7 @@ export default async function MenuPage({
               </div>
             </CalloutBlock>
             {(executionIntel.whyItMatters || executionIntel.suggestedDecision) && (
-              <details className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+              <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden">
                 <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between select-none hover:bg-gray-50 transition">
                   <span>Commentary</span>
                   <span className="text-gray-400 text-xs">▼</span>
@@ -474,10 +475,12 @@ export default async function MenuPage({
 
         {/* Empty state */}
         {allMetrics.length === 0 && (
-          <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-16 text-center">
-            <p className="text-sm text-gray-400">No menu data published for this property yet.</p>
-            <p className="text-xs text-gray-300 mt-1">Data appears here once uploaded and reviewed by LPP.</p>
-          </div>
+          <EmptyState
+            title="No menu data yet"
+            body="Upload a POS menu mix report to activate menu performance analysis for this property."
+            ctaLabel="Go to Upload →"
+            ctaHref={`/${clientId}/${propertyId}/upload`}
+          />
         )}
 
       </div>

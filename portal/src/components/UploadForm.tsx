@@ -11,6 +11,10 @@ interface UploadFormProps {
 type Stage = "idle" | "uploading" | "done" | "error";
 type FileFormat = "CSV" | "PDF" | "Excel" | "";
 
+const JOST = "'Jost', 'Inter', system-ui, sans-serif";
+const SERIF = "'Cormorant Garamond', Georgia, serif";
+const GOLD = "#B8935A";
+
 const ACCEPTED = [
   "application/pdf",
   "application/vnd.ms-excel",
@@ -55,6 +59,28 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+const selectStyle: React.CSSProperties = {
+  width: "100%",
+  fontFamily: JOST,
+  fontSize: 13,
+  border: "1px solid rgba(18,18,15,0.12)",
+  borderRadius: 0,
+  padding: "12px 14px",
+  background: "#FFFFFF",
+  color: "#12120F",
+  outline: "none",
+};
+
+const labelStyle: React.CSSProperties = {
+  display: "block",
+  fontFamily: JOST,
+  fontSize: 9,
+  letterSpacing: "0.14em",
+  textTransform: "uppercase",
+  color: "rgba(18,18,15,0.4)",
+  marginBottom: 8,
+};
 
 export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFormProps) {
   const [file, setFile]             = useState<File | null>(null);
@@ -151,17 +177,28 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
 
   if (stage === "done") {
     return (
-      <div className="bg-green-50 border border-green-200 rounded-2xl p-8 text-center space-y-3">
-        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-          <span className="text-green-600 text-xl">✓</span>
-        </div>
-        <p className="text-sm font-semibold text-green-800">File uploaded successfully</p>
-        <p className="text-xs text-green-600">
-          Your file has been sent to LPP for review. You'll see it in your Documents page shortly.
+      <div style={{ background: "rgba(184,147,90,0.06)", border: "1px solid rgba(184,147,90,0.2)", borderRadius: 0, padding: 32, textAlign: "center" }}>
+        <p style={{ fontFamily: SERIF, fontSize: "1.2rem", fontWeight: 400, color: "#12120F", marginBottom: 8 }}>
+          File uploaded successfully
+        </p>
+        <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.5)" }}>
+          File received. LPP will review and process your data within 48 hours.
         </p>
         <button
           onClick={reset}
-          className="mt-2 text-xs font-medium text-green-700 hover:text-green-800 underline underline-offset-2"
+          className="hover:text-[#12120F]"
+          style={{
+            marginTop: 12,
+            fontFamily: JOST,
+            fontSize: 10,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            color: GOLD,
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            transition: "color 0.25s ease",
+          }}
         >
           Upload another file
         </button>
@@ -177,10 +214,16 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
         onClick={() => inputRef.current?.click()}
-        className={`
-          relative border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition
-          ${dragging ? "border-blue-400 bg-blue-50" : "border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50"}
-        `}
+        style={{
+          position: "relative",
+          border: `2px dashed ${dragging ? "rgba(184,147,90,0.4)" : "rgba(18,18,15,0.12)"}`,
+          borderRadius: 0,
+          padding: 32,
+          textAlign: "center",
+          cursor: "pointer",
+          background: dragging ? "rgba(184,147,90,0.03)" : "rgba(18,18,15,0.02)",
+          transition: "border-color 0.25s ease, background 0.25s ease",
+        }}
       >
         <input
           ref={inputRef}
@@ -191,29 +234,48 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
         />
 
         {file ? (
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-gray-900">{file.name}</p>
-            <p className="text-xs text-gray-400">{formatBytes(file.size)}</p>
+          <div>
+            <p style={{ fontFamily: SERIF, fontSize: "1.1rem", color: "#12120F", marginBottom: 4 }}>{file.name}</p>
+            <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.4)" }}>{formatBytes(file.size)}</p>
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); reset(); }}
-              className="text-xs text-red-400 hover:text-red-500 mt-1"
+              className="hover:text-[#C0392B]"
+              style={{ marginTop: 8, fontFamily: JOST, fontSize: 11, color: "rgba(192,57,43,0.7)", background: "none", border: "none", cursor: "pointer" }}
             >
               Remove
             </button>
           </div>
         ) : (
-          <div className="space-y-2">
-            <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
-              <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                  d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-              </svg>
-            </div>
-            <p className="text-sm text-gray-600">
-              <span className="font-medium text-blue-600">Click to browse</span> or drag and drop
+          <div>
+            <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.22em", textTransform: "uppercase", color: GOLD, marginBottom: 8 }}>
+              Upload file
             </p>
-            <p className="text-xs text-gray-400">PDF, Excel, CSV, PowerPoint, PNG, JPG · Max 50 MB</p>
+            <p style={{ fontFamily: SERIF, fontSize: "1.1rem", color: "#12120F", marginBottom: 6 }}>
+              Click to browse or drag and drop
+            </p>
+            <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.4)", lineHeight: 1.6 }}>
+              PDF, Excel, CSV, PowerPoint, PNG, JPG · Max 50 MB
+            </p>
+            <button
+              type="button"
+              className="hover:border-[rgba(184,147,90,0.4)] hover:text-[#B8935A]"
+              style={{
+                marginTop: 16,
+                fontFamily: JOST,
+                fontSize: 10,
+                letterSpacing: "0.16em",
+                textTransform: "uppercase",
+                border: "1px solid rgba(18,18,15,0.2)",
+                color: "rgba(18,18,15,0.6)",
+                background: "transparent",
+                padding: "8px 18px",
+                cursor: "pointer",
+                transition: "all 0.25s ease",
+              }}
+            >
+              Choose file
+            </button>
           </div>
         )}
       </div>
@@ -221,14 +283,10 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
       {/* File Format + Upload Type */}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1.5">
-            File format <span className="text-red-400">*</span>
+          <label style={labelStyle}>
+            File format <span style={{ color: "#C0392B" }}>*</span>
           </label>
-          <select
-            value={fileFormat}
-            onChange={(e) => setFileFormat(e.target.value as FileFormat)}
-            className="w-full text-sm border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition bg-white text-gray-700"
-          >
+          <select value={fileFormat} onChange={(e) => setFileFormat(e.target.value as FileFormat)} style={selectStyle}>
             <option value="">Select format…</option>
             {FORMAT_OPTIONS.map(({ value, label }) => (
               <option key={value} value={value}>{label}</option>
@@ -236,14 +294,10 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1.5">
-            Upload type <span className="text-gray-400 font-normal">(optional)</span>
+          <label style={labelStyle}>
+            Upload type <span style={{ color: "rgba(18,18,15,0.35)", textTransform: "none", letterSpacing: 0 }}>(optional)</span>
           </label>
-          <select
-            value={uploadType}
-            onChange={(e) => setUploadType(e.target.value)}
-            className="w-full text-sm border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition bg-white text-gray-700"
-          >
+          <select value={uploadType} onChange={(e) => setUploadType(e.target.value)} style={selectStyle}>
             <option value="">Select type…</option>
             {["P&L","POS Sales","Labor / Payroll","Menu Mix","Budget","Guest Reviews","Reservations","Inventory","Menu Engineering","Other"].map((t) => (
               <option key={t} value={t}>{t}</option>
@@ -254,47 +308,46 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
 
       {/* Reporting Period */}
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1.5">
-          Reporting period <span className="text-gray-400 font-normal">(optional)</span>
+        <label style={labelStyle}>
+          Reporting period <span style={{ color: "rgba(18,18,15,0.35)", textTransform: "none", letterSpacing: 0 }}>(optional)</span>
         </label>
         <input
           type="month"
           value={reportingPeriod}
           onChange={(e) => setReportingPeriod(e.target.value)}
-          className="w-full text-sm border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition"
+          style={selectStyle}
         />
       </div>
 
       {/* Notes */}
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1.5">
-          Notes <span className="text-gray-400 font-normal">(optional)</span>
+        <label style={labelStyle}>
+          Notes <span style={{ color: "rgba(18,18,15,0.35)", textTransform: "none", letterSpacing: 0 }}>(optional)</span>
         </label>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
           placeholder="e.g. March P&L — includes adjusted labor numbers"
-          className="w-full text-sm border border-gray-200 rounded-xl px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition placeholder:text-gray-300"
+          className="placeholder:text-[rgba(18,18,15,0.3)]"
+          style={{ ...selectStyle, resize: "none" }}
         />
       </div>
 
       {/* Progress bar */}
       {stage === "uploading" && (
         <div>
-          <div className="flex items-center justify-between text-xs text-gray-500 mb-1.5">
-            <span>Uploading…</span>
-          </div>
-          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full bg-blue-500 rounded-full animate-pulse w-full" />
+          <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.5)", marginBottom: 6 }}>Uploading…</p>
+          <div style={{ height: 3, background: "rgba(18,18,15,0.08)", overflow: "hidden" }}>
+            <div className="animate-pulse" style={{ height: "100%", width: "100%", background: GOLD }} />
           </div>
         </div>
       )}
 
       {/* Error */}
       {stage === "error" && errorMsg && (
-        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-          <p className="text-xs text-red-700">{errorMsg}</p>
+        <div style={{ background: "rgba(192,57,43,0.06)", border: "1px solid rgba(192,57,43,0.2)", borderRadius: 0, padding: "12px 16px" }}>
+          <p style={{ fontFamily: JOST, fontSize: 12, color: "#C0392B" }}>{errorMsg}</p>
         </div>
       )}
 
@@ -302,7 +355,23 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
       <button
         onClick={submit}
         disabled={!file || stage === "uploading"}
-        className="w-full py-3 px-6 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
+        className="hover:bg-[#D4AF7A]"
+        style={{
+          width: "100%",
+          padding: "13px 24px",
+          background: GOLD,
+          color: "#12120F",
+          fontFamily: JOST,
+          fontSize: 10,
+          fontWeight: 500,
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+          border: "none",
+          borderRadius: 0,
+          cursor: !file || stage === "uploading" ? "not-allowed" : "pointer",
+          opacity: !file || stage === "uploading" ? 0.4 : 1,
+          transition: "background 0.25s ease",
+        }}
       >
         {stage === "uploading" ? "Uploading…" : "Upload file"}
       </button>
