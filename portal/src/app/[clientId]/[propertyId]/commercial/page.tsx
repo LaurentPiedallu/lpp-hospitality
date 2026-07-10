@@ -23,12 +23,6 @@ function severityVariant(s: Severity): "green" | "amber" | "red" {
   return "amber";
 }
 
-function severityCallout(s: Severity): "green" | "amber" | "red" | "gray" {
-  if (s === "Healthy") return "green";
-  if (s === "Critical" || s === "Action Required") return "red";
-  return "amber";
-}
-
 function latestMetric(
   metrics: KpiMetric[],
   category: string,
@@ -79,14 +73,14 @@ function CommercialSection({
       <SectionHeader title={heading} />
 
       {intelligence?.currentRead ? (
-        <CalloutBlock variant={severityCallout(severity)}>
+        <CalloutBlock>
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <p>{intelligence.currentRead}</p>
             <StatusBadge label={severity} variant={severityVariant(severity)} />
           </div>
         </CalloutBlock>
       ) : metrics.length > 0 ? (
-        <CalloutBlock variant="gray">
+        <CalloutBlock>
           <p className="text-sm opacity-60 italic">No commentary published for this period.</p>
         </CalloutBlock>
       ) : null}

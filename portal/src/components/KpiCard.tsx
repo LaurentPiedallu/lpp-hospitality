@@ -1,10 +1,10 @@
 type Variant = "green" | "amber" | "red" | "neutral";
 
-const LABEL_STYLES: Record<Variant, string> = {
-  green:   "text-green-600",
-  amber:   "text-amber-600",
-  red:     "text-red-600",
-  neutral: "text-gray-500",
+const VALUE_COLOR: Record<Variant, string> = {
+  green: "#12120F",
+  amber: "#B8935A",
+  red: "#C0392B",
+  neutral: "#12120F",
 };
 
 export default function KpiCard({
@@ -19,10 +19,31 @@ export default function KpiCard({
   variant?: Variant;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-5">
-      <p className="text-xs text-gray-400 mb-1">{label}</p>
-      <p className={`text-xl sm:text-2xl font-semibold ${LABEL_STYLES[variant]}`}>{value}</p>
-      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+    <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "24px 28px" }}>
+      <p
+        style={{
+          fontFamily: "'Jost', 'Inter', system-ui, sans-serif",
+          fontSize: 9,
+          letterSpacing: "0.16em",
+          textTransform: "uppercase",
+          color: "rgba(18,18,15,0.35)",
+          marginBottom: 8,
+        }}
+      >
+        {label}
+      </p>
+      <p
+        style={{
+          fontFamily: "'Cormorant Garamond', Georgia, serif",
+          fontSize: "2.2rem",
+          fontWeight: 400,
+          color: VALUE_COLOR[variant],
+          lineHeight: 1,
+        }}
+      >
+        {value}
+      </p>
+      {sub && <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 6 }}>{sub}</p>}
     </div>
   );
 }

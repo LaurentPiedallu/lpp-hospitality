@@ -1,21 +1,20 @@
-type Variant = "amber" | "red" | "green" | "gray";
-
-const STYLES: Record<Variant, string> = {
-  amber: "bg-amber-50 border-amber-200 text-amber-900",
-  red:   "bg-red-50 border-red-200 text-red-900",
-  green: "bg-green-50 border-green-200 text-green-900",
-  gray:  "bg-gray-50 border-gray-200 text-gray-700",
-};
-
-export default function CalloutBlock({
-  children,
-  variant = "amber",
-}: {
-  children: React.ReactNode;
-  variant?: Variant;
-}) {
+export default function CalloutBlock({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`rounded-xl border px-5 py-4 text-sm leading-relaxed ${STYLES[variant]}`}>
+    <div
+      style={{
+        background: "#FFFFFF",
+        border: "1px solid rgba(18,18,15,0.08)",
+        borderLeft: "3px solid #B8935A",
+        borderRadius: 0,
+        padding: "28px 32px",
+        marginBottom: 20,
+        fontFamily: "'Jost', 'Inter', system-ui, sans-serif",
+        fontSize: 13,
+        lineHeight: 1.8,
+        color: "rgba(18,18,15,0.65)",
+        fontWeight: 300,
+      }}
+    >
       {children}
     </div>
   );

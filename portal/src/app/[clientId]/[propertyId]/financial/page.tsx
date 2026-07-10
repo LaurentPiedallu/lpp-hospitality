@@ -13,6 +13,7 @@ import StatusBadge from "@/components/StatusBadge";
 import TrendChart from "@/components/TrendChart";
 import BenchmarkGauge from "@/components/BenchmarkGauge";
 import RequestAnalysisButton from "@/components/RequestAnalysisButton";
+import EmptyState from "@/components/EmptyState";
 import type { KpiMetric, Intelligence, Severity } from "@/types/portal";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -20,12 +21,6 @@ import type { KpiMetric, Intelligence, Severity } from "@/types/portal";
 function severityVariant(s: Severity): "green" | "amber" | "red" {
   if (s === "Healthy") return "green";
   if (s === "Critical") return "red";
-  return "amber";
-}
-
-function severityCallout(s: Severity): "green" | "amber" | "red" | "gray" {
-  if (s === "Healthy") return "green";
-  if (s === "Critical" || s === "Action Required") return "red";
   return "amber";
 }
 
@@ -78,14 +73,14 @@ function FinancialSection({
 
       {/* Current read callout */}
       {intelligence?.currentRead ? (
-        <CalloutBlock variant={severityCallout(severity)}>
+        <CalloutBlock>
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <p>{intelligence.currentRead}</p>
             <StatusBadge label={severity} variant={severityVariant(severity)} />
           </div>
         </CalloutBlock>
       ) : metrics.length > 0 ? (
-        <CalloutBlock variant={severityCallout(severity)}>
+        <CalloutBlock>
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <p className="text-sm opacity-70 italic">No commentary published for this period.</p>
             <StatusBadge label={severity} variant={severityVariant(severity)} />
@@ -103,7 +98,7 @@ function FinancialSection({
         const bLow = allMetrics[0]?.benchmarkLow;
         const bHigh = allMetrics[0]?.benchmarkHigh;
         return (
-          <div className="bg-white rounded-xl border border-gray-100 p-4">
+          <div className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] p-4">
             <p className="text-xs text-gray-400 mb-3 uppercase tracking-widest">Trend</p>
             <TrendChart
               data={trendData}
@@ -118,7 +113,7 @@ function FinancialSection({
 
       {/* Commentary toggle */}
       {(intelligence?.whyItMatters || intelligence?.suggestedDecision) && (
-        <details className="bg-white rounded-xl border border-gray-100 overflow-hidden group">
+        <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden group">
           <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between select-none hover:bg-gray-50 transition">
             <span>Commentary</span>
             <span className="text-gray-400 text-xs group-open:rotate-180 transition-transform">▼</span>
@@ -142,7 +137,7 @@ function FinancialSection({
 
       {/* Supporting detail toggle — raw metrics */}
       {metrics.length > 0 && (
-        <details className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden">
           <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between select-none hover:bg-gray-50 transition">
             <span>Supporting detail</span>
             <span className="text-gray-400 text-xs">▼</span>
@@ -397,7 +392,7 @@ export default async function FinancialPage({
           return (
             <section className="space-y-4">
               <SectionHeader title="Performance vs Benchmarks" />
-              <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              <div className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] p-6">
                 <p className="text-xs text-gray-400 mb-5">
                   Grey zone = industry benchmark range · ★ = top quartile · dot = your value
                 </p>
@@ -421,10 +416,12 @@ export default async function FinancialPage({
 
         {/* Empty state */}
         {allMetrics.length === 0 && (
-          <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-16 text-center">
-            <p className="text-sm text-gray-400">No financial KPI data published for this property yet.</p>
-            <p className="text-xs text-gray-300 mt-1">Data appears here once uploaded and reviewed by LPP.</p>
-          </div>
+          <EmptyState
+            title="No financial data yet"
+            body="Upload a P&L file to activate financial review for this property."
+            ctaLabel="Go to Upload →"
+            ctaHref={`/${clientId}/${propertyId}/upload`}
+          />
         )}
 
       </div>

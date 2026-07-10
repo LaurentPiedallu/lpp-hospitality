@@ -132,7 +132,7 @@ export default async function PropertyPage({
         {execSummary && (
           <section>
             <SectionHeader title="Executive Summary" />
-            <CalloutBlock variant="amber">
+            <CalloutBlock>
               {execSummary.currentRead}
               {execSummary.whyItMatters && (
                 <p className="mt-2 opacity-80">{execSummary.whyItMatters}</p>
