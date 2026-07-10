@@ -2,9 +2,9 @@
 // Every public-facing query enforces Published status + client isolation.
 
 import {
-  queryDatabase, publishedAnd, relationFilter,
+  queryDatabase, publishedAnd, relationFilter, dateEqualsFilter,
   title, richText, select, num, email, url, checkbox,
-  relationIds, rollupNumber, updateSelectProperty,
+  relationId, relationIds, rollupNumber, updateSelectProperty,
 } from "./notion-fetch";
 import { NOTION_DBS } from "./notion-ids";
 import type {
@@ -185,15 +185,26 @@ export async function getActions(propertyId: string): Promise<Action[]> {
     priority: (select(p, "Priority") || "Medium") as Action["priority"],
     decisionRequired: checkbox(p, "Decision Required"),
     dueDateIso: p.properties?.["Due Date"]?.date?.start ?? null,
+    clientVisible: checkbox(p, "Client Visible"),
   }));
 }
 
 // ─── Opportunities ────────────────────────────────────────────────────────────
+// Internal-only database — feeds Actions and Briefs. Never render this list
+// raw on a client-facing page; use it for aggregate stats or to resolve a
+// Brief's "Biggest Opportunity" relation instead.
 
-export async function getOpportunities(propertyId: string): Promise<Opportunity[]> {
+// periodIso scopes to one Reporting Period; omit only for internal/aggregate
+// call sites that intentionally look across all periods (e.g. Commercial
+// Review's opportunities panel, unchanged by this fix).
+export async function getOpportunities(propertyId: string, periodIso?: string): Promise<Opportunity[]> {
   const pages = await queryDatabase({
     databaseId: NOTION_DBS.OPPORTUNITIES,
-    filter: publishedAnd(relationFilter("Property", propertyId)),
+    filter: publishedAnd(
+      periodIso
+        ? { and: [relationFilter("Property", propertyId), dateEqualsFilter("Reporting Period", periodIso)] }
+        : relationFilter("Property", propertyId)
+    ),
   });
   return pages.map((p) => ({
     id: p.id,
@@ -209,11 +220,16 @@ export async function getOpportunities(propertyId: string): Promise<Opportunity[
 }
 
 // ─── Risks ────────────────────────────────────────────────────────────────────
+// Internal-only database — same rules as Opportunities above.
 
-export async function getRisks(propertyId: string): Promise<Risk[]> {
+export async function getRisks(propertyId: string, periodIso?: string): Promise<Risk[]> {
   const pages = await queryDatabase({
     databaseId: NOTION_DBS.RISKS,
-    filter: publishedAnd(relationFilter("Property", propertyId)),
+    filter: publishedAnd(
+      periodIso
+        ? { and: [relationFilter("Property", propertyId), dateEqualsFilter("Reporting Period", periodIso)] }
+        : relationFilter("Property", propertyId)
+    ),
   });
   return pages.map((p) => ({
     id: p.id,
@@ -296,15 +312,11 @@ export async function updateActionStatus(
 
 // ─── Briefs ───────────────────────────────────────────────────────────────────
 
-export async function getBriefs(clientId: string): Promise<Brief[]> {
-  const pages = await queryDatabase({
-    databaseId: NOTION_DBS.BRIEFS,
-    filter: publishedAnd(relationFilter("Client", clientId)),
-    sorts: [{ property: "Published Date", direction: "descending" }],
-  });
-  return pages.map((p) => ({
+function toBrief(p: Awaited<ReturnType<typeof queryDatabase>>[number], clientId: string): Brief {
+  return {
     id: p.id,
     clientId,
+    propertyId: relationId(p, "Property") || null,
     title: title(p, "Brief"),
     executiveSummary: richText(p, "Executive Summary"),
     overallHealth: (select(p, "Overall Health") || null) as OverallHealth | null,
@@ -313,14 +325,32 @@ export async function getBriefs(clientId: string): Promise<Brief[]> {
     briefPageUrl: url(p, "Brief Page URL"),
     reportingPeriodStart: p.properties?.["Reporting Period"]?.date?.start ?? null,
     publishedDateStart: p.properties?.["Published Date"]?.date?.start ?? null,
-  }));
+    biggestOpportunityId: relationId(p, "Biggest Opportunity") || null,
+    biggestRiskId: relationId(p, "Biggest Risk") || null,
+  };
 }
 
-export async function getLatestBrief(clientId: string, propertyId?: string): Promise<Brief | null> {
-  const all = await getBriefs(clientId);
-  if (!propertyId) return all[0] ?? null;
-  // If we later add property-level briefs, filter here
-  return all[0] ?? null;
+export async function getBriefs(clientId: string): Promise<Brief[]> {
+  const pages = await queryDatabase({
+    databaseId: NOTION_DBS.BRIEFS,
+    filter: publishedAnd(relationFilter("Client", clientId)),
+    sorts: [{ property: "Published Date", direction: "descending" }],
+  });
+  return pages.map((p) => toBrief(p, clientId));
+}
+
+// The most recent Published Brief for a specific property — this establishes
+// "the current Reporting Period" for that property. Every period-scoped query
+// on the property overview should be anchored to this Brief's period, not to
+// "everything ever generated for this property."
+export async function getLatestPublishedBrief(propertyId: string, clientId: string): Promise<Brief | null> {
+  const pages = await queryDatabase({
+    databaseId: NOTION_DBS.BRIEFS,
+    filter: publishedAnd(relationFilter("Property", propertyId)),
+    sorts: [{ property: "Reporting Period", direction: "descending" }],
+    pageSize: 1,
+  });
+  return pages[0] ? toBrief(pages[0], clientId) : null;
 }
 
 // ─── Benchmarks ───────────────────────────────────────────────────────────────

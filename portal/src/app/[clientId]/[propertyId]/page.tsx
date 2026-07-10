@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import {
   getProperty, getLatestKpiSummary, getKpiMetrics, getActions,
   getOpportunities, getRisks, getIntelligence, hasUnpublishedFinancialData,
+  getLatestPublishedBrief,
 } from "@/lib/notion-queries";
 import { deriveHealth } from "@/lib/health";
 import { usd, pct, compact, formatPeriod } from "@/lib/format";
@@ -93,22 +94,38 @@ export default async function PropertyPage({
   const { clientId, propertyId } = await params;
   if (session.role !== "admin" && session.clientId !== clientId) redirect("/dashboard");
 
-  const [property, kpi, allMetrics, actions, opportunities, risks, intelligence] = await Promise.all([
+  const [property, kpi, allMetrics, actions, intelligence, latestBrief] = await Promise.all([
     getProperty(propertyId, clientId),
     getLatestKpiSummary(propertyId),
     getKpiMetrics(propertyId),
     getActions(propertyId),
-    getOpportunities(propertyId),
-    getRisks(propertyId),
     getIntelligence(propertyId),
+    getLatestPublishedBrief(propertyId, clientId),
   ]);
 
   if (!property) notFound();
 
+  // Opportunities and Risks are internal-only analytical inputs (they feed
+  // Actions and the Brief) and must be scoped to the current Reporting
+  // Period — the most recent Published Brief's period — never aggregated
+  // across every period ever generated for this property.
+  const currentPeriod = latestBrief?.reportingPeriodStart ?? null;
+  const [opportunities, risks] = currentPeriod
+    ? await Promise.all([
+        getOpportunities(propertyId, currentPeriod),
+        getRisks(propertyId, currentPeriod),
+      ])
+    : [[] as Opportunity[], [] as Risk[]];
+
   const health = deriveHealth(kpi);
-  const openActions = (actions as Action[]).filter((a) => a.status !== "Complete");
-  const activeRisks = (risks as Risk[]).filter((r) => r.status !== "Closed" && r.status !== "Archived");
+  const openActions = (actions as Action[]).filter((a) => a.clientVisible && a.status !== "Complete");
   const annualOpportunity = (opportunities as Opportunity[]).reduce((s, o) => s + o.estimatedAnnualImpact, 0);
+  const biggestOpportunity = latestBrief?.biggestOpportunityId
+    ? (opportunities as Opportunity[]).find((o) => o.id === latestBrief.biggestOpportunityId) ?? null
+    : null;
+  const biggestRisk = latestBrief?.biggestRiskId
+    ? (risks as Risk[]).find((r) => r.id === latestBrief.biggestRiskId) ?? null
+    : null;
 
   // Admin-only signal: financial numbers are all missing even though a
   // summary exists — check whether real data is sitting unpublished in Notion.
@@ -200,31 +217,18 @@ export default async function PropertyPage({
           </section>
         )}
 
-        {/* Value creation */}
-        {(opportunities as Opportunity[]).length > 0 && (
+        {/* Biggest opportunity — narrative, sourced from the Brief, not a raw list */}
+        {biggestOpportunity && (
           <section>
-            <SectionHeader title="Value Creation" />
-            <div>
-              {(opportunities as Opportunity[]).map((opp) => (
-                <div key={opp.id} style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "16px 20px", marginBottom: 12 }}>
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p style={{ fontFamily: JOST, fontSize: 13, color: "#12120F" }}>{opp.title}</p>
-                      {opp.category && <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 2 }}>{opp.category}</p>}
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      {opp.estimatedAnnualImpact > 0 && (
-                        <span style={{ fontFamily: SERIF, fontSize: "1.1rem", color: "#12120F" }}>{compact(opp.estimatedAnnualImpact)}/yr</span>
-                      )}
-                      <StatusBadge
-                        label={opp.stage || "Identified"}
-                        variant={opp.stage === "Implemented" || opp.stage === "Measured" ? "green" : opp.stage === "In Progress" ? "blue" : "amber"}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <SectionHeader title="Biggest Opportunity" />
+            <CalloutBlock>
+              <p>{biggestOpportunity.title}</p>
+              {biggestOpportunity.estimatedAnnualImpact > 0 && (
+                <p style={{ marginTop: 8, fontFamily: SERIF, fontSize: "1.3rem", color: "#12120F" }}>
+                  {compact(biggestOpportunity.estimatedAnnualImpact)}/yr estimated impact
+                </p>
+              )}
+            </CalloutBlock>
           </section>
         )}
 
@@ -337,35 +341,16 @@ export default async function PropertyPage({
           </section>
         )}
 
-        {/* Active risks */}
-        {activeRisks.length > 0 && (
+        {/* Biggest risk — narrative, sourced from the Brief, not a raw list */}
+        {biggestRisk && (
           <section>
-            <SectionHeader title="Active Risks" />
-            <div>
-              {activeRisks.map((risk) => {
-                const urgent = risk.status === "Open" || risk.status === "Escalated";
-                return (
-                  <div
-                    key={risk.id}
-                    style={{
-                      background: urgent ? "rgba(192,57,43,0.04)" : "#FFFFFF",
-                      border: urgent ? "1px solid rgba(192,57,43,0.12)" : "1px solid rgba(18,18,15,0.08)",
-                      borderLeft: urgent ? "3px solid #C0392B" : "1px solid rgba(18,18,15,0.08)",
-                      borderRadius: 0,
-                      padding: "16px 20px",
-                      marginBottom: 12,
-                    }}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <p style={{ fontFamily: JOST, fontSize: 13, color: "#12120F" }}>{risk.title}</p>
-                      <StatusBadge label={risk.status} variant={urgent ? "red" : "amber"} />
-                    </div>
-                    {risk.mitigationPlan && <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.5)", marginTop: 4 }}>{risk.mitigationPlan}</p>}
-                    {risk.category && <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.35)", marginTop: 4 }}>{risk.category} · {risk.impact} impact</p>}
-                  </div>
-                );
-              })}
-            </div>
+            <SectionHeader title="Biggest Risk" />
+            <CalloutBlock>
+              <p>{biggestRisk.title}</p>
+              {biggestRisk.mitigationPlan && (
+                <p style={{ marginTop: 8, opacity: 0.8 }}>{biggestRisk.mitigationPlan}</p>
+              )}
+            </CalloutBlock>
           </section>
         )}
 

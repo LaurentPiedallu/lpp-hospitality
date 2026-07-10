@@ -141,3 +141,8 @@ export function publishedAnd(extra?: unknown): unknown {
 export function relationFilter(property: string, pageId: string): unknown {
   return { property, relation: { contains: pageId } };
 }
+
+// Date-equals filter — page's date property must exactly match the given ISO date
+export function dateEqualsFilter(property: string, isoDate: string): unknown {
+  return { property, date: { equals: isoDate } };
+}

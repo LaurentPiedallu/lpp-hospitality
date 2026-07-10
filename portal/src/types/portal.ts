@@ -86,6 +86,7 @@ export interface Action {
   priority: "Critical" | "High" | "Medium" | "Low";
   decisionRequired: boolean;
   dueDateIso: string | null;
+  clientVisible: boolean;
 }
 
 export interface Opportunity {
@@ -143,6 +144,7 @@ export interface Initiative {
 export interface Brief {
   id: string;
   clientId: string;
+  propertyId: string | null;
   title: string;
   executiveSummary: string;
   overallHealth: OverallHealth | null;
@@ -151,6 +153,8 @@ export interface Brief {
   briefPageUrl: string;
   reportingPeriodStart: string | null;
   publishedDateStart: string | null;
+  biggestOpportunityId: string | null;
+  biggestRiskId: string | null;
 }
 
 export interface Benchmark {
