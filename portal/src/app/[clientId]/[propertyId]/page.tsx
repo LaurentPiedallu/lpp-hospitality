@@ -5,10 +5,12 @@ import {
   getProperty, getLatestKpiSummary, getKpiMetrics, getActions,
   getOpportunities, getRisks, getIntelligence, hasUnpublishedFinancialData,
 } from "@/lib/notion-queries";
-import { deriveHealth, healthColorClass, healthBgClass } from "@/lib/health";
+import { deriveHealth } from "@/lib/health";
 import { usd, pct, compact, formatPeriod } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
+import PropertyHeader from "@/components/PropertyHeader";
+import PropertyTabs from "@/components/PropertyTabs";
 import KpiCard from "@/components/KpiCard";
 import SectionHeader from "@/components/SectionHeader";
 import CalloutBlock from "@/components/CalloutBlock";
@@ -16,15 +18,6 @@ import StatusBadge from "@/components/StatusBadge";
 import Sparkline from "@/components/Sparkline";
 import type { Action, Opportunity, Risk, Intelligence, KpiMetric } from "@/types/portal";
 import type { HealthColor } from "@/lib/health";
-
-const SUB_PAGES = [
-  { href: "financial",    icon: "📊", label: "Financial Review",   desc: "Revenue, labor, COGS, profitability" },
-  { href: "commercial",   icon: "⭐", label: "Commercial Review",  desc: "Guest experience and revenue quality" },
-  { href: "menu",         icon: "🍽️", label: "Menu Engineering",   desc: "Item performance and pricing" },
-  { href: "initiatives",  icon: "🚀", label: "Initiatives",        desc: "Now / Next / Later roadmap" },
-  { href: "intelligence", icon: "✦",  label: "AI Intelligence",    desc: "Full analysis across all categories" },
-  { href: "upload",       icon: "📤", label: "Upload Data",        desc: "Briefs, files, and monthly submissions" },
-] as const;
 
 function HealthDot({ color }: { color: HealthColor }) {
   return <span className={`w-2 h-2 rounded-full shrink-0 mt-1 ${{
@@ -116,29 +109,10 @@ export default async function PropertyPage({
   return (
     <PageWrapper>
       <NavBar session={session} />
+      <PropertyHeader property={property} kpi={kpi} />
+      <PropertyTabs clientId={clientId} propertyId={propertyId} active="overview" />
 
-      {/* Banner */}
-      <div className="w-full bg-gray-900 px-4 sm:px-6 md:px-10 py-10 md:py-14">
-        <div className="max-w-5xl mx-auto">
-          <p className="text-sm text-white/50 mb-1">{property.location || property.conceptType}</p>
-          <h1 className="text-3xl md:text-4xl font-semibold text-white mb-3">{property.name}</h1>
-          <div className="flex flex-wrap items-center gap-3">
-            <span className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${
-              healthBgClass(health.color).replace("ring-", "ring-1 ring-")
-            }`}>
-              <span className={`w-2 h-2 rounded-full ${{
-                green: "bg-green-400", amber: "bg-amber-400", red: "bg-red-400",
-              }[health.color]}`} />
-              <span className={healthColorClass(health.color)}>{health.status}</span>
-            </span>
-            <span className="text-xs text-white/40">
-              Data confidence: {property.dataConfidence}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-12">
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 80px" }} className="space-y-12">
 
         {/* At a glance */}
         <section>
@@ -350,23 +324,6 @@ export default async function PropertyPage({
             </div>
           </section>
         )}
-
-        {/* Explore sub-pages */}
-        <section>
-          <SectionHeader title="Explore" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {SUB_PAGES.map(({ href, icon, label, desc }) => (
-              <Link key={href} href={`/${clientId}/${propertyId}/${href}`}
-                className="bg-white rounded-xl border border-gray-100 px-5 py-4 hover:border-gray-300 hover:shadow-sm transition-all flex items-start gap-4">
-                <span className="text-2xl">{icon}</span>
-                <div>
-                  <p className="font-medium text-gray-900 text-sm">{label}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
 
       </div>
     </PageWrapper>

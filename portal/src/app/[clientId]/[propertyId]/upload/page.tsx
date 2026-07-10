@@ -1,10 +1,11 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { getProperty, getBriefs, getUploads } from "@/lib/notion-queries";
+import { getProperty, getBriefs, getUploads, getLatestKpiSummary } from "@/lib/notion-queries";
 import { formatPeriod } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
-import SubPageHeader from "@/components/SubPageHeader";
+import PropertyHeader from "@/components/PropertyHeader";
+import PropertyTabs from "@/components/PropertyTabs";
 import SectionHeader from "@/components/SectionHeader";
 import StatusBadge from "@/components/StatusBadge";
 import UploadForm from "@/components/UploadForm";
@@ -119,10 +120,11 @@ export default async function UploadPage({
   const { clientId, propertyId } = await params;
   if (session.role !== "admin" && session.clientId !== clientId) redirect("/dashboard");
 
-  const [property, briefs, uploads] = await Promise.all([
+  const [property, briefs, uploads, kpi] = await Promise.all([
     getProperty(propertyId, clientId),
     getBriefs(clientId),
     getUploads(clientId, propertyId),
+    getLatestKpiSummary(propertyId),
   ]);
   if (!property) notFound();
 
@@ -132,14 +134,10 @@ export default async function UploadPage({
   return (
     <PageWrapper>
       <NavBar session={session} />
-      <SubPageHeader
-        title="Upload Data"
-        property={property}
-        period={formatPeriod(null)}
-        clientId={clientId}
-      />
+      <PropertyHeader property={property} kpi={kpi} />
+      <PropertyTabs clientId={clientId} propertyId={propertyId} active="upload" />
 
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 space-y-8">
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 80px" }} className="space-y-8">
 
         {/* Guidance */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">

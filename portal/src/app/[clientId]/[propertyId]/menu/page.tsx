@@ -1,16 +1,18 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { getProperty, getKpiMetrics, getIntelligence, getBenchmarks } from "@/lib/notion-queries";
-import { usd, pct, formatPeriod, buildTrendData } from "@/lib/format";
+import { getProperty, getKpiMetrics, getIntelligence, getBenchmarks, buildKpiSummary } from "@/lib/notion-queries";
+import { usd, pct, buildTrendData } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
-import SubPageHeader from "@/components/SubPageHeader";
+import PropertyHeader from "@/components/PropertyHeader";
+import PropertyTabs from "@/components/PropertyTabs";
 import SectionHeader from "@/components/SectionHeader";
 import CalloutBlock from "@/components/CalloutBlock";
 import KpiCard from "@/components/KpiCard";
 import StatusBadge from "@/components/StatusBadge";
 import TrendChart from "@/components/TrendChart";
 import BenchmarkGauge from "@/components/BenchmarkGauge";
+import RequestAnalysisButton from "@/components/RequestAnalysisButton";
 import type { KpiMetric, Intelligence, Benchmark, Severity } from "@/types/portal";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -357,18 +359,19 @@ export default async function MenuPage({
 
   const executionIntel = intel("Execution");
 
+  const kpi = buildKpiSummary(allMetrics);
+
   return (
     <PageWrapper>
       <NavBar session={session} />
-      <SubPageHeader
-        title="Menu Engineering"
-        property={property}
-        period={formatPeriod(latest)}
-        clientId={clientId}
-        intelligenceCategory="Menu"
-      />
+      <PropertyHeader property={property} kpi={kpi} />
+      <PropertyTabs clientId={clientId} propertyId={propertyId} active="menu" />
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-12">
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 80px" }} className="space-y-12">
+
+        <div className="flex justify-end">
+          <RequestAnalysisButton clientId={clientId} propertyId={propertyId} category="Menu" label="Refresh analysis" />
+        </div>
 
         {/* ── Food & Beverage Cost ─────────────────────────────────────── */}
         <MenuSection

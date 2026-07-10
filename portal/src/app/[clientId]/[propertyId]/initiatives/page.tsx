@@ -1,10 +1,11 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { getProperty, getInitiatives } from "@/lib/notion-queries";
-import { usd, formatPeriod } from "@/lib/format";
+import { getProperty, getInitiatives, getLatestKpiSummary } from "@/lib/notion-queries";
+import { usd } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
-import SubPageHeader from "@/components/SubPageHeader";
+import PropertyHeader from "@/components/PropertyHeader";
+import PropertyTabs from "@/components/PropertyTabs";
 import StatusBadge from "@/components/StatusBadge";
 import type { Initiative, InitiativeStatus, InitiativeColumn } from "@/types/portal";
 
@@ -164,9 +165,10 @@ export default async function InitiativesPage({
   const { clientId, propertyId } = await params;
   if (session.role !== "admin" && session.clientId !== clientId) redirect("/dashboard");
 
-  const [property, initiatives] = await Promise.all([
+  const [property, initiatives, kpi] = await Promise.all([
     getProperty(propertyId, clientId),
     getInitiatives(propertyId),
+    getLatestKpiSummary(propertyId),
   ]);
 
   if (!property) notFound();
@@ -177,14 +179,10 @@ export default async function InitiativesPage({
   return (
     <PageWrapper>
       <NavBar session={session} />
-      <SubPageHeader
-        title="Initiatives"
-        property={property}
-        period={formatPeriod(null)}
-        clientId={clientId}
-      />
+      <PropertyHeader property={property} kpi={kpi} />
+      <PropertyTabs clientId={clientId} propertyId={propertyId} active="initiatives" />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 space-y-8">
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 80px" }} className="space-y-8">
 
         {initiatives.length > 0 && <SummaryStrip initiatives={initiatives} />}
 

@@ -1,16 +1,18 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { getProperty, getKpiMetrics, getIntelligence } from "@/lib/notion-queries";
-import { usd, pct, formatPeriod, buildTrendData } from "@/lib/format";
+import { getProperty, getKpiMetrics, getIntelligence, buildKpiSummary } from "@/lib/notion-queries";
+import { usd, pct, buildTrendData } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
-import SubPageHeader from "@/components/SubPageHeader";
+import PropertyHeader from "@/components/PropertyHeader";
+import PropertyTabs from "@/components/PropertyTabs";
 import SectionHeader from "@/components/SectionHeader";
 import CalloutBlock from "@/components/CalloutBlock";
 import KpiCard from "@/components/KpiCard";
 import StatusBadge from "@/components/StatusBadge";
 import TrendChart from "@/components/TrendChart";
 import BenchmarkGauge from "@/components/BenchmarkGauge";
+import RequestAnalysisButton from "@/components/RequestAnalysisButton";
 import type { KpiMetric, Intelligence, Severity } from "@/types/portal";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -226,18 +228,19 @@ export default async function FinancialPage({
   const m = (cat: string, unit: string, hint?: string) =>
     latestMetric(allMetrics, cat, unit, hint);
 
+  const kpi = buildKpiSummary(allMetrics);
+
   return (
     <PageWrapper>
       <NavBar session={session} />
-      <SubPageHeader
-        title="Financial Review"
-        property={property}
-        period={formatPeriod(latest)}
-        clientId={clientId}
-        intelligenceCategory="Financial"
-      />
+      <PropertyHeader property={property} kpi={kpi} />
+      <PropertyTabs clientId={clientId} propertyId={propertyId} active="financial" />
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-12">
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 80px" }} className="space-y-12">
+
+        <div className="flex justify-end">
+          <RequestAnalysisButton clientId={clientId} propertyId={propertyId} category="Financial" label="Refresh analysis" />
+        </div>
 
         {/* ── Revenue ──────────────────────────────────────────────────── */}
         <FinancialSection

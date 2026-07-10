@@ -1,10 +1,11 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { getProperty, getIntelligence } from "@/lib/notion-queries";
+import { getProperty, getIntelligence, getLatestKpiSummary } from "@/lib/notion-queries";
 import { formatPeriod } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
-import SubPageHeader from "@/components/SubPageHeader";
+import PropertyHeader from "@/components/PropertyHeader";
+import PropertyTabs from "@/components/PropertyTabs";
 import SectionHeader from "@/components/SectionHeader";
 import StatusBadge from "@/components/StatusBadge";
 import RequestAnalysisButton from "@/components/RequestAnalysisButton";
@@ -101,9 +102,10 @@ export default async function IntelligencePage({
   const { clientId, propertyId } = await params;
   if (session.role !== "admin" && session.clientId !== clientId) redirect("/dashboard");
 
-  const [property, allIntelligence] = await Promise.all([
+  const [property, allIntelligence, kpi] = await Promise.all([
     getProperty(propertyId, clientId),
     getIntelligence(propertyId),
+    getLatestKpiSummary(propertyId),
   ]);
 
   if (!property) notFound();
@@ -120,24 +122,13 @@ export default async function IntelligencePage({
 
   const hasAny = [...byCategory.values()].some((items) => items.length > 0);
 
-  // Most recent period with any intelligence
-  const latestPeriod = (allIntelligence as Intelligence[])
-    .map((i) => i.periodStart)
-    .filter(Boolean)
-    .sort()
-    .reverse()[0] ?? null;
-
   return (
     <PageWrapper>
       <NavBar session={session} />
-      <SubPageHeader
-        title="AI Intelligence"
-        property={property}
-        period={formatPeriod(latestPeriod)}
-        clientId={clientId}
-      />
+      <PropertyHeader property={property} kpi={kpi} />
+      <PropertyTabs clientId={clientId} propertyId={propertyId} active="intelligence" />
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-12">
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 80px" }} className="space-y-12">
 
         {/* Refresh all — shown when there's existing data */}
         {hasAny && (
