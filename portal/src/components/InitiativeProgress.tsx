@@ -4,10 +4,13 @@ import { useState } from "react";
 import StatusBadge from "@/components/StatusBadge";
 import type { Action } from "@/types/portal";
 
-const JOST = "'Jost', 'Inter', system-ui, sans-serif";
-const GOLD = "#B8935A";
+export const JOST = "'Jost', 'Inter', system-ui, sans-serif";
+export const GOLD = "#B8935A";
 
-const STATUS_VARIANT: Record<Action["status"], "green" | "amber" | "red"> = {
+// Confirmed with Laurent: 3-tone mapping reusing StatusBadge's existing palette.
+// Reuse this exact mapping anywhere Action Status/Priority renders — don't
+// invent a second one.
+export const STATUS_VARIANT: Record<Action["status"], "green" | "amber" | "red"> = {
   "Not Started": "green",
   "In Progress": "amber",
   "Waiting on Client": "red",
@@ -15,7 +18,7 @@ const STATUS_VARIANT: Record<Action["status"], "green" | "amber" | "red"> = {
   "Blocked": "red",
 };
 
-const PRIORITY_VARIANT: Record<Action["priority"], "green" | "amber" | "red"> = {
+export const PRIORITY_VARIANT: Record<Action["priority"], "green" | "amber" | "red"> = {
   Critical: "red",
   High: "amber",
   Medium: "green",
@@ -29,12 +32,12 @@ const PRIORITY_RANK: Record<Action["priority"], number> = {
   Low: 3,
 };
 
-function formatDueDate(iso: string): string {
+export function formatDueDate(iso: string): string {
   const d = new Date(iso + "T12:00:00Z");
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
-function sortActions(actions: Action[]): Action[] {
+export function sortActions(actions: Action[]): Action[] {
   return [...actions].sort((a, b) => {
     const byPriority = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
     if (byPriority !== 0) return byPriority;
@@ -45,7 +48,7 @@ function sortActions(actions: Action[]): Action[] {
   });
 }
 
-function Checkbox({ checked, disabled, onChange }: { checked: boolean; disabled: boolean; onChange: () => void }) {
+export function Checkbox({ checked, disabled, onChange }: { checked: boolean; disabled: boolean; onChange: () => void }) {
   return (
     <label
       style={{

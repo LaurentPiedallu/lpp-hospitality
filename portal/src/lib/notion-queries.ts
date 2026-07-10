@@ -11,7 +11,7 @@ import type {
   Client, Property, KpiMetric, KpiSummary, Action, Opportunity,
   Risk, Intelligence, Initiative, Brief, Benchmark, Upload,
   DataConfidence, Severity, RiskStatus, InitiativeStatus, InitiativeColumn,
-  OverallHealth, ClientStatus, PropertyStatus,
+  OverallHealth, ClientStatus, PropertyStatus, PublishGateStatus, PublishStatus,
 } from "@/types/portal";
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
@@ -397,4 +397,76 @@ export async function getUploads(clientId: string, propertyId: string): Promise<
     status: (select(p, "Processing Status") || "Pending") as Upload["status"],
     notes: richText(p, "Validation Notes"),
   }));
+}
+
+// ─── Admin: publish-gate status ────────────────────────────────────────────
+// Deliberately reads every record regardless of Publish Status — the whole
+// point is to see what's still sitting unreviewed. Never call this from a
+// client-facing page; gate it at the route level (session.role === "admin").
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type RawPage = Record<string, any>;
+
+function rawReportingPeriod(p: RawPage): string | null {
+  return p.properties?.["Reporting Period"]?.date?.start ?? null;
+}
+
+function rawPublishStatus(p: RawPage): string {
+  return p.properties?.["Publish Status"]?.select?.name ?? "Draft";
+}
+
+export async function getPublishGateStatus(
+  propertyId: string,
+  propertyName: string,
+  clientId: string
+): Promise<PublishGateStatus> {
+  const [oppPages, riskPages, intelPages] = await Promise.all([
+    queryDatabase({ databaseId: NOTION_DBS.OPPORTUNITIES, filter: relationFilter("Property", propertyId) }),
+    queryDatabase({ databaseId: NOTION_DBS.RISKS, filter: relationFilter("Property", propertyId) }),
+    queryDatabase({ databaseId: NOTION_DBS.INTELLIGENCE, filter: relationFilter("Property", propertyId) }),
+  ]);
+
+  const allPeriods = [...oppPages, ...riskPages, ...intelPages]
+    .map(rawReportingPeriod)
+    .filter((d): d is string => d != null);
+
+  if (allPeriods.length === 0) {
+    return { propertyId, propertyName, clientId, period: null, intelOppRisk: null, actions: null, briefStatus: null };
+  }
+
+  const period = allPeriods.sort().reverse()[0];
+  const inPeriod = (p: RawPage) => rawReportingPeriod(p) === period;
+
+  const periodRecords = [...oppPages, ...riskPages, ...intelPages].filter(inPeriod);
+  const intelOppRisk = {
+    total: periodRecords.length,
+    published: periodRecords.filter((p) => rawPublishStatus(p) === "Published").length,
+  };
+
+  // Actions carry no Reporting Period of their own — trace through their
+  // Source Opportunity/Source Risk to attribute them to this period.
+  const periodSourceIds = new Set(periodRecords.map((p) => p.id));
+  const actionPages = await queryDatabase({
+    databaseId: NOTION_DBS.ACTIONS,
+    filter: relationFilter("Property", propertyId),
+  });
+  const periodActions = actionPages.filter((a) => {
+    if (!checkbox(a, "Client Visible")) return false;
+    const srcOppId = a.properties?.["Source Opportunity"]?.relation?.[0]?.id;
+    const srcRiskId = a.properties?.["Source Risk"]?.relation?.[0]?.id;
+    return (srcOppId && periodSourceIds.has(srcOppId)) || (srcRiskId && periodSourceIds.has(srcRiskId));
+  });
+  const actions = {
+    total: periodActions.length,
+    published: periodActions.filter((p) => rawPublishStatus(p) === "Published").length,
+  };
+
+  const briefPages = await queryDatabase({
+    databaseId: NOTION_DBS.BRIEFS,
+    filter: relationFilter("Property", propertyId),
+  });
+  const periodBrief = briefPages.find(inPeriod);
+  const briefStatus = periodBrief ? (rawPublishStatus(periodBrief) as PublishStatus) : null;
+
+  return { propertyId, propertyName, clientId, period, intelOppRisk, actions, briefStatus };
 }

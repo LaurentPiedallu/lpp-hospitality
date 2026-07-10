@@ -45,6 +45,24 @@ export default function NavBar({ session }: { session: SessionPayload }) {
 
       {/* Right side — desktop only */}
       <div className="hidden md:flex" style={{ alignItems: "center", gap: 20 }}>
+        {session.role === "admin" && (
+          <Link
+            href="/admin/publish-status"
+            className="hover:text-[rgba(184,147,90,0.8)]"
+            style={{
+              fontFamily: "Inter, system-ui, sans-serif",
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: "0.105em",
+              textTransform: "uppercase",
+              color: "rgba(184,147,90,0.5)",
+              textDecoration: "none",
+              transition: "color .25s ease",
+            }}
+          >
+            Publish Status
+          </Link>
+        )}
         <span
           style={{
             fontFamily: "Inter, system-ui, sans-serif",
@@ -115,6 +133,23 @@ export default function NavBar({ session }: { session: SessionPayload }) {
             zIndex: 100,
           }}
         >
+          {session.role === "admin" && (
+            <Link
+              href="/admin/publish-status"
+              style={{
+                fontFamily: "Inter, system-ui, sans-serif",
+                fontSize: 11,
+                fontWeight: 800,
+                letterSpacing: "0.105em",
+                textTransform: "uppercase",
+                color: "rgba(184,147,90,0.5)",
+                textDecoration: "none",
+                width: "fit-content",
+              }}
+            >
+              Publish Status
+            </Link>
+          )}
           <span style={{ fontFamily: "Inter, system-ui, sans-serif", fontSize: 11, color: "rgba(242,237,228,0.3)" }}>
             {session.email}
           </span>

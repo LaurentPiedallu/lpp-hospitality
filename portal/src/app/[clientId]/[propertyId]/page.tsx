@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import {
-  getProperty, getLatestKpiSummary, getKpiMetrics, getActions,
+  getProperty, getLatestKpiSummary, getKpiMetrics, getActions, getInitiatives,
   getOpportunities, getRisks, getIntelligence, hasUnpublishedFinancialData,
   getLatestPublishedBrief,
 } from "@/lib/notion-queries";
@@ -15,73 +15,12 @@ import PropertyTabs from "@/components/PropertyTabs";
 import KpiCard from "@/components/KpiCard";
 import SectionHeader from "@/components/SectionHeader";
 import CalloutBlock from "@/components/CalloutBlock";
-import StatusBadge from "@/components/StatusBadge";
 import Sparkline from "@/components/Sparkline";
-import type { Action, Opportunity, Risk, Intelligence, KpiMetric } from "@/types/portal";
+import InitiativeSummaryCard from "@/components/InitiativeSummaryCard";
+import type { Action, Opportunity, Risk, Intelligence, Initiative, KpiMetric } from "@/types/portal";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 const SERIF = "'Cormorant Garamond', Georgia, serif";
-
-function isUrgentAction(action: Action): boolean {
-  return (
-    action.status === "Waiting on Client" ||
-    action.priority === "Critical" ||
-    (action.status === "Not Started" && action.decisionRequired)
-  );
-}
-
-function actionBadgeVariant(action: Action): "red" | "green" | "amber" {
-  if (isUrgentAction(action)) return "red";
-  if (action.status === "In Progress") return "amber";
-  return "green";
-}
-
-// ─── Action flag — per Change 10 spec, used for urgent open actions ──────────
-
-function ActionFlag({ action }: { action: Action }) {
-  return (
-    <div
-      style={{
-        background: "rgba(192,57,43,0.04)",
-        border: "1px solid rgba(192,57,43,0.12)",
-        borderLeft: "3px solid #C0392B",
-        borderRadius: 0,
-        padding: "16px 20px",
-        marginBottom: 12,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#C0392B", flexShrink: 0 }} />
-          <span style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", color: "#C0392B" }}>
-            Action Required
-          </span>
-        </div>
-        <StatusBadge label={action.status} variant={actionBadgeVariant(action)} />
-      </div>
-      <div style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.65)", lineHeight: 1.7, fontWeight: 300 }}>
-        <p style={{ color: "#12120F", fontWeight: 400, marginBottom: action.notes ? 4 : 0 }}>{action.title}</p>
-        {action.notes && <p>{action.notes}</p>}
-        {action.owner && <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 4 }}>Owner: {action.owner}</p>}
-      </div>
-    </div>
-  );
-}
-
-function ActionCard({ action }: { action: Action }) {
-  return (
-    <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "16px 20px", marginBottom: 12 }}>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p style={{ fontFamily: JOST, fontSize: 13, color: "#12120F" }}>{action.title}</p>
-          {action.notes && <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.5)", marginTop: 2 }}>{action.notes}</p>}
-          {action.owner && <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.35)", marginTop: 4 }}>Owner: {action.owner}</p>}
-        </div>
-        <StatusBadge label={action.status} variant={actionBadgeVariant(action)} />
-      </div>
-    </div>
-  );
-}
 
 export default async function PropertyPage({
   params,
@@ -94,11 +33,12 @@ export default async function PropertyPage({
   const { clientId, propertyId } = await params;
   if (session.role !== "admin" && session.clientId !== clientId) redirect("/dashboard");
 
-  const [property, kpi, allMetrics, actions, intelligence, latestBrief] = await Promise.all([
+  const [property, kpi, allMetrics, actions, initiatives, intelligence, latestBrief] = await Promise.all([
     getProperty(propertyId, clientId),
     getLatestKpiSummary(propertyId),
     getKpiMetrics(propertyId),
     getActions(propertyId),
+    getInitiatives(propertyId),
     getIntelligence(propertyId),
     getLatestPublishedBrief(propertyId, clientId),
   ]);
@@ -119,6 +59,15 @@ export default async function PropertyPage({
 
   const health = deriveHealth(kpi);
   const openActions = (actions as Action[]).filter((a) => a.clientVisible && a.status !== "Complete");
+
+  // Initiatives with at least one Client Visible, still-open Action — the
+  // grouped replacement for the old flat Actions list. Initiatives with
+  // nothing left for the client to act on are omitted entirely below.
+  const initiativesWithOpenWork = (initiatives as Initiative[]).filter((init) =>
+    (actions as Action[]).some(
+      (a) => init.actionIds.includes(a.id) && a.clientVisible && a.status !== "Complete"
+    )
+  );
   const annualOpportunity = (opportunities as Opportunity[]).reduce((s, o) => s + o.estimatedAnnualImpact, 0);
   const biggestOpportunity = latestBrief?.biggestOpportunityId
     ? (opportunities as Opportunity[]).find((o) => o.id === latestBrief.biggestOpportunityId) ?? null
@@ -203,16 +152,20 @@ export default async function PropertyPage({
           </section>
         )}
 
-        {/* Actions needed */}
-        {openActions.length > 0 && (
+        {/* Actions needed — grouped by Initiative instead of a flat list */}
+        {initiativesWithOpenWork.length > 0 && (
           <section>
             <SectionHeader title="Actions Needed From You" />
             <div>
-              {openActions.map((action) =>
-                isUrgentAction(action)
-                  ? <ActionFlag key={action.id} action={action} />
-                  : <ActionCard key={action.id} action={action} />
-              )}
+              {initiativesWithOpenWork.map((initiative) => (
+                <InitiativeSummaryCard
+                  key={initiative.id}
+                  initiative={initiative}
+                  actions={(actions as Action[]).filter((a) => initiative.actionIds.includes(a.id))}
+                  clientId={clientId}
+                  propertyId={propertyId}
+                />
+              ))}
             </div>
           </section>
         )}

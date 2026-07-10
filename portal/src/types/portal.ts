@@ -183,3 +183,20 @@ export interface Upload {
   status: UploadStatus;
   notes: string;
 }
+
+// Admin-only — whether a property's most recent reporting period is actually
+// ready to show a client, broken down by which database is holding it back.
+export interface PublishGateCounts {
+  total: number;
+  published: number;
+}
+
+export interface PublishGateStatus {
+  propertyId: string;
+  propertyName: string;
+  clientId: string;
+  period: string | null; // most recent period with any content at all, across Intel/Opp/Risk
+  intelOppRisk: PublishGateCounts | null;
+  actions: PublishGateCounts | null;
+  briefStatus: PublishStatus | null; // null = no Brief exists yet for this period
+}
