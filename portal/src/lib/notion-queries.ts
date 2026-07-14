@@ -4,7 +4,7 @@
 import {
   queryDatabase, publishedAnd, relationFilter, dateEqualsFilter,
   title, richText, select, num, email, url, checkbox,
-  relationId, relationIds, rollupNumber, updateSelectProperty,
+  relationId, relationIds, rollupNumber, updateSelectProperty, getPage,
 } from "./notion-fetch";
 import { NOTION_DBS } from "./notion-ids";
 import type {
@@ -431,7 +431,10 @@ export async function getPublishGateStatus(
     .filter((d): d is string => d != null);
 
   if (allPeriods.length === 0) {
-    return { propertyId, propertyName, clientId, period: null, intelOppRisk: null, actions: null, briefStatus: null };
+    return {
+      propertyId, propertyName, clientId, period: null,
+      intelOppRisk: null, actions: null, briefStatus: null, initiativeMismatchCount: 0,
+    };
   }
 
   const period = allPeriods.sort().reverse()[0];
@@ -468,5 +471,27 @@ export async function getPublishGateStatus(
   const periodBrief = briefPages.find(inPeriod);
   const briefStatus = periodBrief ? (rawPublishStatus(periodBrief) as PublishStatus) : null;
 
-  return { propertyId, propertyName, clientId, period, intelOppRisk, actions, briefStatus };
+  // Data-linking check: an Action correctly scoped to this Property, but
+  // whose linked Initiative's own Property points elsewhere. This is
+  // otherwise invisible — the Action still queries fine by its own Property,
+  // it just silently never groups under any Initiative for this property.
+  // Not period-scoped: check every Action for this property, any period.
+  const actionsWithInitiative = actionPages.filter((a) => a.properties?.["Initiative"]?.relation?.[0]?.id);
+  const uniqueInitiativeIds = [
+    ...new Set(actionsWithInitiative.map((a) => a.properties["Initiative"].relation[0].id as string)),
+  ];
+  const initiativePropertyIds = new Map<string, string | null>();
+  await Promise.all(
+    uniqueInitiativeIds.map(async (initId) => {
+      const initPage = await getPage(initId);
+      initiativePropertyIds.set(initId, initPage.properties?.["Property"]?.relation?.[0]?.id ?? null);
+    })
+  );
+  const initiativeMismatchCount = actionsWithInitiative.filter((a) => {
+    const initId = a.properties["Initiative"].relation[0].id as string;
+    const initPropId = initiativePropertyIds.get(initId);
+    return initPropId != null && initPropId !== propertyId;
+  }).length;
+
+  return { propertyId, propertyName, clientId, period, intelOppRisk, actions, briefStatus, initiativeMismatchCount };
 }

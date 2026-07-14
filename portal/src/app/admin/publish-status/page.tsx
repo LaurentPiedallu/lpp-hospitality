@@ -54,6 +54,34 @@ function GateCell({ counts, databaseIds }: { counts: PublishGateCounts | null; d
   );
 }
 
+function MismatchCell({ count }: { count: number }) {
+  if (count === 0) {
+    return (
+      <span style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.6)" }}>
+        <span style={{ color: GOLD }}>✓</span> Linked
+      </span>
+    );
+  }
+  return (
+    <div>
+      <span style={{ fontFamily: JOST, fontSize: 12, color: RED }}>
+        ⚠ {count} mismatched
+      </span>
+      <div style={{ marginTop: 4 }}>
+        <a
+          href={notionUrl(NOTION_DBS.ACTIONS)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-[#B8935A]"
+          style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "rgba(18,18,15,0.4)", textDecoration: "none" }}
+        >
+          Actions
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function BriefCell({ status }: { status: PublishGateStatus["briefStatus"] }) {
   if (status === null) {
     return <span style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.3)" }}>—</span>;
@@ -111,15 +139,17 @@ export default async function PublishStatusPage() {
           Publish gate status
         </h1>
         <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.5)", lineHeight: 1.8, maxWidth: 620, marginBottom: 32 }}>
-          Per property, the most recent reporting period with any content, and whether it&apos;s
-          actually ready to show a client. Reload this page to refresh — nothing here is live-polled.
+          Per property, the most recent reporting period with any content, whether it&apos;s
+          actually ready to show a client, and whether every Action is linked to an Initiative
+          that actually belongs to the same property. Reload this page to refresh — nothing
+          here is live-polled.
         </p>
 
         <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, overflow: "hidden" }}>
           <table className="w-full" style={{ borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ borderBottom: "1px solid rgba(18,18,15,0.08)" }}>
-                {["Property", "Period", "Intelligence / Opp / Risk", "Actions", "Brief"].map((h) => (
+                {["Property", "Period", "Intelligence / Opp / Risk", "Actions", "Brief", "Initiative Links"].map((h) => (
                   <th
                     key={h}
                     style={{
@@ -162,6 +192,9 @@ export default async function PublishStatusPage() {
                   </td>
                   <td style={{ padding: "16px 20px" }}>
                     <BriefCell status={row.briefStatus} />
+                  </td>
+                  <td style={{ padding: "16px 20px" }}>
+                    <MismatchCell count={row.initiativeMismatchCount} />
                   </td>
                 </tr>
               ))}

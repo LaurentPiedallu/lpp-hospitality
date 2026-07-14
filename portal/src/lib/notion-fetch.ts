@@ -108,6 +108,21 @@ export async function queryDatabase(opts: QueryOptions): Promise<NotionPage[]> {
   return results;
 }
 
+// Retrieve a single page by ID, regardless of which database it's in.
+export async function getPage(pageId: string): Promise<NotionPage> {
+  const res = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+    method: "GET",
+    headers: headers(),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Notion page fetch failed (${res.status}): ${errText}`);
+  }
+
+  return res.json() as Promise<NotionPage>;
+}
+
 // Update a single select property on an existing page. Returns the updated
 // page as returned by Notion, so the caller can read back the confirmed
 // value rather than assuming the write applied as requested.

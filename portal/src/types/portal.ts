@@ -199,4 +199,10 @@ export interface PublishGateStatus {
   intelOppRisk: PublishGateCounts | null;
   actions: PublishGateCounts | null;
   briefStatus: PublishStatus | null; // null = no Brief exists yet for this period
+  // Actions belonging to this property but linked to an Initiative whose own
+  // Property points elsewhere — invisible everywhere else in the product,
+  // since the Action still queries correctly by its own Property, it just
+  // never groups under any Initiative for this property. Not period-scoped:
+  // any such mis-link, from any period, is worth surfacing.
+  initiativeMismatchCount: number;
 }
