@@ -55,7 +55,13 @@ function InitiativeCard({
   clientId: string;
   propertyId: string;
 }) {
-  const linkedActions = actions.filter((a) => i.actionIds.includes(a.id));
+  // Same Client Visible filter Overview's Actions query already applies —
+  // reused here so the two pages never disagree on what a client should see.
+  // Deliberately NOT filtering out Complete here (unlike Overview's flat
+  // "still needed" count): InitiativeProgress computes its percentage from
+  // this exact array, and it needs completed items in the denominator to
+  // show real progress rather than always reading 0%.
+  const linkedActions = actions.filter((a) => i.actionIds.includes(a.id) && a.clientVisible);
 
   return (
     <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: 16 }} className="space-y-3">

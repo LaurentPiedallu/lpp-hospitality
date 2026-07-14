@@ -16,11 +16,51 @@ import KpiCard from "@/components/KpiCard";
 import SectionHeader from "@/components/SectionHeader";
 import CalloutBlock from "@/components/CalloutBlock";
 import Sparkline from "@/components/Sparkline";
-import InitiativeSummaryCard from "@/components/InitiativeSummaryCard";
 import type { Action, Opportunity, Risk, Intelligence, Initiative, KpiMetric } from "@/types/portal";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 const SERIF = "'Cormorant Garamond', Georgia, serif";
+const GOLD = "#B8935A";
+
+// Compact summary only — name, category, progress. No individual Action
+// rows here; the Initiatives page is the only place a client sees Action-
+// level detail (title, status, priority, due date). Percentage is computed
+// from the same Client Visible action set the Initiatives page now uses
+// (post Issue 1 fix), so the two pages always show the same number.
+function InitiativeCompactCard({ initiative, actions }: { initiative: Initiative; actions: Action[] }) {
+  if (actions.length === 0) return null;
+  const completed = actions.filter((a) => a.status === "Complete").length;
+  const pctComplete = Math.round((completed / actions.length) * 100);
+
+  return (
+    <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "20px 24px", marginBottom: 12 }}>
+      <div className="flex items-start justify-between gap-3" style={{ marginBottom: 12 }}>
+        <div>
+          <h3 style={{ fontFamily: SERIF, fontSize: "1.2rem", fontWeight: 400, color: "#12120F" }}>{initiative.title}</h3>
+          {initiative.category && (
+            <span
+              style={{
+                fontFamily: JOST,
+                fontSize: 9,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                color: "rgba(18,18,15,0.4)",
+                marginTop: 4,
+                display: "inline-block",
+              }}
+            >
+              {initiative.category}
+            </span>
+          )}
+        </div>
+        <span style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.5)", flexShrink: 0 }}>{pctComplete}%</span>
+      </div>
+      <div style={{ height: 3, background: "rgba(18,18,15,0.08)", borderRadius: 0, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${pctComplete}%`, background: GOLD, borderRadius: 0 }} />
+      </div>
+    </div>
+  );
+}
 
 export default async function PropertyPage({
   params,
@@ -152,20 +192,27 @@ export default async function PropertyPage({
           </section>
         )}
 
-        {/* Actions needed — grouped by Initiative instead of a flat list */}
+        {/* Actions needed — compact Initiative summary, full detail lives on Initiatives */}
         {initiativesWithOpenWork.length > 0 && (
           <section>
             <SectionHeader title="Actions Needed From You" />
             <div>
               {initiativesWithOpenWork.map((initiative) => (
-                <InitiativeSummaryCard
+                <InitiativeCompactCard
                   key={initiative.id}
                   initiative={initiative}
-                  actions={(actions as Action[]).filter((a) => initiative.actionIds.includes(a.id))}
-                  clientId={clientId}
-                  propertyId={propertyId}
+                  actions={(actions as Action[]).filter((a) => initiative.actionIds.includes(a.id) && a.clientVisible)}
                 />
               ))}
+            </div>
+            <div className="text-right" style={{ marginTop: 4 }}>
+              <Link
+                href={`/${clientId}/${propertyId}/initiatives`}
+                className="hover:text-[#D4AF7A]"
+                style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: GOLD, textDecoration: "none", transition: "color 0.25s ease" }}
+              >
+                View all Initiatives →
+              </Link>
             </div>
           </section>
         )}
