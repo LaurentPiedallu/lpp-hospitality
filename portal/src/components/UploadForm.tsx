@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 interface UploadFormProps {
   clientId: string;
@@ -8,12 +9,15 @@ interface UploadFormProps {
   onSuccess?: () => void;
 }
 
-type Stage = "idle" | "uploading" | "done" | "error";
+type Stage = "idle" | "uploading" | "polling" | "done" | "timeout" | "error";
 type FileFormat = "CSV" | "PDF" | "Excel" | "";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 const SERIF = "'Cormorant Garamond', Georgia, serif";
 const GOLD = "#B8935A";
+
+const POLL_INTERVAL_MS = 4000;
+const POLL_TIMEOUT_MS = 3 * 60 * 1000;
 
 const ACCEPTED = [
   "application/pdf",
@@ -92,7 +96,58 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
   const [progress, setProgress]     = useState(0);
   const [errorMsg, setErrorMsg]     = useState("");
   const [dragging, setDragging]     = useState(false);
+  const [pollStatus, setPollStatus] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollStartRef = useRef(0);
+  const router = useRouter();
+
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => stopPolling, [stopPolling]);
+
+  const pollUploadStatus = useCallback((notionPageId: string) => {
+    pollStartRef.current = Date.now();
+
+    const tick = async () => {
+      try {
+        const res = await fetch(
+          `/api/upload/status?id=${encodeURIComponent(notionPageId)}&clientId=${encodeURIComponent(clientId)}`
+        );
+        if (res.ok) {
+          const data = (await res.json()) as { status: string };
+          if (data.status === "Processed" || data.status === "Published") {
+            setStage("done");
+            router.refresh();
+            onSuccess?.();
+            return;
+          }
+          if (data.status === "Failed") {
+            setStage("error");
+            setErrorMsg("Something went wrong while processing this file · contact LPP if this persists");
+            return;
+          }
+          setPollStatus(data.status);
+        }
+      } catch {
+        // Transient network error — keep polling rather than failing the wait.
+      }
+
+      if (Date.now() - pollStartRef.current >= POLL_TIMEOUT_MS) {
+        setStage("timeout");
+        return;
+      }
+
+      pollTimerRef.current = setTimeout(tick, POLL_INTERVAL_MS);
+    };
+
+    tick();
+  }, [clientId, router, onSuccess]);
 
   const handleFile = (f: File) => {
     setFile(f);
@@ -153,9 +208,12 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
         throw new Error(message);
       }
 
-      setStage("done");
+      const data = (await res.json()) as { notionPageId: string };
       setProgress(100);
-      onSuccess?.();
+      setStage("polling");
+      setPollStatus("Pending");
+      router.refresh();
+      pollUploadStatus(data.notionPageId);
 
     } catch (err) {
       setStage("error");
@@ -164,6 +222,7 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
   };
 
   const reset = () => {
+    stopPolling();
     setFile(null);
     setFileFormat("");
     setUploadType("");
@@ -172,36 +231,74 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
     setStage("idle");
     setProgress(0);
     setErrorMsg("");
+    setPollStatus("");
     if (inputRef.current) inputRef.current.value = "";
   };
+
+  const resetButton = (
+    <button
+      onClick={reset}
+      className="hover:text-[#12120F]"
+      style={{
+        marginTop: 12,
+        fontFamily: JOST,
+        fontSize: 10,
+        letterSpacing: "0.12em",
+        textTransform: "uppercase",
+        color: GOLD,
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        transition: "color 0.25s ease",
+      }}
+    >
+      Upload another file
+    </button>
+  );
+
+  if (stage === "polling") {
+    const analyzing = pollStatus !== "Pending";
+    return (
+      <div style={{ background: "rgba(184,147,90,0.06)", border: "1px solid rgba(184,147,90,0.2)", borderRadius: 0, padding: 32, textAlign: "center" }}>
+        <p style={{ fontFamily: SERIF, fontSize: "1.2rem", fontWeight: 400, color: "#12120F", marginBottom: analyzing ? 8 : 16 }}>
+          {analyzing ? "Analyzing your data" : "Uploading file…"}
+        </p>
+        {analyzing && (
+          <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.5)", marginBottom: 16 }}>
+            This usually takes 1 to 2 minutes
+          </p>
+        )}
+        <div style={{ height: 3, background: "rgba(18,18,15,0.08)", overflow: "hidden", maxWidth: 240, margin: "0 auto" }}>
+          <div className="animate-pulse" style={{ height: "100%", width: "100%", background: GOLD }} />
+        </div>
+      </div>
+    );
+  }
+
+  if (stage === "timeout") {
+    return (
+      <div style={{ background: "rgba(184,147,90,0.06)", border: "1px solid rgba(184,147,90,0.2)", borderRadius: 0, padding: 32, textAlign: "center" }}>
+        <p style={{ fontFamily: SERIF, fontSize: "1.2rem", fontWeight: 400, color: "#12120F", marginBottom: 8 }}>
+          Still working on it
+        </p>
+        <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.5)" }}>
+          This is taking longer than usual · we&apos;ll keep working on it, feel free to check back
+        </p>
+        {resetButton}
+      </div>
+    );
+  }
 
   if (stage === "done") {
     return (
       <div style={{ background: "rgba(184,147,90,0.06)", border: "1px solid rgba(184,147,90,0.2)", borderRadius: 0, padding: 32, textAlign: "center" }}>
         <p style={{ fontFamily: SERIF, fontSize: "1.2rem", fontWeight: 400, color: "#12120F", marginBottom: 8 }}>
-          File uploaded successfully
+          File processed successfully
         </p>
         <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.5)" }}>
-          File received. LPP will review and process your data within 48 hours.
+          Your data has been analyzed and is ready for review
         </p>
-        <button
-          onClick={reset}
-          className="hover:text-[#12120F]"
-          style={{
-            marginTop: 12,
-            fontFamily: JOST,
-            fontSize: 10,
-            letterSpacing: "0.12em",
-            textTransform: "uppercase",
-            color: GOLD,
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            transition: "color 0.25s ease",
-          }}
-        >
-          Upload another file
-        </button>
+        {resetButton}
       </div>
     );
   }
