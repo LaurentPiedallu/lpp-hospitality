@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Property, KpiSummary } from "@/types/portal";
-import { compact, pct } from "@/lib/format";
+import { compact, pct, relativeTime } from "@/lib/format";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 const SERIF = "'Cormorant Garamond', Georgia, serif";
@@ -23,32 +23,40 @@ function StripKpi({ label, value, sub, negative }: { label: string; value: strin
 export default function PropertyHeader({
   property,
   kpi,
+  lastUpdated,
 }: {
   property: Property;
   kpi: KpiSummary | null;
+  lastUpdated?: string | null;
 }) {
   return (
     <div style={{ background: "#12120F", padding: "48px 60px 40px" }}>
-      <Link
-        href="/dashboard"
-        className="hover:text-[#B8935A]"
-        style={{
-          fontFamily: JOST,
-          fontSize: 10,
-          letterSpacing: "0.14em",
-          textTransform: "uppercase",
-          color: "rgba(184,147,90,0.5)",
-          textDecoration: "none",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 28,
-          transition: "color 0.25s ease",
-          width: "fit-content",
-        }}
-      >
-        ← Portfolio
-      </Link>
+      <div className="flex items-center justify-between" style={{ marginBottom: 28 }}>
+        <Link
+          href="/dashboard"
+          className="hover:text-[#B8935A]"
+          style={{
+            fontFamily: JOST,
+            fontSize: 10,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            color: "rgba(184,147,90,0.5)",
+            textDecoration: "none",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            transition: "color 0.25s ease",
+            width: "fit-content",
+          }}
+        >
+          ← Portfolio
+        </Link>
+        {lastUpdated && (
+          <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(242,237,228,0.3)" }}>
+            Last updated {relativeTime(lastUpdated)}
+          </p>
+        )}
+      </div>
 
       <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(242,237,228,0.3)", marginBottom: 8 }}>
         {property.location || property.conceptType}

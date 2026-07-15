@@ -52,6 +52,10 @@ export interface KpiMetric {
   targetValue: number | null;
   interpretation: string;
   periodStart: string | null; // ISO date
+  // Notion's own last_edited_time — no "Processed At" property exists on
+  // this database, this is the closest honest proxy for "when was this
+  // record last touched by the backend."
+  processedAt: string | null;
 }
 
 // Aggregated view built from a set of KpiMetrics for one period
@@ -123,6 +127,7 @@ export interface Intelligence {
   confidence: DataConfidence;
   periodStart: string | null;
   createdAt: string | null;  // Notion page created_time — used for staleness detection
+  processedAt: string | null; // Notion page last_edited_time — see KpiMetric.processedAt
 }
 
 export interface Initiative {

@@ -80,6 +80,7 @@ export async function getKpiMetrics(propertyId: string): Promise<KpiMetric[]> {
     targetValue: p.properties?.["Target Value"]?.number ?? null,
     interpretation: richText(p, "LPP Interpretation"),
     periodStart: p.properties?.["Reporting Period"]?.date?.start ?? null,
+    processedAt: (p.last_edited_time as string) ?? null,
   }));
 }
 
@@ -262,6 +263,7 @@ export async function getIntelligence(propertyId: string): Promise<Intelligence[
     confidence: (select(p, "Confidence") || "Medium") as DataConfidence,
     periodStart: p.properties?.["Reporting Period"]?.date?.start ?? null,
     createdAt: (p.created_time as string) ?? null,
+    processedAt: (p.last_edited_time as string) ?? null,
   }));
 }
 
