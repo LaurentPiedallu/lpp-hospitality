@@ -224,8 +224,8 @@ export default async function FinancialPage({
     latestMetric(allMetrics, cat, unit, hint);
 
   return (
-    <PageWrapper>
-      <NavBar session={session} />
+    <PageWrapper noTopPadding>
+      <NavBar session={session} transparentAtTop />
       <PropertyHeader property={property} />
       <PropertyTabs clientId={clientId} propertyId={propertyId} active="financial" />
 

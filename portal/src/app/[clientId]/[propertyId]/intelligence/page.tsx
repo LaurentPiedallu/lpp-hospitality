@@ -121,8 +121,8 @@ export default async function IntelligencePage({
   const hasAny = [...byCategory.values()].some((items) => items.length > 0);
 
   return (
-    <PageWrapper>
-      <NavBar session={session} />
+    <PageWrapper noTopPadding>
+      <NavBar session={session} transparentAtTop />
       <PropertyHeader property={property} />
       <PropertyTabs clientId={clientId} propertyId={propertyId} active="intelligence" />
 

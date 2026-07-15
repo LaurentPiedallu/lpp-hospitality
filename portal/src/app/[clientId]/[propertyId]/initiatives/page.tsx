@@ -210,8 +210,8 @@ export default async function InitiativesPage({
   const archived = initiatives.filter((i) => i.status === "Archived");
 
   return (
-    <PageWrapper>
-      <NavBar session={session} />
+    <PageWrapper noTopPadding>
+      <NavBar session={session} transparentAtTop />
       <PropertyHeader property={property} />
       <PropertyTabs clientId={clientId} propertyId={propertyId} active="initiatives" />
 

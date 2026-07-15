@@ -1,12 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import type { SessionPayload } from "@/lib/auth";
 
-export default function NavBar({ session }: { session: SessionPayload }) {
+// Same email/sign-out opacity used to be 0.3 — measured at 2.47:1 contrast
+// against the solid #12120F background alone, under WCAG AA's 4.5:1. Bumped
+// to 0.55 (matches the same fix already applied to the property hero text).
+const DIM_TEXT = "rgba(242,237,228,0.55)";
+
+// Reuses the marketing site's transparent-over-hero, solid-on-scroll pattern
+// (see script.js: `siteHeader.classList.toggle('nav-solid', scrollY > 72)`)
+// — same threshold, same transition. Only used on pages with a full-bleed
+// hero directly behind the nav (see PropertyHeader); everywhere else the
+// nav stays solid, since most pages have no dark hero under it to overlay.
+export default function NavBar({ session, transparentAtTop }: { session: SessionPayload; transparentAtTop?: boolean }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [solid, setSolid] = useState(!transparentAtTop);
+
+  useEffect(() => {
+    if (!transparentAtTop) return;
+    const applyNavState = () => setSolid(window.scrollY > 72);
+    applyNavState();
+    window.addEventListener("scroll", applyNavState, { passive: true });
+    return () => window.removeEventListener("scroll", applyNavState);
+  }, [transparentAtTop]);
 
   return (
     <header
@@ -18,8 +37,10 @@ export default function NavBar({ session }: { session: SessionPayload }) {
         zIndex: 100,
         height: 68,
         minHeight: 68,
-        background: "#12120F",
-        borderBottom: "1px solid rgba(184,147,90,0.1)",
+        background: solid ? "#12120F" : "transparent",
+        backdropFilter: solid ? "blur(12px)" : "none",
+        borderBottom: solid ? "1px solid rgba(184,147,90,0.1)" : "1px solid transparent",
+        transition: "background-color .35s ease, border-color .35s ease, backdrop-filter .35s ease",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -67,7 +88,7 @@ export default function NavBar({ session }: { session: SessionPayload }) {
           style={{
             fontFamily: "Inter, system-ui, sans-serif",
             fontSize: 11,
-            color: "rgba(242,237,228,0.3)",
+            color: DIM_TEXT,
             maxWidth: 200,
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -79,14 +100,14 @@ export default function NavBar({ session }: { session: SessionPayload }) {
 
         <a
           href="/api/auth/logout"
-          className="hover:text-[rgba(242,237,228,0.55)]"
+          className="hover:text-[rgba(242,237,228,0.9)]"
           style={{
             fontFamily: "Inter, system-ui, sans-serif",
             fontSize: 11,
             fontWeight: 800,
             letterSpacing: "0.105em",
             textTransform: "uppercase",
-            color: "rgba(242,237,228,0.3)",
+            color: DIM_TEXT,
             textDecoration: "none",
             transition: "color .25s ease",
           }}
@@ -156,14 +177,14 @@ export default function NavBar({ session }: { session: SessionPayload }) {
 
           <a
             href="/api/auth/logout"
-            className="hover:text-[rgba(242,237,228,0.55)]"
+            className="hover:text-[rgba(242,237,228,0.9)]"
             style={{
               fontFamily: "Inter, system-ui, sans-serif",
               fontSize: 11,
               fontWeight: 800,
               letterSpacing: "0.105em",
               textTransform: "uppercase",
-              color: "rgba(242,237,228,0.3)",
+              color: DIM_TEXT,
               textDecoration: "none",
               width: "fit-content",
               transition: "color .25s ease",

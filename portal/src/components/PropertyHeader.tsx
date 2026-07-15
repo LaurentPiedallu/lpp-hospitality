@@ -5,10 +5,15 @@ import { propertyPhoto } from "@/lib/property-photos";
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 const SERIF = "'Cormorant Garamond', Georgia, serif";
 
-// Scrim opacity chosen so a worst-case bright photo highlight still lands
-// within ~0.02:1 of the flat #12120F background's own contrast baseline —
-// verified against WCAG's relative-luminance formula, not eyeballed.
-const SCRIM = "rgba(18,18,15,0.92)";
+// Vertical scrim, not a flat overlay — sampled the real photo's brightness
+// (p95, robust to single-pixel outliers like a light fixture) in the actual
+// regions text sits over: nav band + name block need ~80% opacity to keep
+// text passing WCAG AA; the lower portion of the hero has no text over it
+// and can run much lighter (40%) so the room — the point of using the photo
+// — actually reads. 68% is roughly where the property name block ends.
+const SCRIM_TOP = "rgba(18,18,15,0.80)";
+const SCRIM_BOTTOM = "rgba(18,18,15,0.40)";
+const SCRIM_GRADIENT = `linear-gradient(to bottom, ${SCRIM_TOP} 0%, ${SCRIM_TOP} 68%, ${SCRIM_BOTTOM} 100%)`;
 
 // The pre-existing 0.3/0.35-opacity muted text in this header measured
 // 2.47:1 / 2.92:1 contrast against the flat background alone — already
@@ -34,10 +39,14 @@ export default function PropertyHeader({
   return (
     <div
       style={{
-        padding: "48px 60px 40px",
+        // +68px accounts for the fixed nav bar now overlaying this hero
+        // (see NavBar's transparentAtTop + PageWrapper's noTopPadding) —
+        // the rest of the page is unaffected since this fully offsets the
+        // top padding removed from PageWrapper.
+        padding: "116px 60px 40px",
         ...(photoUrl
           ? {
-              backgroundImage: `linear-gradient(${SCRIM}, ${SCRIM}), url(${photoUrl})`,
+              backgroundImage: `${SCRIM_GRADIENT}, url(${photoUrl})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
             }

@@ -264,8 +264,8 @@ export default async function PropertyPage({
     : [];
 
   return (
-    <PageWrapper>
-      <NavBar session={session} />
+    <PageWrapper noTopPadding>
+      <NavBar session={session} transparentAtTop />
       <PropertyHeader property={property} lastUpdated={lastUpdated} />
       <PropertyTabs clientId={clientId} propertyId={propertyId} active="overview" />
 

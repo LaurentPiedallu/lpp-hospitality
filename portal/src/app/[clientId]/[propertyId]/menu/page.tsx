@@ -355,8 +355,8 @@ export default async function MenuPage({
   const executionIntel = intel("Execution");
 
   return (
-    <PageWrapper>
-      <NavBar session={session} />
+    <PageWrapper noTopPadding>
+      <NavBar session={session} transparentAtTop />
       <PropertyHeader property={property} />
       <PropertyTabs clientId={clientId} propertyId={propertyId} active="menu" />
 

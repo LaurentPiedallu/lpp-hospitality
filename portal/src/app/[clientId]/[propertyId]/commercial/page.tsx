@@ -330,8 +330,8 @@ export default async function CommercialPage({
   );
 
   return (
-    <PageWrapper>
-      <NavBar session={session} />
+    <PageWrapper noTopPadding>
+      <NavBar session={session} transparentAtTop />
       <PropertyHeader property={property} />
       <PropertyTabs clientId={clientId} propertyId={propertyId} active="commercial" />
 
