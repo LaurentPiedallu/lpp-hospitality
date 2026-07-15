@@ -107,7 +107,15 @@ export function buildKpiSummary(metrics: KpiMetric[]): KpiSummary | null {
   // KPI Records didn't have LPP Metric Key populated, producing bogus values
   // like a $46 "total revenue". Missing key -> null -> renders as "—", which
   // is the honest result when the source data isn't tagged correctly.
-  const byKey = (key: string) => current.find((m) => m.lppMetricKey === key)?.metricValue ?? null;
+  //
+  // Optional category param: "covers" is reused across two KPI Categories
+  // (Revenue's "Total Covers (Revenue Customers)" vs Guest Experience's
+  // "Total Covers Surveyed" / "Survey Response Count") — key alone picked
+  // up whichever record Notion happened to return first. Verified this is
+  // the only LPP Metric Key that repeats across categories in the current
+  // dataset; every other key below maps to exactly one category.
+  const byKey = (key: string, category?: string) =>
+    current.find((m) => m.lppMetricKey === key && (!category || m.category === category))?.metricValue ?? null;
 
   // Derive worst financial severity
   const severityRank: Record<Severity, number> = {
@@ -120,7 +128,7 @@ export function buildKpiSummary(metrics: KpiMetric[]): KpiSummary | null {
   return {
     period: latestPeriod ?? "",
     revenue:         byKey("total_revenue"),
-    covers:          byKey("covers"),
+    covers:          byKey("covers", "Revenue"),
     avgSpend:        byKey("avg_spend"),
     laborDollars:    byKey("total_payroll"),
     laborPct:        byKey("labor_pct"),

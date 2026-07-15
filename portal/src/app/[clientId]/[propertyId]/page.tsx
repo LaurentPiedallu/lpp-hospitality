@@ -21,17 +21,16 @@ const SERIF = "'Cormorant Garamond', Georgia, serif";
 const GOLD = "#B8935A";
 
 // Financial Snapshot caption — same weight/size as the existing sub-stat
-// line (e.g. "175 covers"), clamped to 2 lines rather than shrunk further.
+// line (e.g. "175 covers"). Wraps to as many lines as the sentence needs;
+// no clamp or truncation, since these are single sentences where the
+// clipped-off tail (often the number that makes it meaningful) is the
+// whole point of the caption.
 const captionStyle: React.CSSProperties = {
   fontFamily: JOST,
   fontSize: 11,
   color: "rgba(18,18,15,0.45)",
   marginTop: 6,
   lineHeight: 1.4,
-  display: "-webkit-box",
-  WebkitLineClamp: 2,
-  WebkitBoxOrient: "vertical",
-  overflow: "hidden",
 };
 
 // ~10% more breathing room than the prior 48px section rhythm.
