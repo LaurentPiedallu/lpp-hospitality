@@ -103,6 +103,9 @@ export interface Opportunity {
   category: string;
   priority: string;
   nextStep: string;
+  // No field on Opportunity itself captures the causal "why" distinct from
+  // the headline — that lives on the linked Intelligence finding instead.
+  sourceIntelligenceId: string | null;
 }
 
 export interface Risk {
@@ -187,6 +190,8 @@ export interface Upload {
   uploadedAt: string | null;
   status: UploadStatus;
   notes: string;
+  uploadType: string;             // e.g. "P&L", "Guest Reviews" — used to detect pending uploads
+  reportingPeriod: string | null; // ISO date, distinct from Upload Date
 }
 
 // Admin-only — whether a property's most recent reporting period is actually

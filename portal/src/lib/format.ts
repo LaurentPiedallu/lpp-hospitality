@@ -44,6 +44,34 @@ export function relativeTime(iso: string | null): string {
   return `${years} year${years === 1 ? "" : "s"} ago`;
 }
 
+// Splits a block of prose into up to `targetCount` paragraphs by grouping
+// consecutive sentences into roughly-equal-sized chunks. This is a purely
+// structural split, not a summary — it doesn't shorten or reword the text,
+// just breaks a dense paragraph into shorter, easier-to-scan ones. Source
+// text that doesn't cleanly separate into distinct ideas (e.g. every
+// sentence carries both a finding and a call to action) will still produce
+// paragraphs that read a bit mixed — that's a content problem the split
+// itself can't fix.
+export function splitIntoParagraphs(text: string, targetCount = 3): string[] {
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+
+  const sentences = trimmed.match(/[^.!?]+[.!?]+(?:\s+|$)/g)?.map((s) => s.trim()) ?? [trimmed];
+  const count = Math.min(targetCount, sentences.length);
+  if (count <= 1) return [sentences.join(" ")];
+
+  const base = Math.floor(sentences.length / count);
+  const remainder = sentences.length % count;
+  const paragraphs: string[] = [];
+  let i = 0;
+  for (let g = 0; g < count; g++) {
+    const size = base + (g < remainder ? 1 : 0);
+    paragraphs.push(sentences.slice(i, i + size).join(" "));
+    i += size;
+  }
+  return paragraphs;
+}
+
 export interface TrendDataPoint {
   period: string;
   value: number;

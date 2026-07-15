@@ -217,6 +217,7 @@ export async function getOpportunities(propertyId: string, periodIso?: string): 
     category: select(p, "Opportunity Category"),
     priority: select(p, "Priority"),
     nextStep: richText(p, "Next Step"),
+    sourceIntelligenceId: relationId(p, "Source Intelligence") || null,
   }));
 }
 
@@ -398,6 +399,8 @@ export async function getUploads(clientId: string, propertyId: string): Promise<
     uploadedAt: p.properties?.["Upload Date"]?.date?.start ?? null,
     status: (select(p, "Processing Status") || "Pending") as Upload["status"],
     notes: richText(p, "Validation Notes"),
+    uploadType: select(p, "Upload Type"),
+    reportingPeriod: p.properties?.["Reporting Period"]?.date?.start ?? null,
   }));
 }
 

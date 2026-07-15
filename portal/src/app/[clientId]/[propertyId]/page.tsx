@@ -4,10 +4,10 @@ import { getSession } from "@/lib/auth";
 import {
   getProperty, getLatestKpiSummary, getKpiMetrics, getActions, getInitiatives,
   getOpportunities, getRisks, getIntelligence, hasUnpublishedFinancialData,
-  getLatestPublishedBrief,
+  getLatestPublishedBrief, getUploads,
 } from "@/lib/notion-queries";
 import { deriveHealth } from "@/lib/health";
-import { usd, pct, compact, formatPeriod } from "@/lib/format";
+import { usd, pct, compact, formatPeriod, splitIntoParagraphs } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
@@ -15,7 +15,7 @@ import PropertyTabs from "@/components/PropertyTabs";
 import SectionHeader from "@/components/SectionHeader";
 import CalloutBlock from "@/components/CalloutBlock";
 import Sparkline from "@/components/Sparkline";
-import type { Action, Opportunity, Risk, Intelligence, Initiative, KpiMetric } from "@/types/portal";
+import type { Action, Opportunity, Risk, Intelligence, Initiative, KpiMetric, Upload } from "@/types/portal";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 const SERIF = "'Cormorant Garamond', Georgia, serif";
@@ -103,7 +103,7 @@ export default async function PropertyPage({
   const { clientId, propertyId } = await params;
   if (session.role !== "admin" && session.clientId !== clientId) redirect("/dashboard");
 
-  const [property, kpi, allMetrics, actions, initiatives, intelligence, latestBrief] = await Promise.all([
+  const [property, kpi, allMetrics, actions, initiatives, intelligence, latestBrief, uploads] = await Promise.all([
     getProperty(propertyId, clientId),
     getLatestKpiSummary(propertyId),
     getKpiMetrics(propertyId),
@@ -111,6 +111,7 @@ export default async function PropertyPage({
     getInitiatives(propertyId),
     getIntelligence(propertyId),
     getLatestPublishedBrief(propertyId, clientId),
+    getUploads(clientId, propertyId),
   ]);
 
   if (!property) notFound();
@@ -145,6 +146,30 @@ export default async function PropertyPage({
   const biggestRisk = latestBrief?.biggestRiskId
     ? (risks as Risk[]).find((r) => r.id === latestBrief.biggestRiskId) ?? null
     : null;
+
+  // The Opportunity record itself has no field for the causal "why" (only
+  // a headline title and a "Next Step" action) — the driving Intelligence
+  // finding behind it does, so pull that instead of fabricating a field.
+  const opportunityDriver = biggestOpportunity?.sourceIntelligenceId
+    ? (intelligence as Intelligence[]).find((i) => i.id === biggestOpportunity.sourceIntelligenceId)?.finding ?? null
+    : null;
+
+  // Pending uploads — compares upload types seen in prior periods for this
+  // property against the current period, so it only flags a type as
+  // "pending" when this specific property has actually established a
+  // pattern of uploading it. No universal "expected" list is assumed.
+  const priorPeriodUploadTypes = new Set(
+    (uploads as Upload[])
+      .filter((u) => u.reportingPeriod && u.reportingPeriod !== currentPeriod && u.uploadType && u.status !== "Failed")
+      .map((u) => u.uploadType)
+  );
+  const currentPeriodUploadTypes = new Set(
+    (uploads as Upload[])
+      .filter((u) => u.reportingPeriod === currentPeriod && u.uploadType && u.status !== "Failed")
+      .map((u) => u.uploadType)
+  );
+  const pendingUploadTypes = [...priorPeriodUploadTypes].filter((t) => !currentPeriodUploadTypes.has(t));
+  const hasUploadHistory = priorPeriodUploadTypes.size > 0 && currentPeriod != null;
 
   // Admin-only signal: financial numbers are all missing even though a
   // summary exists — check whether real data is sitting unpublished in Notion.
@@ -217,6 +242,12 @@ export default async function PropertyPage({
     .map(({ label, key, fallback }) => ({ label, metric: guestMetric(key, fallback) }))
     .filter((c): c is { label: string; metric: { display: string; isRange: boolean } } => c.metric != null);
 
+  // Structural split only — groups sentences into shorter paragraphs, does
+  // not shorten or reword. See splitIntoParagraphs in lib/format.ts.
+  const currentReadParagraphs = latestBrief?.executiveSummary
+    ? splitIntoParagraphs(latestBrief.executiveSummary, 3)
+    : [];
+
   return (
     <PageWrapper>
       <NavBar session={session} />
@@ -225,44 +256,47 @@ export default async function PropertyPage({
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 0" }}>
 
-        {/* At a glance — demoted to a slim strip, no longer competing with Current Read below it */}
+        {/* At a glance — a quiet reference strip; Current Read below is the page's visual anchor */}
         <section style={{ marginBottom: SECTION_GAP }}>
-          <div className="flex flex-wrap items-center gap-x-10 gap-y-3" style={{ paddingBottom: 20, borderBottom: "1px solid rgba(18,18,15,0.08)" }}>
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-2" style={{ paddingBottom: 12, borderBottom: "1px solid rgba(18,18,15,0.06)" }}>
             {[
               { label: "Overall Health", value: health.status },
               { label: "Annual Opportunity", value: annualOpportunity > 0 ? compact(annualOpportunity) : "—" },
               { label: "Actions Needed", value: String(openActions.length) },
               { label: "Data Confidence", value: property.dataConfidence },
             ].map(({ label, value }) => (
-              <div key={label} style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
-                <span style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)" }}>
+              <div key={label} style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                <span style={{ fontFamily: JOST, fontSize: 8, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(18,18,15,0.3)" }}>
                   {label}
                 </span>
-                <span style={{ fontFamily: JOST, fontSize: 13, color: "#12120F", fontWeight: 500 }}>{value}</span>
+                <span style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.55)", fontWeight: 400 }}>{value}</span>
               </div>
             ))}
           </div>
         </section>
 
         {/* Current read — the top-line state, given real visual weight and placed first */}
-        {latestBrief?.executiveSummary && (
+        {currentReadParagraphs.length > 0 && (
           <section style={{ marginBottom: SECTION_GAP }}>
             <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD, marginBottom: 14 }}>
               Current Read
             </p>
-            <p
-              style={{
-                fontFamily: SERIF,
-                fontSize: "clamp(0.95rem, 1.3vw, 1.05rem)",
-                fontWeight: 400,
-                lineHeight: 1.7,
-                color: "#12120F",
-                borderLeft: "3px solid #B8935A",
-                paddingLeft: 24,
-              }}
-            >
-              {latestBrief.executiveSummary}
-            </p>
+            <div style={{ borderLeft: "3px solid #B8935A", paddingLeft: 24 }} className="space-y-3">
+              {currentReadParagraphs.map((paragraph, i) => (
+                <p
+                  key={i}
+                  style={{
+                    fontFamily: SERIF,
+                    fontSize: "clamp(0.95rem, 1.3vw, 1.05rem)",
+                    fontWeight: 400,
+                    lineHeight: 1.7,
+                    color: "#12120F",
+                  }}
+                >
+                  {paragraph}
+                </p>
+              ))}
+            </div>
           </section>
         )}
 
@@ -302,9 +336,14 @@ export default async function PropertyPage({
               <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD, marginBottom: 18 }}>
                 Biggest Opportunity
               </p>
-              <p style={{ fontFamily: SERIF, fontSize: "clamp(1.3rem, 2vw, 1.6rem)", fontWeight: 300, color: "rgba(242,237,228,0.85)", lineHeight: 1.5, maxWidth: 640, marginBottom: 22 }}>
+              <p style={{ fontFamily: SERIF, fontSize: "clamp(1.3rem, 2vw, 1.6rem)", fontWeight: 300, color: "rgba(242,237,228,0.85)", lineHeight: 1.5, maxWidth: 640, marginBottom: opportunityDriver ? 10 : 22 }}>
                 {biggestOpportunity.title}
               </p>
+              {opportunityDriver && (
+                <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(242,237,228,0.45)", maxWidth: 640, marginBottom: 22 }}>
+                  {opportunityDriver}
+                </p>
+              )}
               {biggestOpportunity.estimatedAnnualImpact > 0 && (
                 <p style={{ fontFamily: SERIF, fontSize: "clamp(2.8rem, 6vw, 4.2rem)", fontWeight: 300, color: "#B8935A", lineHeight: 1 }}>
                   {compact(biggestOpportunity.estimatedAnnualImpact)}
@@ -432,7 +471,7 @@ export default async function PropertyPage({
 
         {/* Watch item — same underlying "Biggest Risk" data, client-facing label softened */}
         {biggestRisk && (
-          <section>
+          <section style={{ marginBottom: hasUploadHistory ? SECTION_GAP : 0 }}>
             <SectionHeader title="Watch Item" />
             <CalloutBlock>
               <p>{biggestRisk.title}</p>
@@ -440,6 +479,32 @@ export default async function PropertyPage({
                 <p style={{ marginTop: 8, opacity: 0.8 }}>{biggestRisk.mitigationPlan}</p>
               )}
             </CalloutBlock>
+          </section>
+        )}
+
+        {/* What happens next — only Pending Uploads has real data behind it today;
+            Next Scheduled Review and Last Client Action are omitted, see notes below */}
+        {hasUploadHistory && (
+          <section>
+            <SectionHeader title="What Happens Next" />
+            <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "22px 26px" }}>
+              <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 10 }}>
+                Pending Uploads
+              </p>
+              {pendingUploadTypes.length > 0 ? (
+                <ul className="space-y-1.5">
+                  {pendingUploadTypes.map((t) => (
+                    <li key={t} style={{ fontFamily: JOST, fontSize: 13, color: "#12120F" }}>
+                      {t} · Not yet received
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.55)" }}>
+                  All expected files received for the current period
+                </p>
+              )}
+            </div>
           </section>
         )}
 
