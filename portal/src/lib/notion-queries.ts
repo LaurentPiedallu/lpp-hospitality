@@ -7,6 +7,7 @@ import {
   relationId, relationIds, rollupNumber, updateSelectProperty, getPage,
 } from "./notion-fetch";
 import { NOTION_DBS } from "./notion-ids";
+import { maxIso } from "./format";
 import type {
   Client, Property, KpiMetric, KpiSummary, Action, Opportunity,
   Risk, Intelligence, Initiative, Brief, Benchmark, Upload,
@@ -362,6 +363,30 @@ export async function getLatestPublishedBrief(propertyId: string, clientId: stri
     pageSize: 1,
   });
   return pages[0] ? toBrief(pages[0], clientId) : null;
+}
+
+// "Last updated" for the property hero — most recent Notion last_edited_time
+// (see KpiMetric.processedAt / Intelligence.processedAt) across this
+// property's current-period KPI Records and Intelligence, where "current
+// period" is anchored to the latest Published Brief's Reporting Period, same
+// definition the Overview page uses. Self-contained (fetches its own data)
+// so every property tab can call it identically regardless of what else
+// that page already has loaded.
+export async function getLastUpdated(propertyId: string, clientId: string): Promise<string | null> {
+  const [metrics, intelligence, brief] = await Promise.all([
+    getKpiMetrics(propertyId),
+    getIntelligence(propertyId),
+    getLatestPublishedBrief(propertyId, clientId),
+  ]);
+
+  const currentPeriod = brief?.reportingPeriodStart ?? null;
+  const periodMetrics = currentPeriod ? metrics.filter((m) => m.periodStart === currentPeriod) : metrics;
+  const periodIntel = currentPeriod ? intelligence.filter((i) => i.periodStart === currentPeriod) : intelligence;
+
+  return maxIso([
+    ...periodMetrics.map((m) => m.processedAt),
+    ...periodIntel.map((i) => i.processedAt),
+  ]);
 }
 
 // ─── Benchmarks ───────────────────────────────────────────────────────────────

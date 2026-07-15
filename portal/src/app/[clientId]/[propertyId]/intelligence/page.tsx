@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { getProperty, getIntelligence } from "@/lib/notion-queries";
+import { getProperty, getIntelligence, getLastUpdated } from "@/lib/notion-queries";
 import { formatPeriod } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
@@ -8,7 +8,6 @@ import PropertyHeader from "@/components/PropertyHeader";
 import PropertyTabs from "@/components/PropertyTabs";
 import SectionHeader from "@/components/SectionHeader";
 import StatusBadge from "@/components/StatusBadge";
-import RequestAnalysisButton from "@/components/RequestAnalysisButton";
 import RefreshAllButton from "@/components/RefreshAllButton";
 import EmptyState from "@/components/EmptyState";
 import { ANALYSIS_CATEGORIES, isStale, relativeAge } from "@/lib/analysis-config";
@@ -101,9 +100,10 @@ export default async function IntelligencePage({
   const { clientId, propertyId } = await params;
   if (session.role !== "admin" && session.clientId !== clientId) redirect("/dashboard");
 
-  const [property, allIntelligence] = await Promise.all([
+  const [property, allIntelligence, lastUpdated] = await Promise.all([
     getProperty(propertyId, clientId),
     getIntelligence(propertyId),
+    getLastUpdated(propertyId, clientId),
   ]);
 
   if (!property) notFound();
@@ -123,7 +123,7 @@ export default async function IntelligencePage({
   return (
     <PageWrapper noTopPadding>
       <NavBar session={session} transparentAtTop />
-      <PropertyHeader property={property} />
+      <PropertyHeader property={property} lastUpdated={lastUpdated} />
       <PropertyTabs clientId={clientId} propertyId={propertyId} active="intelligence" />
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 80px" }} className="space-y-12">
@@ -170,20 +170,10 @@ export default async function IntelligencePage({
               const config = CATEGORY_LABELS[cat] ?? { label: cat, description: "" };
               return (
                 <section key={cat} className="space-y-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <SectionHeader title={config.label} />
-                      {config.description && (
-                        <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.4)", marginTop: -12, marginBottom: 16 }}>{config.description}</p>
-                      )}
-                    </div>
-                    <RequestAnalysisButton
-                      clientId={clientId}
-                      propertyId={propertyId}
-                      category={cat}
-                      label={`Refresh ${config.label.toLowerCase()}`}
-                    />
-                  </div>
+                  <SectionHeader title={config.label} />
+                  {config.description && (
+                    <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.4)", marginTop: -12, marginBottom: 16 }}>{config.description}</p>
+                  )}
                   <div className="space-y-4">
                     {items.map((item) => (
                       <IntelligenceCard key={item.id} item={item} />

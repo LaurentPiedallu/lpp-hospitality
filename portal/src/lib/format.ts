@@ -44,6 +44,13 @@ export function relativeTime(iso: string | null): string {
   return `${years} year${years === 1 ? "" : "s"} ago`;
 }
 
+// Latest of a set of ISO timestamp strings (nulls ignored). Plain string
+// comparison is valid here since all inputs are ISO 8601 UTC.
+export function maxIso(dates: (string | null)[]): string | null {
+  const valid = dates.filter((d): d is string => d != null);
+  return valid.length === 0 ? null : valid.reduce((max, d) => (d > max ? d : max));
+}
+
 // Splits a block of prose into up to `targetCount` paragraphs by grouping
 // consecutive sentences into roughly-equal-sized chunks. This is a purely
 // structural split, not a summary — it doesn't shorten or reword the text,

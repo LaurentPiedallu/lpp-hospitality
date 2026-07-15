@@ -55,6 +55,7 @@ export default function PropertyTabs({
               letterSpacing: "0.16em",
               textTransform: "uppercase",
               color: isActive ? "#12120F" : "rgba(18,18,15,0.4)",
+              fontWeight: isActive ? 600 : 400,
               padding: "16px 20px",
               borderBottom: isActive ? "2px solid #B8935A" : "2px solid transparent",
               textDecoration: "none",

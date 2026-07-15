@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { getProperty, getKpiMetrics, getIntelligence } from "@/lib/notion-queries";
+import { getProperty, getKpiMetrics, getIntelligence, getLastUpdated } from "@/lib/notion-queries";
 import { usd, pct, buildTrendData } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
@@ -12,7 +12,6 @@ import KpiCard from "@/components/KpiCard";
 import StatusBadge from "@/components/StatusBadge";
 import TrendChart from "@/components/TrendChart";
 import BenchmarkGauge from "@/components/BenchmarkGauge";
-import RequestAnalysisButton from "@/components/RequestAnalysisButton";
 import EmptyState from "@/components/EmptyState";
 import type { KpiMetric, Intelligence, Severity } from "@/types/portal";
 
@@ -191,10 +190,11 @@ export default async function FinancialPage({
   const { clientId, propertyId } = await params;
   if (session.role !== "admin" && session.clientId !== clientId) redirect("/dashboard");
 
-  const [property, allMetrics, allIntelligence] = await Promise.all([
+  const [property, allMetrics, allIntelligence, lastUpdated] = await Promise.all([
     getProperty(propertyId, clientId),
     getKpiMetrics(propertyId),
     getIntelligence(propertyId),
+    getLastUpdated(propertyId, clientId),
   ]);
 
   if (!property) notFound();
@@ -226,14 +226,10 @@ export default async function FinancialPage({
   return (
     <PageWrapper noTopPadding>
       <NavBar session={session} transparentAtTop />
-      <PropertyHeader property={property} />
+      <PropertyHeader property={property} lastUpdated={lastUpdated} />
       <PropertyTabs clientId={clientId} propertyId={propertyId} active="financial" />
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 80px" }} className="space-y-12">
-
-        <div className="flex justify-end">
-          <RequestAnalysisButton clientId={clientId} propertyId={propertyId} category="Financial" label="Refresh analysis" />
-        </div>
 
         {/* ── Revenue ──────────────────────────────────────────────────── */}
         <FinancialSection

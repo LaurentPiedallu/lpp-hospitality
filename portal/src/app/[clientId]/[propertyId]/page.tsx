@@ -7,7 +7,7 @@ import {
   getLatestPublishedBrief, getUploads,
 } from "@/lib/notion-queries";
 import { deriveHealth } from "@/lib/health";
-import { usd, pct, compact, formatPeriod, splitIntoParagraphs } from "@/lib/format";
+import { usd, pct, compact, formatPeriod, splitIntoParagraphs, maxIso } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
@@ -41,11 +41,6 @@ const PRIORITY_RANK: Record<string, number> = { Critical: 0, High: 1, Medium: 2,
 function topAction(actions: Action[]): Action | null {
   if (actions.length === 0) return null;
   return [...actions].sort((a, b) => (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9))[0];
-}
-
-function maxIso(dates: (string | null)[]): string | null {
-  const valid = dates.filter((d): d is string => d != null);
-  return valid.length === 0 ? null : valid.reduce((max, d) => (d > max ? d : max));
 }
 
 // Initiative titles are the raw Notion page title (e.g. "Lex Yard — Commercial"),
