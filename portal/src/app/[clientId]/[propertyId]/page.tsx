@@ -36,6 +36,16 @@ function maxIso(dates: (string | null)[]): string | null {
   return valid.length === 0 ? null : valid.reduce((max, d) => (d > max ? d : max));
 }
 
+// Initiative titles are the raw Notion page title (e.g. "Lex Yard — Commercial"),
+// not a frontend-constructed string. On this single-property page the property
+// name is already shown in the header and tab bar, so strip it here for display
+// only — the underlying Notion title, and every other page that reads it
+// (e.g. the Initiatives tab), is untouched.
+function stripPropertyPrefix(title: string, propertyName: string): string {
+  const prefix = `${propertyName} — `;
+  return title.startsWith(prefix) ? title.slice(prefix.length) : title;
+}
+
 function PrimarySectionHeader({ title }: { title: string }) {
   return (
     <h2 style={{ fontFamily: SERIF, fontSize: "1.9rem", fontWeight: 400, color: "#12120F", marginBottom: 24 }}>
@@ -52,15 +62,16 @@ function PrimarySectionHeader({ title }: { title: string }) {
 // (Notion's own default silently renders as "Medium" for all of them,
 // which isn't a real signal), while linked Actions carry genuine,
 // varied Critical/High/Medium priority.
-function InitiativeCompactCard({ initiative, openActions }: { initiative: Initiative; openActions: Action[] }) {
+function InitiativeCompactCard({ initiative, openActions, propertyName }: { initiative: Initiative; openActions: Action[]; propertyName: string }) {
   if (openActions.length === 0) return null;
   const next = topAction(openActions);
+  const displayTitle = stripPropertyPrefix(initiative.title, propertyName);
 
   return (
     <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "22px 26px", marginBottom: 12 }}>
       <div className="flex items-start justify-between gap-3" style={{ marginBottom: next ? 10 : 0 }}>
         <div>
-          <h3 style={{ fontFamily: SERIF, fontSize: "1.2rem", fontWeight: 400, color: "#12120F" }}>{initiative.title}</h3>
+          <h3 style={{ fontFamily: SERIF, fontSize: "1.2rem", fontWeight: 400, color: "#12120F" }}>{displayTitle}</h3>
           {initiative.category && (
             <span
               style={{
@@ -309,6 +320,7 @@ export default async function PropertyPage({
                 <InitiativeCompactCard
                   key={initiative.id}
                   initiative={initiative}
+                  propertyName={property.name}
                   openActions={(actions as Action[]).filter(
                     (a) => initiative.actionIds.includes(a.id) && a.clientVisible && a.status !== "Complete"
                   )}
