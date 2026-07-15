@@ -14,12 +14,25 @@ import PropertyHeader from "@/components/PropertyHeader";
 import PropertyTabs from "@/components/PropertyTabs";
 import SectionHeader from "@/components/SectionHeader";
 import CalloutBlock from "@/components/CalloutBlock";
-import Sparkline from "@/components/Sparkline";
 import type { Action, Opportunity, Risk, Intelligence, Initiative, KpiMetric, Upload } from "@/types/portal";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 const SERIF = "'Cormorant Garamond', Georgia, serif";
 const GOLD = "#B8935A";
+
+// Financial Snapshot caption — same weight/size as the existing sub-stat
+// line (e.g. "175 covers"), clamped to 2 lines rather than shrunk further.
+const captionStyle: React.CSSProperties = {
+  fontFamily: JOST,
+  fontSize: 11,
+  color: "rgba(18,18,15,0.45)",
+  marginTop: 6,
+  lineHeight: 1.4,
+  display: "-webkit-box",
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: "vertical",
+  overflow: "hidden",
+};
 
 // ~10% more breathing room than the prior 48px section rhythm.
 const SECTION_GAP = 53;
@@ -193,30 +206,22 @@ export default async function PropertyPage({
       ? await hasUnpublishedFinancialData(propertyId)
       : false;
 
-  // Build sparkline series from multi-period KPI data
-  function trendSeries(cat: string, unit: string, hint?: string): { period: string; value: number }[] {
-    const byPeriod = new Map<string, number>();
-    (allMetrics as KpiMetric[])
-      .filter((m) =>
-        m.category === cat &&
-        m.unit === unit &&
-        m.periodStart != null &&
-        (hint ? m.metricName.toLowerCase().includes(hint) : true)
-      )
-      .forEach((m) => {
-        if (!byPeriod.has(m.periodStart!)) byPeriod.set(m.periodStart!, m.metricValue);
-      });
-    return [...byPeriod.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([period, value]) => ({ period, value }));
-  }
-
-  const revenueTrend    = trendSeries("Revenue", "$");
-  const laborPctTrend   = trendSeries("Labor", "%");
-  const cogsPctTrend    = trendSeries("COGS", "%");
-  const profitPctTrend  = trendSeries("Profitability", "%");
-  const latestPeriod    = (allMetrics as KpiMetric[])
+  const latestPeriod = (allMetrics as KpiMetric[])
     .map((m) => m.periodStart).filter(Boolean).sort().reverse()[0] ?? null;
+
+  // Financial Snapshot captions — the LPP Interpretation from the specific
+  // KPI Record driving that card's value, not a generic property-level
+  // field. Left blank (not a placeholder) when the record or its
+  // interpretation doesn't exist yet for this property/period.
+  function metricInterpretation(key: string): string {
+    return (allMetrics as KpiMetric[])
+      .find((m) => m.lppMetricKey === key && m.periodStart === latestPeriod)
+      ?.interpretation?.trim() ?? "";
+  }
+  const revenueInterpretation    = metricInterpretation("total_revenue");
+  const laborInterpretation      = metricInterpretation("labor_pct");
+  const cogsInterpretation       = metricInterpretation("cogs_pct");
+  const netProfitInterpretation  = metricInterpretation("net_profit_pct");
 
   // "Last updated" — no "Processed At" property exists on KPI Records or
   // Intelligence; this uses Notion's own last_edited_time as the honest
@@ -393,11 +398,7 @@ export default async function PropertyPage({
                   {kpi.revenue != null ? compact(kpi.revenue) : "—"}
                 </p>
                 {kpi.covers != null && <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 6 }}>{kpi.covers.toLocaleString()} covers</p>}
-                {revenueTrend.length >= 2 && (
-                  <div className="mt-3">
-                    <Sparkline data={revenueTrend.map((d) => d.value)} color="#B8935A" />
-                  </div>
-                )}
+                {revenueInterpretation && <p style={captionStyle}>{revenueInterpretation}</p>}
               </div>
 
               {/* Labor */}
@@ -407,11 +408,7 @@ export default async function PropertyPage({
                   {kpi.laborPct != null ? pct(kpi.laborPct) : "—"}
                 </p>
                 {kpi.laborDollars != null && <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 6 }}>{usd(kpi.laborDollars)}</p>}
-                {laborPctTrend.length >= 2 && (
-                  <div className="mt-3">
-                    <Sparkline data={laborPctTrend.map((d) => d.value)} color="#B8935A" />
-                  </div>
-                )}
+                {laborInterpretation && <p style={captionStyle}>{laborInterpretation}</p>}
               </div>
 
               {/* COGS */}
@@ -421,11 +418,7 @@ export default async function PropertyPage({
                   {kpi.cogsPct != null ? pct(kpi.cogsPct) : "—"}
                 </p>
                 {kpi.cogsDollars != null && <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 6 }}>{usd(kpi.cogsDollars)}</p>}
-                {cogsPctTrend.length >= 2 && (
-                  <div className="mt-3">
-                    <Sparkline data={cogsPctTrend.map((d) => d.value)} color="#B8935A" />
-                  </div>
-                )}
+                {cogsInterpretation && <p style={captionStyle}>{cogsInterpretation}</p>}
               </div>
 
               {/* Net profit */}
@@ -435,11 +428,7 @@ export default async function PropertyPage({
                   {kpi.netProfitPct != null ? pct(kpi.netProfitPct) : "—"}
                 </p>
                 {kpi.netProfitDollars != null && <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 6 }}>{usd(kpi.netProfitDollars)}</p>}
-                {profitPctTrend.length >= 2 && (
-                  <div className="mt-3">
-                    <Sparkline data={profitPctTrend.map((d) => d.value)} color="#B8935A" />
-                  </div>
-                )}
+                {netProfitInterpretation && <p style={captionStyle}>{netProfitInterpretation}</p>}
               </div>
             </div>
 
