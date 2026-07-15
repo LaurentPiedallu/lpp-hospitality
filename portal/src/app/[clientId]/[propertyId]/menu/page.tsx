@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { getProperty, getKpiMetrics, getIntelligence, getBenchmarks, buildKpiSummary } from "@/lib/notion-queries";
+import { getProperty, getKpiMetrics, getIntelligence, getBenchmarks } from "@/lib/notion-queries";
 import { usd, pct, buildTrendData } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
@@ -354,12 +354,10 @@ export default async function MenuPage({
 
   const executionIntel = intel("Execution");
 
-  const kpi = buildKpiSummary(allMetrics);
-
   return (
     <PageWrapper>
       <NavBar session={session} />
-      <PropertyHeader property={property} kpi={kpi} />
+      <PropertyHeader property={property} />
       <PropertyTabs clientId={clientId} propertyId={propertyId} active="menu" />
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 80px" }} className="space-y-12">

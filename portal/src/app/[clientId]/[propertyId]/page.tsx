@@ -266,7 +266,7 @@ export default async function PropertyPage({
   return (
     <PageWrapper>
       <NavBar session={session} />
-      <PropertyHeader property={property} kpi={kpi} lastUpdated={lastUpdated} />
+      <PropertyHeader property={property} lastUpdated={lastUpdated} />
       <PropertyTabs clientId={clientId} propertyId={propertyId} active="overview" />
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 0" }}>

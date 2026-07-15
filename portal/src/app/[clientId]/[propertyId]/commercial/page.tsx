@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, buildKpiSummary } from "@/lib/notion-queries";
+import { getProperty, getKpiMetrics, getIntelligence, getOpportunities } from "@/lib/notion-queries";
 import { usd, pct, buildTrendData } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
@@ -329,12 +329,10 @@ export default async function CommercialPage({
     g.metricName.toLowerCase().includes("direct")
   );
 
-  const kpi = buildKpiSummary(allMetrics);
-
   return (
     <PageWrapper>
       <NavBar session={session} />
-      <PropertyHeader property={property} kpi={kpi} />
+      <PropertyHeader property={property} />
       <PropertyTabs clientId={clientId} propertyId={propertyId} active="commercial" />
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 80px" }} className="space-y-12">

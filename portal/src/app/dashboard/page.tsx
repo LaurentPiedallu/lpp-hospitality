@@ -6,6 +6,7 @@ import { deriveHealth } from "@/lib/health";
 import { compact, pct } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
+import { propertyPhoto } from "@/lib/property-photos";
 import type { Client, Property, KpiSummary } from "@/types/portal";
 import type { HealthColor } from "@/lib/health";
 
@@ -151,6 +152,7 @@ function Kpi({ label, value, sub, negative }: { label: string; value: string; su
 function PropertyOverviewCard({ card, clientId }: { card: PropertyCard; clientId: string }) {
   const { property, kpi, openActions, health, unpublishedFinancialData } = card;
   const declining = kpi?.financialSeverity === "Critical" || kpi?.financialSeverity === "Action Required";
+  const photoUrl = propertyPhoto(property.id);
 
   return (
     <Link
@@ -167,16 +169,31 @@ function PropertyOverviewCard({ card, clientId }: { card: PropertyCard; clientId
     >
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between" style={{ marginBottom: 20 }}>
-        <div>
-          <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", color: INK_QUIET, marginBottom: 4 }}>
-            {property.location || property.conceptType}
-          </p>
-          <h3 style={{ fontFamily: SERIF, fontSize: "1.8rem", fontWeight: 400, color: INK, lineHeight: 1.1 }}>
-            {property.name}
-          </h3>
-          {property.conceptType && (
-            <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 3 }}>{property.conceptType}</p>
+        <div className="flex items-start" style={{ gap: 16 }}>
+          {photoUrl && (
+            <div
+              style={{
+                width: 88,
+                height: 64,
+                flexShrink: 0,
+                backgroundImage: `url(${photoUrl})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                border: "1px solid rgba(18,18,15,0.08)",
+              }}
+            />
           )}
+          <div>
+            <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", color: INK_QUIET, marginBottom: 4 }}>
+              {property.location || property.conceptType}
+            </p>
+            <h3 style={{ fontFamily: SERIF, fontSize: "1.8rem", fontWeight: 400, color: INK, lineHeight: 1.1 }}>
+              {property.name}
+            </h3>
+            {property.conceptType && (
+              <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 3 }}>{property.conceptType}</p>
+            )}
+          </div>
         </div>
         {openActions > 0 && <ActionRequiredBadge />}
       </div>
