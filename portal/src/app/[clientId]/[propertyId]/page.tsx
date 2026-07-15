@@ -253,13 +253,12 @@ export default async function PropertyPage({
             <p
               style={{
                 fontFamily: SERIF,
-                fontSize: "clamp(1.5rem, 2.4vw, 1.9rem)",
+                fontSize: "clamp(0.95rem, 1.3vw, 1.05rem)",
                 fontWeight: 400,
-                lineHeight: 1.5,
+                lineHeight: 1.7,
                 color: "#12120F",
                 borderLeft: "3px solid #B8935A",
                 paddingLeft: 24,
-                maxWidth: 820,
               }}
             >
               {latestBrief.executiveSummary}

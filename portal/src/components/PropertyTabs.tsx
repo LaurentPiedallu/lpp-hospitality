@@ -32,7 +32,7 @@ export default function PropertyTabs({
 }) {
   return (
     <div
-      className="flex overflow-x-auto"
+      className="flex overflow-x-auto justify-between"
       style={{
         background: "#F2EDE4",
         borderBottom: "1px solid rgba(18,18,15,0.08)",
