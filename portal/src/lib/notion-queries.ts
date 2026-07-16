@@ -274,6 +274,7 @@ export async function getIntelligence(propertyId: string): Promise<Intelligence[
     periodStart: p.properties?.["Reporting Period"]?.date?.start ?? null,
     createdAt: (p.created_time as string) ?? null,
     processedAt: (p.last_edited_time as string) ?? null,
+    estimatedAnnualImpact: num(p, "Estimated Annual Impact"),
   }));
 }
 

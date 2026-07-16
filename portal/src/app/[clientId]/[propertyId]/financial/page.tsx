@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getProperty, getKpiMetrics, getIntelligence, getLastUpdated } from "@/lib/notion-queries";
-import { usd, pct, buildTrendData } from "@/lib/format";
+import { usd, pct, buildTrendData, findMetricByKey, findIntelligence } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
@@ -23,22 +23,6 @@ function severityVariant(s: Severity): "green" | "amber" | "red" {
   return "amber";
 }
 
-// Get the most recent period's value for a category + unit combination
-function latestMetric(
-  metrics: KpiMetric[],
-  category: string,
-  unit: string,
-  nameHint?: string
-): KpiMetric | null {
-  const matches = metrics.filter(
-    (m) =>
-      m.category === category &&
-      m.unit === unit &&
-      (nameHint ? m.metricName.toLowerCase().includes(nameHint.toLowerCase()) : true)
-  );
-  return matches.sort((a, b) => (b.periodStart ?? "").localeCompare(a.periodStart ?? ""))[0] ?? null;
-}
-
 function latestPeriod(metrics: KpiMetric[]): string | null {
   return (
     metrics
@@ -56,15 +40,20 @@ function FinancialSection({
   intelligence,
   metrics,
   allMetrics,
+  primarySeverity,
   children,
 }: {
   heading: string;
   intelligence: Intelligence | null;
   metrics: KpiMetric[];   // latest period metrics for this section
   allMetrics: KpiMetric[]; // all periods — for trend chart
+  // Severity of this section's own primary metric (e.g. labor_pct for
+  // Labor) — not an arbitrary first-in-array metric, which could belong to
+  // any line item in the category and mislead the badge.
+  primarySeverity?: Severity;
   children: React.ReactNode; // KPI cards
 }) {
-  const severity = intelligence?.severity ?? (metrics[0]?.severity ?? "Monitor");
+  const severity = intelligence?.severity ?? primarySeverity ?? "Monitor";
 
   return (
     <section className="space-y-4">
@@ -215,13 +204,16 @@ export default async function FinancialPage({
         (hint ? m.metricName.toLowerCase().includes(hint.toLowerCase()) : true)
     );
 
-  // Intelligence by category (most recent)
+  // Intelligence by category, scoped to the current period — a category with
+  // no record for this period must not fall through to an older one (see
+  // findIntelligence in lib/format.ts for the bug this fixes).
   const intel = (cat: string): Intelligence | null =>
-    (allIntelligence as Intelligence[]).find((i) => i.category === cat) ?? null;
+    findIntelligence(allIntelligence as Intelligence[], cat, latest);
 
-  // Convenience metric lookup
-  const m = (cat: string, unit: string, hint?: string) =>
-    latestMetric(allMetrics, cat, unit, hint);
+  // KPI lookup by canonical LPP Metric Key, not category/unit/name-guessing
+  // (see findMetricByKey in lib/format.ts for the bug this fixes).
+  const byKey = (key: string, category?: string) =>
+    findMetricByKey(allMetrics, key, latest, category);
 
   return (
     <PageWrapper noTopPadding>
@@ -232,146 +224,183 @@ export default async function FinancialPage({
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 80px" }} className="space-y-12">
 
         {/* ── Revenue ──────────────────────────────────────────────────── */}
-        <FinancialSection
-          heading="Revenue"
-          intelligence={intel("Financial")}
-          metrics={catMetrics("Revenue")}
-          allMetrics={trendFor("Revenue", "$")}
-        >
-          {[
-            m("Revenue", "$") && (
-              <KpiCard key="rev" label="Total Revenue" value={usd(m("Revenue", "$")!.metricValue)}
-                variant={severityVariant(m("Revenue", "$")!.severity)} />
-            ),
-            m("Revenue", "Count") && (
-              <KpiCard key="cov" label="Covers" value={m("Revenue", "Count")!.metricValue.toLocaleString()}
-                variant="neutral" />
-            ),
-            m("Revenue", "$", "spend") && (
-              <KpiCard key="asp" label="Avg Spend" value={usd(m("Revenue", "$", "spend")!.metricValue)}
-                variant={severityVariant(m("Revenue", "$", "spend")!.severity)} />
-            ),
-            m("Revenue", "$", "check") && (
-              <KpiCard key="avc" label="Avg Check" value={usd(m("Revenue", "$", "check")!.metricValue)}
-                variant={severityVariant(m("Revenue", "$", "check")!.severity)} />
-            ),
-          ].filter(Boolean)}
-        </FinancialSection>
+        {(() => {
+          const totalRevenue = byKey("total_revenue");
+          const covers = byKey("covers", "Revenue");
+          const avgSpend = byKey("avg_spend");
+          const avgCheck = byKey("avg_check");
+          return (
+            <FinancialSection
+              heading="Revenue"
+              intelligence={intel("Financial")}
+              metrics={catMetrics("Revenue")}
+              allMetrics={trendFor("Revenue", "$")}
+              primarySeverity={totalRevenue?.severity}
+            >
+              {[
+                totalRevenue && (
+                  <KpiCard key="rev" label="Total Revenue" value={usd(totalRevenue.metricValue)}
+                    variant={severityVariant(totalRevenue.severity)} />
+                ),
+                covers && (
+                  <KpiCard key="cov" label="Covers" value={covers.metricValue.toLocaleString()}
+                    variant="neutral" />
+                ),
+                avgSpend && (
+                  <KpiCard key="asp" label="Avg Spend" value={usd(avgSpend.metricValue)}
+                    variant={severityVariant(avgSpend.severity)} />
+                ),
+                avgCheck && (
+                  <KpiCard key="avc" label="Avg Check" value={usd(avgCheck.metricValue)}
+                    variant={severityVariant(avgCheck.severity)} />
+                ),
+              ].filter(Boolean)}
+            </FinancialSection>
+          );
+        })()}
 
         {/* ── Labor ────────────────────────────────────────────────────── */}
-        <FinancialSection
-          heading="Labor"
-          intelligence={intel("Labor")}
-          metrics={catMetrics("Labor")}
-          allMetrics={trendFor("Labor", "%")}
-        >
-          {[
-            m("Labor", "$") && (
-              <KpiCard key="lab$" label="Labor Cost" value={usd(m("Labor", "$")!.metricValue)}
-                variant={severityVariant(m("Labor", "$")!.severity)} />
-            ),
-            m("Labor", "%") && (
-              <KpiCard key="lab%" label="Labor %" value={pct(m("Labor", "%")!.metricValue)}
-                sub="of revenue"
-                variant={severityVariant(m("Labor", "%")!.severity)} />
-            ),
-            m("Labor", "%")?.benchmarkLow != null && (
-              <KpiCard key="labB" label="Benchmark Range"
-                value={`${m("Labor", "%")!.benchmarkLow}–${m("Labor", "%")!.benchmarkHigh}%`}
-                variant="neutral" />
-            ),
-            m("Labor", "%")?.targetValue != null && (
-              <KpiCard key="labT" label="Target"
-                value={pct(m("Labor", "%")!.targetValue!)}
-                variant="neutral" />
-            ),
-          ].filter(Boolean)}
-        </FinancialSection>
+        {(() => {
+          const laborCost = byKey("total_payroll");
+          const laborPct = byKey("labor_pct");
+          return (
+            <FinancialSection
+              heading="Labor"
+              intelligence={intel("Labor")}
+              metrics={catMetrics("Labor")}
+              allMetrics={trendFor("Labor", "%")}
+              primarySeverity={laborPct?.severity}
+            >
+              {[
+                laborCost && (
+                  <KpiCard key="lab$" label="Labor Cost" value={usd(laborCost.metricValue)}
+                    variant={severityVariant(laborCost.severity)} />
+                ),
+                laborPct && (
+                  <KpiCard key="lab%" label="Labor %" value={pct(laborPct.metricValue)}
+                    sub="of revenue"
+                    variant={severityVariant(laborPct.severity)} />
+                ),
+                laborPct?.benchmarkLow != null && (
+                  <KpiCard key="labB" label="Benchmark Range"
+                    value={`${laborPct.benchmarkLow}–${laborPct.benchmarkHigh}%`}
+                    variant="neutral" />
+                ),
+                laborPct?.targetValue != null && (
+                  <KpiCard key="labT" label="Target"
+                    value={pct(laborPct.targetValue)}
+                    variant="neutral" />
+                ),
+              ].filter(Boolean)}
+            </FinancialSection>
+          );
+        })()}
 
         {/* ── COGS ─────────────────────────────────────────────────────── */}
-        <FinancialSection
-          heading="Food & Beverage COGS"
-          intelligence={intel("COGS")}
-          metrics={catMetrics("COGS")}
-          allMetrics={trendFor("COGS", "%")}
-        >
-          {[
-            m("COGS", "$") && (
-              <KpiCard key="cog$" label="COGS" value={usd(m("COGS", "$")!.metricValue)}
-                variant={severityVariant(m("COGS", "$")!.severity)} />
-            ),
-            m("COGS", "%") && (
-              <KpiCard key="cog%" label="COGS %" value={pct(m("COGS", "%")!.metricValue)}
-                sub="of revenue"
-                variant={severityVariant(m("COGS", "%")!.severity)} />
-            ),
-            m("COGS", "%")?.benchmarkLow != null && (
-              <KpiCard key="cogB" label="Benchmark Range"
-                value={`${m("COGS", "%")!.benchmarkLow}–${m("COGS", "%")!.benchmarkHigh}%`}
-                variant="neutral" />
-            ),
-            m("COGS", "%")?.targetValue != null && (
-              <KpiCard key="cogT" label="Target"
-                value={pct(m("COGS", "%")!.targetValue!)}
-                variant="neutral" />
-            ),
-          ].filter(Boolean)}
-        </FinancialSection>
+        {(() => {
+          const cogsDollars = byKey("total_cogs");
+          const cogsPct = byKey("cogs_pct");
+          return (
+            <FinancialSection
+              heading="Food & Beverage COGS"
+              intelligence={intel("COGS")}
+              metrics={catMetrics("COGS")}
+              allMetrics={trendFor("COGS", "%")}
+              primarySeverity={cogsPct?.severity}
+            >
+              {[
+                cogsDollars && (
+                  <KpiCard key="cog$" label="COGS" value={usd(cogsDollars.metricValue)}
+                    variant={severityVariant(cogsDollars.severity)} />
+                ),
+                cogsPct && (
+                  <KpiCard key="cog%" label="COGS %" value={pct(cogsPct.metricValue)}
+                    sub="of revenue"
+                    variant={severityVariant(cogsPct.severity)} />
+                ),
+                cogsPct?.benchmarkLow != null && (
+                  <KpiCard key="cogB" label="Benchmark Range"
+                    value={`${cogsPct.benchmarkLow}–${cogsPct.benchmarkHigh}%`}
+                    variant="neutral" />
+                ),
+                cogsPct?.targetValue != null && (
+                  <KpiCard key="cogT" label="Target"
+                    value={pct(cogsPct.targetValue)}
+                    variant="neutral" />
+                ),
+              ].filter(Boolean)}
+            </FinancialSection>
+          );
+        })()}
 
         {/* ── OpEx ─────────────────────────────────────────────────────── */}
-        <FinancialSection
-          heading="Operating Expenses"
-          intelligence={intel("Execution")}
-          metrics={catMetrics("OpEx")}
-          allMetrics={trendFor("OpEx", "%")}
-        >
-          {[
-            m("OpEx", "$") && (
-              <KpiCard key="opx$" label="Operating Expenses" value={usd(m("OpEx", "$")!.metricValue)}
-                variant={severityVariant(m("OpEx", "$")!.severity)} />
-            ),
-            m("OpEx", "%") && (
-              <KpiCard key="opx%" label="OpEx %" value={pct(m("OpEx", "%")!.metricValue)}
-                sub="of revenue"
-                variant={severityVariant(m("OpEx", "%")!.severity)} />
-            ),
-            m("OpEx", "%")?.benchmarkLow != null && (
-              <KpiCard key="opxB" label="Benchmark Range"
-                value={`${m("OpEx", "%")!.benchmarkLow}–${m("OpEx", "%")!.benchmarkHigh}%`}
-                variant="neutral" />
-            ),
-          ].filter(Boolean)}
-        </FinancialSection>
+        {(() => {
+          const opexDollars = byKey("opex");
+          const opexPct = byKey("opex_pct");
+          return (
+            <FinancialSection
+              heading="Operating Expenses"
+              intelligence={intel("Execution")}
+              metrics={catMetrics("OpEx")}
+              allMetrics={trendFor("OpEx", "%")}
+              primarySeverity={opexPct?.severity}
+            >
+              {[
+                opexDollars && (
+                  <KpiCard key="opx$" label="Operating Expenses" value={usd(opexDollars.metricValue)}
+                    variant={severityVariant(opexDollars.severity)} />
+                ),
+                opexPct && (
+                  <KpiCard key="opx%" label="OpEx %" value={pct(opexPct.metricValue)}
+                    sub="of revenue"
+                    variant={severityVariant(opexPct.severity)} />
+                ),
+                opexPct?.benchmarkLow != null && (
+                  <KpiCard key="opxB" label="Benchmark Range"
+                    value={`${opexPct.benchmarkLow}–${opexPct.benchmarkHigh}%`}
+                    variant="neutral" />
+                ),
+              ].filter(Boolean)}
+            </FinancialSection>
+          );
+        })()}
 
         {/* ── Profitability ─────────────────────────────────────────────── */}
-        <FinancialSection
-          heading="Profitability"
-          intelligence={intel("Financial")}
-          metrics={catMetrics("Profitability")}
-          allMetrics={trendFor("Profitability", "%")}
-        >
-          {[
-            m("Profitability", "$") && (
-              <KpiCard key="pro$" label="Net Profit" value={usd(m("Profitability", "$")!.metricValue)}
-                variant={severityVariant(m("Profitability", "$")!.severity)} />
-            ),
-            m("Profitability", "%") && (
-              <KpiCard key="pro%" label="Net Profit %" value={pct(m("Profitability", "%")!.metricValue)}
-                sub="margin"
-                variant={severityVariant(m("Profitability", "%")!.severity)} />
-            ),
-            m("Profitability", "%")?.benchmarkLow != null && (
-              <KpiCard key="proB" label="Benchmark Range"
-                value={`${m("Profitability", "%")!.benchmarkLow}–${m("Profitability", "%")!.benchmarkHigh}%`}
-                variant="neutral" />
-            ),
-            m("Profitability", "%")?.targetValue != null && (
-              <KpiCard key="proT" label="Target"
-                value={pct(m("Profitability", "%")!.targetValue!)}
-                variant="neutral" />
-            ),
-          ].filter(Boolean)}
-        </FinancialSection>
+        {(() => {
+          const netProfit = byKey("net_profit");
+          const netProfitPct = byKey("net_profit_pct");
+          return (
+            <FinancialSection
+              heading="Profitability"
+              intelligence={intel("Profitability")}
+              metrics={catMetrics("Profitability")}
+              allMetrics={trendFor("Profitability", "%")}
+              primarySeverity={netProfitPct?.severity}
+            >
+              {[
+                netProfit && (
+                  <KpiCard key="pro$" label="Net Profit" value={usd(netProfit.metricValue)}
+                    variant={severityVariant(netProfit.severity)} />
+                ),
+                netProfitPct && (
+                  <KpiCard key="pro%" label="Net Profit %" value={pct(netProfitPct.metricValue)}
+                    sub="margin"
+                    variant={severityVariant(netProfitPct.severity)} />
+                ),
+                netProfitPct?.benchmarkLow != null && (
+                  <KpiCard key="proB" label="Benchmark Range"
+                    value={`${netProfitPct.benchmarkLow}–${netProfitPct.benchmarkHigh}%`}
+                    variant="neutral" />
+                ),
+                netProfitPct?.targetValue != null && (
+                  <KpiCard key="proT" label="Target"
+                    value={pct(netProfitPct.targetValue)}
+                    variant="neutral" />
+                ),
+              ].filter(Boolean)}
+            </FinancialSection>
+          );
+        })()}
 
         {/* ── Performance vs Benchmarks ────────────────────────────── */}
         {(() => {

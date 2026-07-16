@@ -1,3 +1,5 @@
+import type { KpiMetric, Intelligence } from "@/types/portal";
+
 export function usd(value: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -49,6 +51,52 @@ export function relativeTime(iso: string | null): string {
 export function maxIso(dates: (string | null)[]): string | null {
   const valid = dates.filter((d): d is string => d != null);
   return valid.length === 0 ? null : valid.reduce((max, d) => (d > max ? d : max));
+}
+
+// Looks up a single KPI Record by its canonical LPP Metric Key for a
+// specific period — never by category/unit/name-substring, which silently
+// picks up whichever sibling record happens to share those (e.g. matching
+// "Labor" + "$" alone returns "Sick Pay" just as readily as the intended
+// "Total Payroll" record). Optional category constrains further for keys
+// reused across categories for different concepts (e.g. "covers" also
+// exists under Guest Experience as a survey sample size, distinct from the
+// real total under Revenue).
+export function findMetricByKey(
+  metrics: KpiMetric[],
+  key: string,
+  periodStart: string | null,
+  category?: string
+): KpiMetric | null {
+  return (
+    metrics.find(
+      (m) => m.lppMetricKey === key && m.periodStart === periodStart && (!category || m.category === category)
+    ) ?? null
+  );
+}
+
+// Looks up the Intelligence record for a category, scoped to a specific
+// period — critically, period-scoped, unlike a bare category filter. Without
+// that, a category with no record for the current period silently falls
+// through to an older period's record with the same category (confirmed
+// cause of a real bug: Financial Review's COGS narrative was showing a
+// March record because June's COGS finding happened to be categorized
+// "Data Quality" instead of "COGS").
+//
+// When a period has more than one record sharing a category — the model has
+// no field that otherwise disambiguates which one belongs to a given
+// section — this prefers the one with the larger Estimated Annual Impact,
+// on the reasoning that the more financially material finding is the more
+// relevant one for a financial-review context. Verified this cleanly picks
+// the right record where it mattered (a $4.58M finding vs. a $60K one), but
+// it's a heuristic, not a real link, and won't always be correct.
+export function findIntelligence(
+  intelligence: Intelligence[],
+  category: string,
+  periodStart: string | null
+): Intelligence | null {
+  const candidates = intelligence.filter((i) => i.category === category && i.periodStart === periodStart);
+  if (candidates.length === 0) return null;
+  return candidates.reduce((best, i) => (i.estimatedAnnualImpact > best.estimatedAnnualImpact ? i : best));
 }
 
 // Splits a block of prose into up to `targetCount` paragraphs by grouping

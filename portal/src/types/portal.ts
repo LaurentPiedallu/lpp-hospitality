@@ -131,6 +131,10 @@ export interface Intelligence {
   periodStart: string | null;
   createdAt: string | null;  // Notion page created_time — used for staleness detection
   processedAt: string | null; // Notion page last_edited_time — see KpiMetric.processedAt
+  // Used to pick between multiple records sharing a category for the same
+  // period (Notion's own categorization doesn't otherwise disambiguate) —
+  // see findIntelligence in lib/format.ts.
+  estimatedAnnualImpact: number;
 }
 
 export interface Initiative {
