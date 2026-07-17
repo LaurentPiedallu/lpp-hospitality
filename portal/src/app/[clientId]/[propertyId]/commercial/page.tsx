@@ -1,7 +1,10 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastUpdated } from "@/lib/notion-queries";
-import { usd, pct, buildTrendData, looksLikeIndividualStaffMetric, findMetricByKey } from "@/lib/format";
+import {
+  usd, pct, compact, buildTrendData, looksLikeIndividualStaffMetric, findMetricByKey,
+  extractIndividualStaffNames, mentionsIndividualStaff,
+} from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
@@ -17,6 +20,13 @@ import type { KpiMetric, Intelligence, Opportunity, Severity } from "@/types/por
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 const SERIF = "'Cormorant Garamond', Georgia, serif";
+const GOLD = "#B8935A";
+
+// Rating-unit Guest Experience metrics that duplicate a canonical score
+// already shown under its own card (e.g. "Atmosphere Sub-Score" alongside
+// the canonical "Atmosphere Score"/guest_ambiance) — kept out of every
+// guest-experience display on this page (cards, table, benchmark gauges).
+const REDUNDANT_GUEST_METRIC_NAMES = new Set(["Atmosphere Sub-Score", "Food Taste Score"]);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -272,6 +282,37 @@ function ThemeCard({ label, value, max }: { label: string; value: number; max: n
   );
 }
 
+// ─── Covers by daypart — demand mix, not budget variance ─────────────────────
+// Segments sum exactly to the total covers figure for this property (no
+// residual bucket needed).
+
+function DaypartSplit({ segments }: { segments: { label: string; value: number; color: string }[] }) {
+  const total = segments.reduce((s, seg) => s + seg.value, 0);
+  return (
+    <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: 20 }}>
+      <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 16 }}>
+        Covers by Daypart
+      </p>
+      <div className="flex" style={{ height: 28, overflow: "hidden" }}>
+        {segments.map((seg) => (
+          <div key={seg.label} style={{ width: `${(seg.value / total) * 100}%`, background: seg.color }} />
+        ))}
+      </div>
+      <div className="flex flex-wrap" style={{ gap: 20, marginTop: 14 }}>
+        {segments.map((seg) => (
+          <div key={seg.label} className="flex items-center" style={{ gap: 8 }}>
+            <span style={{ width: 8, height: 8, background: seg.color, flexShrink: 0 }} />
+            <span style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.65)" }}>
+              {seg.label} <span style={{ color: "#12120F", fontWeight: 500 }}>{seg.value.toLocaleString()}</span>{" "}
+              <span style={{ color: "rgba(18,18,15,0.35)" }}>· {((seg.value / total) * 100).toFixed(0)}%</span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function CommercialPage({
@@ -285,11 +326,10 @@ export default async function CommercialPage({
   const { clientId, propertyId } = await params;
   if (session.role !== "admin" && session.clientId !== clientId) redirect("/dashboard");
 
-  const [property, allMetrics, allIntelligence, opportunities, lastUpdated] = await Promise.all([
+  const [property, allMetrics, allIntelligence, lastUpdated] = await Promise.all([
     getProperty(propertyId, clientId),
     getKpiMetrics(propertyId),
     getIntelligence(propertyId),
-    getOpportunities(propertyId),
     getLastUpdated(propertyId, clientId),
   ]);
 
@@ -299,6 +339,12 @@ export default async function CommercialPage({
   const currentMetrics = latest
     ? allMetrics.filter((m) => m.periodStart === latest)
     : allMetrics;
+
+  // Opportunities, scoped to the current reporting period — this panel used
+  // to intentionally look across every period ever generated (see the old
+  // comment on getOpportunities in notion-queries.ts), which is what let
+  // stale March-period opportunities keep showing alongside June's.
+  const opportunities = latest ? await getOpportunities(propertyId, latest) : [];
 
   const catMetrics = (cat: string) => currentMetrics.filter((m) => m.category === cat);
 
@@ -313,29 +359,68 @@ export default async function CommercialPage({
   const intel = (cat: string): Intelligence | null =>
     (allIntelligence as Intelligence[]).find((i) => i.category === cat) ?? null;
 
-  const m = (cat: string, unit: string, hint?: string) =>
-    latestMetric(allMetrics, cat, unit, hint);
+  // Individual staff names detected from this property's own KPI Records
+  // (see extractIndividualStaffNames in lib/format.ts) — used below to keep
+  // Opportunity text (title/Next Step) from naming a staff member even
+  // though Opportunities are a separate database from KPI Records and don't
+  // go through looksLikeIndividualStaffMetric at all.
+  const staffNames = extractIndividualStaffNames(allMetrics);
+  const commercialOpportunities = (opportunities as Opportunity[]).filter(
+    (o) => !mentionsIndividualStaff(o.title, staffNames) && !mentionsIndividualStaff(o.nextStep, staffNames)
+  );
 
   // Guest ratings — all Rating-unit metrics under Guest Experience category,
   // excluding any record that identifies an individual staff member by name
-  // (client-facing page — see looksLikeIndividualStaffMetric in lib/format.ts).
+  // (client-facing page — see looksLikeIndividualStaffMetric in lib/format.ts)
+  // and any metric that duplicates a canonical score shown under its own card.
   const guestRatings = catMetrics("Guest Experience")
     .filter((g) => g.unit === "Rating")
-    .filter((g) => !looksLikeIndividualStaffMetric(g.metricName || g.kpiRecord));
+    .filter((g) => !looksLikeIndividualStaffMetric(g.metricName || g.kpiRecord))
+    .filter((g) => !REDUNDANT_GUEST_METRIC_NAMES.has(g.metricName));
   // Canonical lookup, not a name-hint match — "overall" as a substring hint
   // would also match individually-named records like "Hector T Server
   // Overall Score", surfacing that person's own number under a generic
   // "Average rating" label even without printing their name.
   const overallRating = findMetricByKey(allMetrics, "guest_overall", latest) ?? guestRatings[0] ?? null;
 
-  // Covers / reservations — under Revenue or Commercial category
-  const coversMetric = m("Revenue", "Count") ?? m("Commercial", "Count");
-  const conversionMetric = m("Commercial", "%", "conversion");
+  // Covers — canonical key, scoped to Revenue (the real property-wide total),
+  // not a bare category+unit match, which was silently returning whichever
+  // Count-unit Revenue record Notion happened to return first (Dinner Covers,
+  // 2,400) instead of the actual total (Total Covers / Revenue Customers,
+  // 7,040) — same class of bug already fixed on Financial Review.
+  const coversMetric = findMetricByKey(allMetrics, "covers", latest, "Revenue");
+  const conversionMetric = latestMetric(allMetrics, "Commercial", "%", "conversion");
   const channelMetrics = catMetrics("Commercial").filter((g) =>
     g.metricName.toLowerCase().includes("channel") ||
     g.metricName.toLowerCase().includes("online") ||
     g.metricName.toLowerCase().includes("direct")
   );
+
+  // Covers by daypart — real demand-mix data (not budget variance), moved
+  // here from the old "Revenue Drivers" section. Only shown when all three
+  // are present; segments sum exactly to coversMetric's total in the real
+  // dataset, so no residual bucket is needed.
+  const dinnerCovers = catMetrics("Revenue").find((c) => c.metricName === "Dinner Covers") ?? null;
+  const lunchCovers = catMetrics("Revenue").find((c) => c.metricName === "Lunch Covers") ?? null;
+  const breakfastCovers = catMetrics("Revenue").find((c) => c.metricName === "Breakfast Covers") ?? null;
+  const daypartCovers = [breakfastCovers, lunchCovers, dinnerCovers].every((c) => c != null)
+    ? [breakfastCovers!, lunchCovers!, dinnerCovers!]
+    : null;
+
+  // Average check — canonical key, the same blended figure Financial Review
+  // uses (not the "Revenue Drivers" section's old name-hint match, which
+  // picked up "Dinner Average Check" instead).
+  const avgCheckMetric = findMetricByKey(allMetrics, "avg_check", latest, "Revenue");
+
+  // Page-level synthesis — built from the same verified figures the sections
+  // below display, connecting guest-experience strength to the specific
+  // revenue-capture gap and the quantified opportunities that follow. Only
+  // renders when the figures it depends on actually exist.
+  const totalOpportunityValue = commercialOpportunities.reduce((s, o) => s + o.estimatedAnnualImpact, 0);
+  const synthesis =
+    overallRating && avgCheckMetric?.benchmarkLow != null && totalOpportunityValue > 0
+      ? `Guest sentiment remains exceptional at ${overallRating.metricValue.toFixed(1)} out of 100, but that goodwill isn't yet fully converted into revenue: average check of ${usd(avgCheckMetric.metricValue)} trails the ${usd(avgCheckMetric.benchmarkLow)} full-service benchmark floor, and the shortfall traces to volume rather than pricing — dinner, the highest-check daypart, is running well below plan. The opportunities below turn specific, verified guest-experience strengths — near-perfect cleanliness and hospitality scores, high likelihood-to-recommend — into ${compact(totalOpportunityValue)} of identified annual upside, from hotel upsell placement to loyalty conversion and dinner volume recovery.`
+      : null;
 
   return (
     <PageWrapper noTopPadding>
@@ -344,6 +429,31 @@ export default async function CommercialPage({
       <PropertyTabs clientId={clientId} propertyId={propertyId} active="commercial" />
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 80px" }} className="space-y-12">
+
+        {/* ── Commercial Synthesis ─────────────────────────────────────── */}
+        {synthesis && (
+          <section>
+            <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD, marginBottom: 14 }}>
+              Commercial Synthesis
+            </p>
+            <p
+              style={{
+                fontFamily: SERIF,
+                fontSize: "clamp(0.95rem, 1.3vw, 1.05rem)",
+                fontWeight: 400,
+                lineHeight: 1.7,
+                color: "#12120F",
+                borderLeft: "3px solid #B8935A",
+                paddingLeft: 24,
+              }}
+            >
+              {synthesis}
+            </p>
+          </section>
+        )}
+
+        {/* ── Opportunities — promoted from the bottom ────────────────────── */}
+        <OpportunitiesPanel opportunities={commercialOpportunities} />
 
         {/* ── Guest Experience ─────────────────────────────────────────── */}
         <CommercialSection
@@ -406,58 +516,41 @@ export default async function CommercialPage({
               />
             ))}
           </div>
+          {daypartCovers && (
+            <DaypartSplit
+              segments={[
+                { label: "Breakfast", value: daypartCovers[0].metricValue, color: "#B8935A" },
+                { label: "Lunch", value: daypartCovers[1].metricValue, color: "#7c3aed" },
+                { label: "Dinner", value: daypartCovers[2].metricValue, color: "#12120F" },
+              ]}
+            />
+          )}
         </CommercialSection>
 
-        {/* ── Revenue Drivers ──────────────────────────────────────────── */}
-        {catMetrics("Revenue").length > 0 && (
-          <CommercialSection
-            heading="Revenue Drivers"
-            intelligence={intel("Financial")}
-            metrics={catMetrics("Revenue")}
-            allMetrics={trendFor("Revenue", "$")}
-            trendUnit="$"
-          >
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[
-                m("Revenue", "$") && (
-                  <KpiCard key="rev" label="Total Revenue" value={usd(m("Revenue", "$")!.metricValue)}
-                    variant={severityVariant(m("Revenue", "$")!.severity)} />
-                ),
-                m("Revenue", "$", "spend") && (
-                  <KpiCard key="asp" label="Avg Spend" value={usd(m("Revenue", "$", "spend")!.metricValue)}
-                    variant={severityVariant(m("Revenue", "$", "spend")!.severity)} />
-                ),
-                m("Revenue", "$", "check") && (
-                  <KpiCard key="avc" label="Avg Check" value={usd(m("Revenue", "$", "check")!.metricValue)}
-                    variant={severityVariant(m("Revenue", "$", "check")!.severity)} />
-                ),
-                m("Revenue", "$", "adr") && (
-                  <KpiCard key="adr" label="ADR" value={usd(m("Revenue", "$", "adr")!.metricValue)}
-                    variant={severityVariant(m("Revenue", "$", "adr")!.severity)} />
-                ),
-                m("Revenue", "$", "revpar") && (
-                  <KpiCard key="rev" label="RevPAR" value={usd(m("Revenue", "$", "revpar")!.metricValue)}
-                    variant={severityVariant(m("Revenue", "$", "revpar")!.severity)} />
-                ),
-                m("Revenue", "%", "occupancy") && (
-                  <KpiCard key="occ" label="Occupancy" value={pct(m("Revenue", "%", "occupancy")!.metricValue)}
-                    variant={severityVariant(m("Revenue", "%", "occupancy")!.severity)} />
-                ),
-              ].filter(Boolean)}
-            </div>
-          </CommercialSection>
-        )}
-
-        {/* ── Performance vs Benchmarks ────────────────────────────── */}
+        {/* ── Performance vs Benchmarks — commercial-relevant metrics only ── */}
         {(() => {
+          // Guest Experience scores and Revenue-category demand metrics that
+          // carry a real (non-placeholder) benchmark range — e.g. the average
+          // check variants, benchmarked against $90–$160 full-service NYC
+          // comparables. Explicitly excludes Labor, COGS, OpEx, and
+          // Profitability regardless of whether a given line item happens to
+          // have a benchmark range set, per this page's commercial/guest
+          // focus — those belong on Financial Review. Also excludes the raw
+          // dollar/count totals under Revenue (Total Revenue, Food Revenue,
+          // daypart covers, etc.), which in the real data only ever carry a
+          // 0–0 placeholder range rather than a genuine industry comparable.
+          const COMMERCIAL_CATEGORIES = new Set(["Guest Experience", "Revenue"]);
           const gaugeMetrics = currentMetrics.filter(
             (met) =>
               met.benchmarkLow != null &&
               met.benchmarkHigh != null &&
-              !looksLikeIndividualStaffMetric(met.metricName || met.kpiRecord)
+              !(met.benchmarkLow === 0 && met.benchmarkHigh === 0) &&
+              COMMERCIAL_CATEGORIES.has(met.category) &&
+              !looksLikeIndividualStaffMetric(met.metricName || met.kpiRecord) &&
+              !REDUNDANT_GUEST_METRIC_NAMES.has(met.metricName)
           );
           if (gaugeMetrics.length === 0) return null;
-          const HIGHER_BETTER = new Set(["Revenue", "Profitability", "Guest Experience", "Commercial"]);
+          const HIGHER_BETTER = new Set(["Revenue", "Guest Experience"]);
           return (
             <section className="space-y-4">
               <SectionHeader title="Performance vs Benchmarks" />
@@ -483,11 +576,8 @@ export default async function CommercialPage({
           );
         })()}
 
-        {/* ── Opportunities ────────────────────────────────────────────── */}
-        <OpportunitiesPanel opportunities={opportunities} />
-
         {/* Empty state */}
-        {allMetrics.length === 0 && opportunities.length === 0 && (
+        {allMetrics.length === 0 && commercialOpportunities.length === 0 && (
           <EmptyState
             title="No guest feedback yet"
             body="Guest feedback synthesis will appear here once review data has been uploaded and processed."

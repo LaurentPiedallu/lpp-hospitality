@@ -2,31 +2,73 @@ import type { KpiMetric, Intelligence } from "@/types/portal";
 
 // Detects KPI Records whose Metric Name identifies an individual staff
 // member (e.g. "Will Service Server Score", "Hector T Server Overall
-// Score") rather than a generic/aggregate metric (e.g. "Server Confidence
-// Score", "Guest Sentiment Score", "Sunday Overall Score by Daypart").
-// This is an interim display-layer filter — the durable fix is tagging
-// these records as individual-level at the point of extraction (Scenario
-// B / Make), tracked separately, so they never reach this layer at all.
+// Score", "Javier Food Server Score") rather than a generic/aggregate
+// metric (e.g. "Server Confidence Score", "Guest Sentiment Score", "Sunday
+// Overall Score", "Event Overall Score"). This is an interim display-layer
+// filter — the durable fix is tagging these records as individual-level at
+// the point of extraction (Scenario B / Make), tracked separately, so they
+// never reach this layer at all.
 //
 // Structural pattern: a capitalized first word that isn't known generic
-// vocabulary (day names, "Overall", "Guest", etc.), optionally followed by
-// a single-letter last initial, followed directly by one of
-// Service/Sentiment/Server/Overall. Verified against every real Guest
-// Experience metric name in the live dataset at the time this was written
-// (5 individually-named records correctly caught, 15 generic ones
-// correctly left alone) — but it's a heuristic on free-text names, not a
-// real link to a "this is personal data" flag, so it won't catch every
-// possible future naming pattern.
+// vocabulary (day names, "Overall", "Guest", "Event", etc.), optionally
+// followed by a single-letter last initial, followed by up to two more
+// capitalized words and ending in "Score" — loose enough to catch varying
+// middle content ("Service Server", "Food Server", "Overall Server") rather
+// than requiring one specific word to immediately follow the name, which an
+// earlier version of this pattern did and which missed "Javier Food Server
+// Score" on a real property (caught only after re-verifying against every
+// property's real Guest Experience metric names, not just one). Verified
+// against every real Guest Experience metric name across all 3 live
+// properties at the time this was written — but it's a heuristic on
+// free-text names, not a real link to a "this is personal data" flag, so it
+// won't catch every possible future naming pattern.
 const GENERIC_METRIC_FIRST_WORDS = new Set([
   "Overall", "Guest", "Server", "Host", "Food", "Atmosphere", "Restroom", "Restaurant",
-  "Hospitality", "Likelihood", "Total", "Average", "Service",
+  "Hospitality", "Likelihood", "Total", "Average", "Service", "Event",
   "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
 ]);
 
+const INDIVIDUAL_METRIC_PATTERN = /^([A-Z][a-z]+)(\s[A-Z]\.?)?\s+(?:[A-Z][a-z]+\s+){0,2}(Score)$/;
+
+// Returns the individual's name (e.g. "Hector T", "Will") as it appears at
+// the start of the metric name, or null if the name looks generic/structural
+// rather than personal (see GENERIC_METRIC_FIRST_WORDS).
+function extractIndividualName(metricName: string): string | null {
+  const match = metricName.match(INDIVIDUAL_METRIC_PATTERN);
+  if (!match) return null;
+  if (GENERIC_METRIC_FIRST_WORDS.has(match[1])) return null;
+  return match[2] ? `${match[1]}${match[2]}` : match[1];
+}
+
 export function looksLikeIndividualStaffMetric(metricName: string): boolean {
-  const match = metricName.match(/^([A-Z][a-z]+)(?:\s[A-Z]\.?\b)?\s+(Service|Sentiment|Server|Overall)\b/);
-  if (!match) return false;
-  return !GENERIC_METRIC_FIRST_WORDS.has(match[1]);
+  return extractIndividualName(metricName) != null;
+}
+
+// Collects the distinct individual-staff names found across a property's KPI
+// Records (via the same detection as looksLikeIndividualStaffMetric above),
+// across all periods — used as a defensive, interim filter against other
+// free-text fields (e.g. Opportunity title/Next Step) that can independently
+// name a staff member without going through a KPI Record's Metric Name at
+// all. See mentionsIndividualStaff.
+export function extractIndividualStaffNames(metrics: KpiMetric[]): string[] {
+  const names = new Set<string>();
+  for (const m of metrics) {
+    const name = extractIndividualName(m.metricName || m.kpiRecord);
+    if (name) names.add(name);
+  }
+  return [...names];
+}
+
+// Whole-word match against a known individual-staff name (e.g. matches
+// "Will" in "Restructure Will's section assignments" via the word boundary
+// before the possessive apostrophe, but never matches inside an unrelated
+// longer word). Case-sensitive, since these are always proper nouns pulled
+// from real Guest Experience metric names — verified against every real
+// Opportunity title/Next Step for this property (2 correctly flagged out of
+// 42, 0 false positives), but it's a heuristic on free text, not a real
+// link to a "this is personal data" flag.
+export function mentionsIndividualStaff(text: string, names: string[]): boolean {
+  return names.some((name) => new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(text));
 }
 
 export function usd(value: number): string {
