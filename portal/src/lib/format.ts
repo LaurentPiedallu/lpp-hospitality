@@ -1,5 +1,34 @@
 import type { KpiMetric, Intelligence } from "@/types/portal";
 
+// Detects KPI Records whose Metric Name identifies an individual staff
+// member (e.g. "Will Service Server Score", "Hector T Server Overall
+// Score") rather than a generic/aggregate metric (e.g. "Server Confidence
+// Score", "Guest Sentiment Score", "Sunday Overall Score by Daypart").
+// This is an interim display-layer filter — the durable fix is tagging
+// these records as individual-level at the point of extraction (Scenario
+// B / Make), tracked separately, so they never reach this layer at all.
+//
+// Structural pattern: a capitalized first word that isn't known generic
+// vocabulary (day names, "Overall", "Guest", etc.), optionally followed by
+// a single-letter last initial, followed directly by one of
+// Service/Sentiment/Server/Overall. Verified against every real Guest
+// Experience metric name in the live dataset at the time this was written
+// (5 individually-named records correctly caught, 15 generic ones
+// correctly left alone) — but it's a heuristic on free-text names, not a
+// real link to a "this is personal data" flag, so it won't catch every
+// possible future naming pattern.
+const GENERIC_METRIC_FIRST_WORDS = new Set([
+  "Overall", "Guest", "Server", "Host", "Food", "Atmosphere", "Restroom", "Restaurant",
+  "Hospitality", "Likelihood", "Total", "Average", "Service",
+  "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+]);
+
+export function looksLikeIndividualStaffMetric(metricName: string): boolean {
+  const match = metricName.match(/^([A-Z][a-z]+)(?:\s[A-Z]\.?\b)?\s+(Service|Sentiment|Server|Overall)\b/);
+  if (!match) return false;
+  return !GENERIC_METRIC_FIRST_WORDS.has(match[1]);
+}
+
 export function usd(value: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",

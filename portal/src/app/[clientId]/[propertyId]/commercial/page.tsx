@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastUpdated } from "@/lib/notion-queries";
-import { usd, pct, buildTrendData } from "@/lib/format";
+import { usd, pct, buildTrendData, looksLikeIndividualStaffMetric, findMetricByKey } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
@@ -316,9 +316,17 @@ export default async function CommercialPage({
   const m = (cat: string, unit: string, hint?: string) =>
     latestMetric(allMetrics, cat, unit, hint);
 
-  // Guest ratings — all Rating-unit metrics under Guest Experience category
-  const guestRatings = catMetrics("Guest Experience").filter((g) => g.unit === "Rating");
-  const overallRating = m("Guest Experience", "Rating", "overall") ?? guestRatings[0] ?? null;
+  // Guest ratings — all Rating-unit metrics under Guest Experience category,
+  // excluding any record that identifies an individual staff member by name
+  // (client-facing page — see looksLikeIndividualStaffMetric in lib/format.ts).
+  const guestRatings = catMetrics("Guest Experience")
+    .filter((g) => g.unit === "Rating")
+    .filter((g) => !looksLikeIndividualStaffMetric(g.metricName || g.kpiRecord));
+  // Canonical lookup, not a name-hint match — "overall" as a substring hint
+  // would also match individually-named records like "Hector T Server
+  // Overall Score", surfacing that person's own number under a generic
+  // "Average rating" label even without printing their name.
+  const overallRating = findMetricByKey(allMetrics, "guest_overall", latest) ?? guestRatings[0] ?? null;
 
   // Covers / reservations — under Revenue or Commercial category
   const coversMetric = m("Revenue", "Count") ?? m("Commercial", "Count");
@@ -443,7 +451,10 @@ export default async function CommercialPage({
         {/* ── Performance vs Benchmarks ────────────────────────────── */}
         {(() => {
           const gaugeMetrics = currentMetrics.filter(
-            (met) => met.benchmarkLow != null && met.benchmarkHigh != null
+            (met) =>
+              met.benchmarkLow != null &&
+              met.benchmarkHigh != null &&
+              !looksLikeIndividualStaffMetric(met.metricName || met.kpiRecord)
           );
           if (gaugeMetrics.length === 0) return null;
           const HIGHER_BETTER = new Set(["Revenue", "Profitability", "Guest Experience", "Commercial"]);

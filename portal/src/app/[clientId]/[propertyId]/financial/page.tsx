@@ -393,7 +393,7 @@ export default async function FinancialPage({
             <p
               style={{
                 fontFamily: SERIF,
-                fontSize: "clamp(1.05rem, 1.4vw, 1.2rem)",
+                fontSize: "clamp(0.95rem, 1.3vw, 1.05rem)",
                 fontWeight: 400,
                 lineHeight: 1.7,
                 color: "#12120F",
