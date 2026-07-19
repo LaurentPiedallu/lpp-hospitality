@@ -243,14 +243,25 @@ export default async function PropertyPage({
     return { display: `${lo.toFixed(0)}–${hi.toFixed(0)}`, isRange: true };
   }
 
+  // Guest Experience captions — same LPP Interpretation lookup as Financial
+  // Snapshot above (metricInterpretation), keyed to each card's own canonical
+  // metric. Empty string, not a placeholder, when the record or its
+  // interpretation doesn't exist yet — same convention as Financial Snapshot.
   const guestCards = [
     { label: "Overall",  key: "guest_overall",  fallback: kpi?.guestOverall ?? null },
     { label: "Food",     key: "guest_food",     fallback: kpi?.guestFood ?? null },
     { label: "Service",  key: "guest_service",  fallback: kpi?.guestService ?? null },
     { label: "Ambiance", key: "guest_ambiance", fallback: kpi?.guestAmbiance ?? null },
   ]
-    .map(({ label, key, fallback }) => ({ label, metric: guestMetric(key, fallback) }))
-    .filter((c): c is { label: string; metric: { display: string; isRange: boolean } } => c.metric != null);
+    .map(({ label, key, fallback }) => ({
+      label,
+      metric: guestMetric(key, fallback),
+      interpretation: metricInterpretation(key),
+    }))
+    .filter(
+      (c): c is { label: string; metric: { display: string; isRange: boolean }; interpretation: string } =>
+        c.metric != null
+    );
 
   // Structural split only — groups sentences into shorter paragraphs, does
   // not shorten or reword. See splitIntoParagraphs in lib/format.ts.
@@ -444,8 +455,18 @@ export default async function PropertyPage({
           <section style={{ marginBottom: SECTION_GAP }}>
             <SectionHeader title="Guest Experience" />
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {guestCards.map(({ label, metric }) => (
-                <div key={label} style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "24px 28px" }}>
+              {guestCards.map(({ label, metric, interpretation }) => (
+                <div
+                  key={label}
+                  style={{
+                    background: "#FFFFFF",
+                    border: "1px solid rgba(18,18,15,0.08)",
+                    borderRadius: 0,
+                    padding: "24px 28px",
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                >
                   <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 8 }}>
                     {label}
                   </p>
@@ -458,6 +479,13 @@ export default async function PropertyPage({
                       Range across {`${label.toLowerCase()}`} sources this period
                     </p>
                   )}
+                  {/* flex: 1 slot, present on every card regardless of whether this
+                      one has text — so the grid's row-stretch gives all four cards
+                      equal height, and every caption slot then stretches to match,
+                      sized to whichever of the four captions is longest this period. */}
+                  <div style={{ flex: 1 }}>
+                    {interpretation && <p style={captionStyle}>{interpretation}</p>}
+                  </div>
                 </div>
               ))}
             </div>
