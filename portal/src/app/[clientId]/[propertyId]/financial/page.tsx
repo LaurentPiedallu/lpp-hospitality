@@ -312,9 +312,11 @@ export default async function FinancialPage({
     findIntelligence(allIntelligence as Intelligence[], cat, latest);
 
   // KPI lookup by canonical LPP Metric Key, not category/unit/name-guessing
-  // (see findMetricByKey in lib/format.ts for the bug this fixes).
-  const byKey = (key: string, category?: string) =>
-    findMetricByKey(allMetrics, key, latest, category);
+  // (see findMetricByKey in lib/format.ts for the bug this fixes). Segment
+  // defaults to "Total" inside findMetricByKey itself, so omitting it here
+  // keeps every existing call below unchanged.
+  const byKey = (key: string, category?: string, segment?: string) =>
+    findMetricByKey(allMetrics, key, latest, category, segment);
 
   // Precompute the primary metric for each section once — used for KPI
   // cards, driver visuals, and severity fallback alike.
@@ -325,18 +327,24 @@ export default async function FinancialPage({
 
   const laborCost = byKey("total_payroll");
   const laborPct = byKey("labor_pct");
-  // Driver line items — none of these have a canonical LPP Metric Key (all
-  // "unclassified" in the source data), so matched by exact metric name
-  // instead of guessing at category + unit. Only shown if genuinely present.
-  const wages = currentMetrics.find((m) => m.category === "Labor" && m.metricName === "Total Wages") ?? null;
-  const payrollTaxes = currentMetrics.find((m) => m.category === "Labor" && m.metricName === "Payroll Taxes") ?? null;
-  const benefits = currentMetrics.find((m) => m.category === "Labor" && m.metricName === "Total Benefits") ?? null;
+  // Driver line items — canonical key + Segment lookup (see the Segment
+  // field on KpiMetric / findMetricByKey in lib/format.ts). Previously
+  // matched by exact metric name since none of these had a canonical key at
+  // all; now that a prior pass tagged them with real key+segment pairs,
+  // this is resilient to title variants Notion has both used for the same
+  // figure (e.g. "Total Wages" vs "Total Payroll Only" — both Segment
+  // "Wages Total"). Only shown if genuinely present for this property/period.
+  const wages = byKey("total_payroll", "Labor", "Wages Total");
+  const payrollTaxes = byKey("total_payroll", "Labor", "Payroll Taxes");
+  const benefits = byKey("total_payroll", "Labor", "Benefits");
   const laborDrivers = [wages, payrollTaxes, benefits].filter((x): x is KpiMetric => x != null);
 
   const cogsDollars = byKey("total_cogs");
   const cogsPct = byKey("cogs_pct");
-  const foodCost = currentMetrics.find((m) => m.category === "COGS" && m.metricName === "Food Cost of Sales") ?? null;
-  const beverageCost = currentMetrics.find((m) => m.category === "COGS" && m.metricName === "Beverage Cost of Sales") ?? null;
+  // Beverage COGS is one blended figure (beer/wine/liquor not split further
+  // in the source P&Ls) — don't build UI implying a finer breakdown exists.
+  const foodCost = byKey("total_cogs", "COGS", "Food");
+  const beverageCost = byKey("total_cogs", "COGS", "Beverage");
 
   const opexDollars = byKey("opex");
   const opexPct = byKey("opex_pct");

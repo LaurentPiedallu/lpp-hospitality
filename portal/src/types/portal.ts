@@ -42,6 +42,12 @@ export interface KpiMetric {
   category: string;        // Revenue | Labor | COGS | OpEx | Profitability | Guest Experience | ...
   metricName: string;
   lppMetricKey: LppMetricKey | null;
+  // Which slice of the metric this row represents (e.g. "Breakfast",
+  // "Food", "Wages Total") — a second axis alongside lppMetricKey, not a
+  // replacement. Null/blank means "Total" by convention (records Published
+  // before this field existed were never backfilled) — see findMetricByKey
+  // in lib/format.ts, which already treats blank as Total.
+  segment: string | null;
   metricValue: number;
   unit: string;            // $ | % | Count | Rating | Days | Text
   severity: Severity;

@@ -132,15 +132,28 @@ export function maxIso(dates: (string | null)[]): string | null {
 // reused across categories for different concepts (e.g. "covers" also
 // exists under Guest Experience as a survey sample size, distinct from the
 // real total under Revenue).
+//
+// Segment defaults to "Total" — most call sites want the headline figure,
+// not a daypart/wage-type/COGS-type slice. A record with a blank/null
+// Segment is treated as Total too: Segment is a second axis added after a
+// lot of KPI Records already existed and were Published, and blank-means-
+// Total was a deliberate backward-compatibility choice so nothing already
+// Published needed to change. Pass an explicit segment (e.g. "Breakfast",
+// "Food", "Wages Total") to get a specific slice instead.
 export function findMetricByKey(
   metrics: KpiMetric[],
   key: string,
   periodStart: string | null,
-  category?: string
+  category?: string,
+  segment: string = "Total"
 ): KpiMetric | null {
   return (
     metrics.find(
-      (m) => m.lppMetricKey === key && m.periodStart === periodStart && (!category || m.category === category)
+      (m) =>
+        m.lppMetricKey === key &&
+        m.periodStart === periodStart &&
+        (!category || m.category === category) &&
+        (m.segment ?? "Total") === segment
     ) ?? null
   );
 }

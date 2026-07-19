@@ -71,6 +71,7 @@ export async function getKpiMetrics(propertyId: string): Promise<KpiMetric[]> {
     category: select(p, "KPI Category"),
     metricName: richText(p, "Metric Name"),
     lppMetricKey: (select(p, "LPP Metric Key") || null) as import("@/types/portal").LppMetricKey | null,
+    segment: select(p, "Segment") || null,
     metricValue: num(p, "Metric Value"),
     unit: select(p, "Unit"),
     severity: (select(p, "Severity") || "Monitor") as Severity,
@@ -115,8 +116,20 @@ export function buildKpiSummary(metrics: KpiMetric[]): KpiSummary | null {
   // up whichever record Notion happened to return first. Verified this is
   // the only LPP Metric Key that repeats across categories in the current
   // dataset; every other key below maps to exactly one category.
+  //
+  // Segment defaults to Total (blank Segment counts as Total too — see
+  // findMetricByKey in lib/format.ts for the same convention). Necessary as
+  // of the Segment reclassification: "covers", "total_payroll", "total_cogs"
+  // and "opex" now each have multiple same-period, same-category records
+  // (Breakfast/Lunch/Dinner covers, Food/Beverage COGS, etc.) alongside the
+  // Total one, and without this, .find() silently returned whichever
+  // segment record happened to come first — confirmed live-wrong on the
+  // Dashboard property cards (Lex Yard showing "2,400 covers" / "$26K COGS"
+  // instead of the real 7,040 / $144K) before this fix.
   const byKey = (key: string, category?: string) =>
-    current.find((m) => m.lppMetricKey === key && (!category || m.category === category))?.metricValue ?? null;
+    current.find(
+      (m) => m.lppMetricKey === key && (!category || m.category === category) && (m.segment ?? "Total") === "Total"
+    )?.metricValue ?? null;
 
   // Derive worst financial severity
   const severityRank: Record<Severity, number> = {

@@ -313,6 +313,36 @@ function DaypartSplit({ segments }: { segments: { label: string; value: number; 
   );
 }
 
+// ─── Average check by daypart — comparative bars, not a stacked split ────────
+// An average check isn't a part of a whole the way covers are, so bars are
+// sized against the highest daypart value, not against a summed total — same
+// visual language as Financial Review's DriverBreakdown, without the
+// percent-of-total math that wouldn't mean anything here.
+
+function DaypartCheckBars({ items }: { items: { label: string; value: number }[] }) {
+  const max = Math.max(...items.map((i) => i.value));
+  return (
+    <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: 20 }}>
+      <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 16 }}>
+        Average Check by Daypart
+      </p>
+      <div className="space-y-3">
+        {items.map((item) => (
+          <div key={item.label}>
+            <div className="flex items-baseline justify-between" style={{ marginBottom: 4 }}>
+              <span style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.65)" }}>{item.label}</span>
+              <span style={{ fontFamily: JOST, fontSize: 12, color: "#12120F", fontWeight: 500 }}>{usd(item.value)}</span>
+            </div>
+            <div style={{ height: 5, background: "rgba(18,18,15,0.06)" }}>
+              <div style={{ height: "100%", width: `${(item.value / max) * 100}%`, background: "#B8935A" }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function CommercialPage({
@@ -383,12 +413,19 @@ export default async function CommercialPage({
   // "Average rating" label even without printing their name.
   const overallRating = findMetricByKey(allMetrics, "guest_overall", latest) ?? guestRatings[0] ?? null;
 
+  // KPI lookup by canonical LPP Metric Key + Segment (see Segment on
+  // KpiMetric / findMetricByKey in lib/format.ts). Segment defaults to
+  // "Total" inside findMetricByKey itself, so omitting it keeps every
+  // existing call below unchanged.
+  const byKey = (key: string, category?: string, segment?: string) =>
+    findMetricByKey(allMetrics, key, latest, category, segment);
+
   // Covers — canonical key, scoped to Revenue (the real property-wide total),
   // not a bare category+unit match, which was silently returning whichever
   // Count-unit Revenue record Notion happened to return first (Dinner Covers,
   // 2,400) instead of the actual total (Total Covers / Revenue Customers,
   // 7,040) — same class of bug already fixed on Financial Review.
-  const coversMetric = findMetricByKey(allMetrics, "covers", latest, "Revenue");
+  const coversMetric = byKey("covers", "Revenue");
   const conversionMetric = latestMetric(allMetrics, "Commercial", "%", "conversion");
   const channelMetrics = catMetrics("Commercial").filter((g) =>
     g.metricName.toLowerCase().includes("channel") ||
@@ -396,21 +433,41 @@ export default async function CommercialPage({
     g.metricName.toLowerCase().includes("direct")
   );
 
+  // Daypart segments in display order — not every property/period has all
+  // of these (e.g. Brunch is only populated for some properties in some
+  // periods), so both breakdowns below build their list from whichever are
+  // actually present rather than assuming a fixed set.
+  const DAYPART_SEGMENTS = ["Breakfast", "Lunch", "Brunch", "Dinner", "Event"] as const;
+  const DAYPART_COLORS: Record<string, string> = {
+    Breakfast: "#B8935A", Lunch: "#7c3aed", Brunch: "#D4AF7A", Dinner: "#12120F", Event: "#6b7280",
+  };
+
   // Covers by daypart — real demand-mix data (not budget variance), moved
-  // here from the old "Revenue Drivers" section. Only shown when all three
-  // are present; segments sum exactly to coversMetric's total in the real
-  // dataset, so no residual bucket is needed.
-  const dinnerCovers = catMetrics("Revenue").find((c) => c.metricName === "Dinner Covers") ?? null;
-  const lunchCovers = catMetrics("Revenue").find((c) => c.metricName === "Lunch Covers") ?? null;
-  const breakfastCovers = catMetrics("Revenue").find((c) => c.metricName === "Breakfast Covers") ?? null;
-  const daypartCovers = [breakfastCovers, lunchCovers, dinnerCovers].every((c) => c != null)
-    ? [breakfastCovers!, lunchCovers!, dinnerCovers!]
-    : null;
+  // here from the old "Revenue Drivers" section. Canonical key + Segment
+  // lookup, not exact-metric-name matching (which only ever checked for
+  // Breakfast/Lunch/Dinner and would've silently missed a Brunch period).
+  // Only shown with 2+ dayparts present; segments sum to coversMetric's
+  // total in the real dataset, so no residual bucket is needed.
+  const daypartCoverEntries = DAYPART_SEGMENTS
+    .map((seg) => ({ label: seg as string, metric: byKey("covers", "Revenue", seg) }))
+    .filter((e): e is { label: string; metric: KpiMetric } => e.metric != null);
+  const daypartCovers = daypartCoverEntries.length >= 2 ? daypartCoverEntries : null;
 
   // Average check — canonical key, the same blended figure Financial Review
   // uses (not the "Revenue Drivers" section's old name-hint match, which
   // picked up "Dinner Average Check" instead).
-  const avgCheckMetric = findMetricByKey(allMetrics, "avg_check", latest, "Revenue");
+  const avgCheckMetric = byKey("avg_check", "Revenue");
+
+  // Average check by daypart — comparative bars, not a stacked/summed split
+  // like covers-by-daypart: an average check isn't a part of a whole, so it
+  // shouldn't be sized as a percentage of one. Only shown with 2+ dayparts
+  // present. Deliberately excludes the Segment "Food" avg_check (a
+  // food-only, all-dayparts-combined figure — a different axis entirely,
+  // not a daypart, per the internal Segment Mapping notes).
+  const daypartAvgCheckEntries = DAYPART_SEGMENTS
+    .map((seg) => ({ label: seg as string, metric: byKey("avg_check", "Revenue", seg) }))
+    .filter((e): e is { label: string; metric: KpiMetric } => e.metric != null);
+  const daypartAvgCheck = daypartAvgCheckEntries.length >= 2 ? daypartAvgCheckEntries : null;
 
   // Page-level synthesis — built from the same verified figures the sections
   // below display, connecting guest-experience strength to the specific
@@ -518,11 +575,16 @@ export default async function CommercialPage({
           </div>
           {daypartCovers && (
             <DaypartSplit
-              segments={[
-                { label: "Breakfast", value: daypartCovers[0].metricValue, color: "#B8935A" },
-                { label: "Lunch", value: daypartCovers[1].metricValue, color: "#7c3aed" },
-                { label: "Dinner", value: daypartCovers[2].metricValue, color: "#12120F" },
-              ]}
+              segments={daypartCovers.map((d) => ({
+                label: d.label,
+                value: d.metric.metricValue,
+                color: DAYPART_COLORS[d.label],
+              }))}
+            />
+          )}
+          {daypartAvgCheck && (
+            <DaypartCheckBars
+              items={daypartAvgCheck.map((d) => ({ label: d.label, value: d.metric.metricValue }))}
             />
           )}
         </CommercialSection>
