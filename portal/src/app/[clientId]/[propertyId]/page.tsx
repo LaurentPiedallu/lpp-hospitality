@@ -4,17 +4,17 @@ import { getSession } from "@/lib/auth";
 import {
   getProperty, getLatestKpiSummary, getKpiMetrics, getActions, getInitiatives,
   getOpportunities, getRisks, getIntelligence, hasUnpublishedFinancialData,
-  getLatestPublishedBrief, getUploads,
+  getPublishedBriefs,
 } from "@/lib/notion-queries";
 import { deriveHealth } from "@/lib/health";
-import { usd, pct, compact, formatPeriod, splitIntoParagraphs, maxIso } from "@/lib/format";
+import { usd, pct, compact, formatPeriod, splitIntoParagraphs, maxIso, findMetricByKey } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
 import PropertyTabs from "@/components/PropertyTabs";
 import SectionHeader from "@/components/SectionHeader";
 import CalloutBlock from "@/components/CalloutBlock";
-import type { Action, Opportunity, Risk, Intelligence, Initiative, KpiMetric, Upload } from "@/types/portal";
+import type { Action, Opportunity, Intelligence, Initiative, KpiMetric } from "@/types/portal";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 const SERIF = "'Cormorant Garamond', Georgia, serif";
@@ -51,6 +51,41 @@ function topAction(actions: Action[]): Action | null {
 function stripPropertyPrefix(title: string, propertyName: string): string {
   const prefix = `${propertyName} — `;
   return title.startsWith(prefix) ? title.slice(prefix.length) : title;
+}
+
+// Emerging Risk — a genuine "not yet critical, but worth watching" signal,
+// not a hardcoded Guest Commentary pick. Prefers Severity=Monitor (the
+// existing field that already conceptually matches "not yet critical, but
+// could become one") across every Intelligence Category, not just Guest;
+// the highest Estimated Monthly Impact breaks a tie among multiple Monitor
+// records, most-recently-touched breaking a further tie. Falls back to the
+// lowest-impact Action Required record when no Monitor-severity record
+// exists for the period — a real, confirmed case (Lex Yard's June Published
+// Intelligence has zero Monitor-severity records) — so the section stays
+// populated with a genuine finding rather than going empty, while still
+// reading as a step down in urgency from what's already covered earlier on
+// the page (Immediate Priorities, Biggest Opportunity). Returns null if
+// nothing qualifies even under the fallback, so the section can hide
+// entirely rather than show a placeholder.
+function selectEmergingRisk(records: Intelligence[], period: string | null): Intelligence | null {
+  const current = records.filter((i) => i.periodStart === period);
+
+  const byImpactThenRecency = (dir: 1 | -1) => (a: Intelligence, b: Intelligence) =>
+    b.estimatedMonthlyImpact !== a.estimatedMonthlyImpact
+      ? dir * (b.estimatedMonthlyImpact - a.estimatedMonthlyImpact)
+      : (b.processedAt ?? "").localeCompare(a.processedAt ?? "");
+
+  const monitor = current.filter((i) => i.severity === "Monitor");
+  if (monitor.length > 0) {
+    return [...monitor].sort(byImpactThenRecency(1))[0]; // highest impact first
+  }
+
+  const actionRequired = current.filter((i) => i.severity === "Action Required");
+  if (actionRequired.length > 0) {
+    return [...actionRequired].sort(byImpactThenRecency(-1))[0]; // lowest impact first
+  }
+
+  return null;
 }
 
 function PrimarySectionHeader({ title }: { title: string }) {
@@ -121,30 +156,38 @@ export default async function PropertyPage({
   const { clientId, propertyId } = await params;
   if (session.role !== "admin" && session.clientId !== clientId) redirect("/dashboard");
 
-  const [property, kpi, allMetrics, actions, initiatives, intelligence, latestBrief, uploads] = await Promise.all([
+  const [property, kpi, allMetrics, actions, initiatives, intelligence, briefs] = await Promise.all([
     getProperty(propertyId, clientId),
     getLatestKpiSummary(propertyId),
     getKpiMetrics(propertyId),
     getActions(propertyId),
     getInitiatives(propertyId),
     getIntelligence(propertyId),
-    getLatestPublishedBrief(propertyId, clientId),
-    getUploads(clientId, propertyId),
+    getPublishedBriefs(propertyId, clientId),
   ]);
 
   if (!property) notFound();
 
-  // Opportunities and Risks are internal-only analytical inputs (they feed
-  // Actions and the Brief) and must be scoped to the current Reporting
-  // Period — the most recent Published Brief's period — never aggregated
-  // across every period ever generated for this property.
+  const latestBrief = briefs[0] ?? null;
+
+  // Opportunities are an internal-only analytical input (feeds Actions and
+  // the Brief) and must be scoped to the current Reporting Period — the
+  // most recent Published Brief's period — never aggregated across every
+  // period ever generated for this property.
   const currentPeriod = latestBrief?.reportingPeriodStart ?? null;
-  const [opportunities, risks] = currentPeriod
-    ? await Promise.all([
-        getOpportunities(propertyId, currentPeriod),
-        getRisks(propertyId, currentPeriod),
-      ])
-    : [[] as Opportunity[], [] as Risk[]];
+  const opportunities = currentPeriod ? await getOpportunities(propertyId, currentPeriod) : [];
+
+  // The prior *reviewed* period — the next distinct period among this
+  // property's Published Briefs, not just any period with KPI data. A
+  // property can have KPI Records for a period whose Brief was never
+  // Published (e.g. Peacock Alley has real June KPI data, but its June
+  // Brief is still Draft) — that period isn't a "prior review" the client
+  // ever saw, so it must not be used as a comparison baseline. Null when
+  // this is the property's first Published review (see Since Last Review
+  // below, which hides entirely in that case).
+  const priorPeriod =
+    briefs.find((b) => b.reportingPeriodStart && b.reportingPeriodStart !== currentPeriod)?.reportingPeriodStart ??
+    null;
 
   const health = deriveHealth(kpi);
   const openActions = (actions as Action[]).filter((a) => a.clientVisible && a.status !== "Complete");
@@ -161,9 +204,6 @@ export default async function PropertyPage({
   const biggestOpportunity = latestBrief?.biggestOpportunityId
     ? (opportunities as Opportunity[]).find((o) => o.id === latestBrief.biggestOpportunityId) ?? null
     : null;
-  const biggestRisk = latestBrief?.biggestRiskId
-    ? (risks as Risk[]).find((r) => r.id === latestBrief.biggestRiskId) ?? null
-    : null;
 
   // The Opportunity record itself has no field for the causal "why" (only
   // a headline title and a "Next Step" action) — the driving Intelligence
@@ -172,22 +212,8 @@ export default async function PropertyPage({
     ? (intelligence as Intelligence[]).find((i) => i.id === biggestOpportunity.sourceIntelligenceId)?.finding ?? null
     : null;
 
-  // Pending uploads — compares upload types seen in prior periods for this
-  // property against the current period, so it only flags a type as
-  // "pending" when this specific property has actually established a
-  // pattern of uploading it. No universal "expected" list is assumed.
-  const priorPeriodUploadTypes = new Set(
-    (uploads as Upload[])
-      .filter((u) => u.reportingPeriod && u.reportingPeriod !== currentPeriod && u.uploadType && u.status !== "Failed")
-      .map((u) => u.uploadType)
-  );
-  const currentPeriodUploadTypes = new Set(
-    (uploads as Upload[])
-      .filter((u) => u.reportingPeriod === currentPeriod && u.uploadType && u.status !== "Failed")
-      .map((u) => u.uploadType)
-  );
-  const pendingUploadTypes = [...priorPeriodUploadTypes].filter((t) => !currentPeriodUploadTypes.has(t));
-  const hasUploadHistory = priorPeriodUploadTypes.size > 0 && currentPeriod != null;
+  // Emerging Risk — see selectEmergingRisk above for the selection logic.
+  const emergingRisk = selectEmergingRisk(intelligence as Intelligence[], currentPeriod);
 
   // Admin-only signal: financial numbers are all missing even though a
   // summary exists — check whether real data is sitting unpublished in Notion.
@@ -268,6 +294,25 @@ export default async function PropertyPage({
   const currentReadParagraphs = latestBrief?.executiveSummary
     ? splitIntoParagraphs(latestBrief.executiveSummary, 3)
     : [];
+
+  // Since Last Review — month-over-month deltas against the prior
+  // *reviewed* period (priorPeriod, above), not just any prior KPI period.
+  // Canonical key lookup (findMetricByKey), same pattern used everywhere
+  // else in the portal. Null whenever either side is missing, so a partial
+  // gap in either period's data hides that one card rather than showing
+  // broken math — same defensive pattern used elsewhere for missing
+  // segments/metrics.
+  function periodDelta(key: string): { current: number; prior: number; delta: number } | null {
+    const current = findMetricByKey(allMetrics as KpiMetric[], key, currentPeriod);
+    const prior = priorPeriod ? findMetricByKey(allMetrics as KpiMetric[], key, priorPeriod) : null;
+    if (current == null || prior == null) return null;
+    return { current: current.metricValue, prior: prior.metricValue, delta: current.metricValue - prior.metricValue };
+  }
+  const revenueDelta = priorPeriod ? periodDelta("total_revenue") : null;
+  const laborDelta = priorPeriod ? periodDelta("labor_pct") : null;
+  const guestDelta = priorPeriod ? periodDelta("guest_overall") : null;
+  const hasSinceLastReview =
+    priorPeriod != null && (revenueDelta != null || laborDelta != null || guestDelta != null);
 
   return (
     <PageWrapper noTopPadding>
@@ -492,40 +537,72 @@ export default async function PropertyPage({
           </section>
         )}
 
-        {/* Watch item — same underlying "Biggest Risk" data, client-facing label softened */}
-        {biggestRisk && (
-          <section style={{ marginBottom: hasUploadHistory ? SECTION_GAP : 0 }}>
-            <SectionHeader title="Watch Item" />
+        {/* Emerging Risk — real selected Intelligence finding, see selectEmergingRisk above */}
+        {emergingRisk && (
+          <section style={{ marginBottom: hasSinceLastReview ? SECTION_GAP : 0 }}>
+            <SectionHeader title="Emerging Risk" />
             <CalloutBlock>
-              <p>{biggestRisk.title}</p>
-              {biggestRisk.mitigationPlan && (
-                <p style={{ marginTop: 8, opacity: 0.8 }}>{biggestRisk.mitigationPlan}</p>
+              <p>{emergingRisk.finding}</p>
+              {emergingRisk.currentRead && (
+                <p style={{ marginTop: 8, opacity: 0.8 }}>{emergingRisk.currentRead}</p>
               )}
             </CalloutBlock>
           </section>
         )}
 
-        {/* What happens next — only Pending Uploads has real data behind it today;
-            Next Scheduled Review and Last Client Action are omitted, see notes below */}
-        {hasUploadHistory && (
+        {/* Since Last Review — month-over-month deltas against the prior
+            reviewed period. Hidden entirely on a property's first Published
+            review (no prior period to compare against) — same silent-hide
+            convention the section it replaces (What Happens Next) used for
+            the equivalent "no prior cycle" case. */}
+        {hasSinceLastReview && (
           <section>
-            <SectionHeader title="What Happens Next" />
-            <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "22px 26px" }}>
-              <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 10 }}>
-                Pending Uploads
-              </p>
-              {pendingUploadTypes.length > 0 ? (
-                <ul className="space-y-1.5">
-                  {pendingUploadTypes.map((t) => (
-                    <li key={t} style={{ fontFamily: JOST, fontSize: 13, color: "#12120F" }}>
-                      {t} · Not yet received
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.55)" }}>
-                  All expected files received for the current period
-                </p>
+            <div className="flex items-center justify-between" style={{ marginBottom: 20 }}>
+              <SectionHeader title="Since Last Review" />
+              {priorPeriod && (
+                <span style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.4)" }}>
+                  vs. {formatPeriod(priorPeriod)}
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {[
+                {
+                  label: "Revenue",
+                  data: revenueDelta,
+                  favorable: revenueDelta != null && revenueDelta.delta >= 0,
+                  format: (v: number) => compact(v),
+                  formatDelta: (d: number) => `${d >= 0 ? "+" : "−"}${compact(Math.abs(d))}`,
+                },
+                {
+                  label: "Labor",
+                  data: laborDelta,
+                  favorable: laborDelta != null && laborDelta.delta <= 0,
+                  format: (v: number) => pct(v),
+                  formatDelta: (d: number) => `${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(1)} pts`,
+                },
+                {
+                  label: "Guest",
+                  data: guestDelta,
+                  favorable: guestDelta != null && guestDelta.delta >= 0,
+                  format: (v: number) => v.toFixed(1),
+                  formatDelta: (d: number) => `${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(1)} pts`,
+                },
+              ].map(({ label, data, favorable, format, formatDelta }) =>
+                data ? (
+                  <div key={label} style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "24px 28px" }}>
+                    <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 8 }}>
+                      {label}
+                    </p>
+                    <p style={{ fontFamily: SERIF, fontSize: "2.2rem", fontWeight: 400, lineHeight: 1, color: favorable ? "#12120F" : "#C0392B" }}>
+                      {formatDelta(data.delta)}
+                      <span style={{ fontFamily: JOST, fontSize: 14, marginLeft: 6 }}>{data.delta >= 0 ? "↑" : "↓"}</span>
+                    </p>
+                    <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 6 }}>
+                      {format(data.prior)} → {format(data.current)}
+                    </p>
+                  </div>
+                ) : null
               )}
             </div>
           </section>

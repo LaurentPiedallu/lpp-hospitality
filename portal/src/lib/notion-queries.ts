@@ -288,6 +288,7 @@ export async function getIntelligence(propertyId: string): Promise<Intelligence[
     createdAt: (p.created_time as string) ?? null,
     processedAt: (p.last_edited_time as string) ?? null,
     estimatedAnnualImpact: num(p, "Estimated Annual Impact"),
+    estimatedMonthlyImpact: num(p, "Estimated Monthly Impact"),
   }));
 }
 
@@ -377,6 +378,23 @@ export async function getLatestPublishedBrief(propertyId: string, clientId: stri
     pageSize: 1,
   });
   return pages[0] ? toBrief(pages[0], clientId) : null;
+}
+
+// Every Published Brief for a property, newest first — unlike
+// getLatestPublishedBrief above, not capped to one. Used to find the prior
+// *reviewed* period for period-over-period deltas (e.g. Overview's "Since
+// Last Review"), which must be the prior Published Brief's period, not just
+// any period that happens to have KPI Records — a property can have KPI
+// data for a period whose Brief was never published to the client (e.g.
+// Peacock Alley has real March + June KPI data, but only March has ever
+// been Published as a Brief).
+export async function getPublishedBriefs(propertyId: string, clientId: string): Promise<Brief[]> {
+  const pages = await queryDatabase({
+    databaseId: NOTION_DBS.BRIEFS,
+    filter: publishedAnd(relationFilter("Property", propertyId)),
+    sorts: [{ property: "Reporting Period", direction: "descending" }],
+  });
+  return pages.map((p) => toBrief(p, clientId));
 }
 
 // "Last updated" for the property hero — most recent Notion last_edited_time

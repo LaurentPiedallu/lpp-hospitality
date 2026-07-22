@@ -141,6 +141,10 @@ export interface Intelligence {
   // period (Notion's own categorization doesn't otherwise disambiguate) —
   // see findIntelligence in lib/format.ts.
   estimatedAnnualImpact: number;
+  // Used to rank same-severity Intelligence records against each other
+  // (e.g. Overview's Emerging Risk selection) — a monthly figure reads
+  // better than annual for a "how big is this right now" comparison.
+  estimatedMonthlyImpact: number;
 }
 
 export interface Initiative {
