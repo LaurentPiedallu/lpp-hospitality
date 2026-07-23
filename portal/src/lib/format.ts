@@ -211,6 +211,23 @@ export function splitIntoParagraphs(text: string, targetCount = 3): string[] {
   return paragraphs;
 }
 
+// Splits a Brief's Critical Drivers (or Recommended Focus) field into
+// individual lines. Confirmed directly against the raw Notion API payload
+// (not any rendered/cached view of it) that the Make-generated content is
+// "\n"-separated within a single rich_text block — e.g. "Cover momentum
+// stalling...\nSick pay anomalies...\n...". Explicit split on that
+// confirmed delimiter, not a fuzzy regex, per the same reasoning as the
+// rest of this file: match exactly what the source data actually does, not
+// what it's assumed to do. Recommended Focus only ever has 1 real item in
+// the live data so far, but the same delimiter convention applies if it's
+// ever 2 (per the Brief's own "1-2 numbered items" spec).
+export function parseTextLines(raw: string): string[] {
+  return raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
 export interface TrendDataPoint {
   period: string;
   value: number;

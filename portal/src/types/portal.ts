@@ -169,6 +169,22 @@ export interface Brief {
   propertyId: string | null;
   title: string;
   executiveSummary: string;
+  // Added alongside Executive Summary for a hierarchical executive-briefing
+  // layout (Overview tab) — populated by Make for Briefs generated after
+  // this schema change, empty ("") on older ones. Empty Executive Read is
+  // the trigger to fall back to the old single-paragraph Executive Summary
+  // rendering, not the mere existence of these fields on the type.
+  executiveRead: string;
+  // Raw rich text, one driver per line (confirmed "\n"-separated in the
+  // real Notion API payload — see lib/format.ts's parseTextLines, which
+  // does the actual line-splitting; kept raw here like every other
+  // rich-text field on this type).
+  criticalDrivers: string;
+  lppPerspective: string;
+  // Raw rich text — 1-2 numbered items, same "\n" convention as
+  // criticalDrivers if there's ever more than one (see parseTextLines).
+  recommendedFocus: string;
+  decisionsRequired: string;
   overallHealth: OverallHealth | null;
   confidence: DataConfidence;
   estimatedAnnualImpact: number;

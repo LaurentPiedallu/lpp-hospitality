@@ -7,7 +7,7 @@ import {
   getPublishedBriefs,
 } from "@/lib/notion-queries";
 import { deriveHealth } from "@/lib/health";
-import { usd, pct, compact, formatPeriod, splitIntoParagraphs, maxIso, findMetricByKey } from "@/lib/format";
+import { usd, pct, compact, formatPeriod, splitIntoParagraphs, parseTextLines, maxIso, findMetricByKey } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
@@ -290,10 +290,20 @@ export default async function PropertyPage({
     );
 
   // Structural split only — groups sentences into shorter paragraphs, does
-  // not shorten or reword. See splitIntoParagraphs in lib/format.ts.
+  // not shorten or reword. See splitIntoParagraphs in lib/format.ts. Only
+  // used by the old-format fallback below (hasNewBriefFormat === false).
   const currentReadParagraphs = latestBrief?.executiveSummary
     ? splitIntoParagraphs(latestBrief.executiveSummary, 3)
     : [];
+
+  // The new hierarchical executive-briefing layout triggers on Executive
+  // Read actually being populated, not on the property merely existing in
+  // the schema — older Published Briefs (March 2026 and earlier) have all
+  // five new fields empty, and fall back to the old single-paragraph
+  // Executive Summary rendering above instead.
+  const hasNewBriefFormat = !!latestBrief?.executiveRead?.trim();
+  const criticalDrivers = latestBrief?.criticalDrivers ? parseTextLines(latestBrief.criticalDrivers) : [];
+  const recommendedFocusItems = latestBrief?.recommendedFocus ? parseTextLines(latestBrief.recommendedFocus) : [];
 
   // Since Last Review — month-over-month deltas against the prior
   // *reviewed* period (priorPeriod, above), not just any prior KPI period.
@@ -341,29 +351,107 @@ export default async function PropertyPage({
           </div>
         </section>
 
-        {/* Current read — the top-line state, given real visual weight and placed first */}
-        {currentReadParagraphs.length > 0 && (
-          <section style={{ marginBottom: SECTION_GAP }}>
-            <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD, marginBottom: 14 }}>
-              Current Read
-            </p>
-            <div style={{ borderLeft: "3px solid #B8935A", paddingLeft: 24 }} className="space-y-3">
-              {currentReadParagraphs.map((paragraph, i) => (
-                <p
-                  key={i}
-                  style={{
-                    fontFamily: SERIF,
-                    fontSize: "clamp(0.95rem, 1.3vw, 1.05rem)",
-                    fontWeight: 400,
-                    lineHeight: 1.7,
-                    color: "#12120F",
-                  }}
-                >
-                  {paragraph}
-                </p>
-              ))}
+        {/* Executive briefing — hierarchical layout (Executive Read / Critical
+            Drivers / LPP Perspective / Recommended Focus + Decisions Required)
+            once a Brief has the new fields populated; falls back to the old
+            single-paragraph Executive Summary rendering for Briefs generated
+            before this schema change (see hasNewBriefFormat above). */}
+        {hasNewBriefFormat && latestBrief ? (
+          <section style={{ marginBottom: SECTION_GAP }} className="space-y-8">
+            {/* Zone 1 — Executive Read: the dominant visual moment */}
+            <div style={{ background: "#12120F", padding: "40px 44px" }}>
+              <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD, marginBottom: 14 }}>
+                Executive Read
+              </p>
+              <p style={{ fontFamily: SERIF, fontSize: "clamp(1.3rem, 2vw, 1.6rem)", fontWeight: 300, color: "#F2EDE4", lineHeight: 1.5 }}>
+                {latestBrief.executiveRead}
+              </p>
             </div>
+
+            {/* Zone 2 — Critical Drivers: a scan zone, one line each */}
+            {criticalDrivers.length > 0 && (
+              <div>
+                <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD, marginBottom: 14 }}>
+                  Critical Drivers
+                </p>
+                <div className="space-y-2">
+                  {criticalDrivers.map((driver, i) => (
+                    <div key={i} className="flex items-center" style={{ gap: 10 }}>
+                      <span style={{ width: 6, height: 6, background: GOLD, flexShrink: 0 }} />
+                      <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.7)", lineHeight: 1.4 }}>
+                        {driver}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Zone 3 — LPP Perspective: the firm's interpretation, plain prose */}
+            {latestBrief.lppPerspective && (
+              <div>
+                <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD, marginBottom: 14 }}>
+                  LPP Perspective
+                </p>
+                <CalloutBlock>
+                  <p>{latestBrief.lppPerspective}</p>
+                </CalloutBlock>
+              </div>
+            )}
+
+            {/* Zone 4 — Recommended Focus + Decisions Required: what happens next */}
+            {(recommendedFocusItems.length > 0 || latestBrief.decisionsRequired) && (
+              <div>
+                {recommendedFocusItems.length > 0 && (
+                  <>
+                    <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD, marginBottom: 14 }}>
+                      Recommended Focus
+                    </p>
+                    <ol className="space-y-2">
+                      {recommendedFocusItems.map((item, i) => (
+                        <li key={i} className="flex" style={{ gap: 10 }}>
+                          <span style={{ fontFamily: SERIF, fontSize: 15, color: GOLD, flexShrink: 0 }}>{i + 1}.</span>
+                          <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.75)", lineHeight: 1.6 }}>
+                            {item}
+                          </p>
+                        </li>
+                      ))}
+                    </ol>
+                  </>
+                )}
+                {latestBrief.decisionsRequired && (
+                  <p style={{ fontFamily: JOST, fontSize: 13, color: "#12120F", lineHeight: 1.6, marginTop: recommendedFocusItems.length > 0 ? 14 : 0 }}>
+                    <span style={{ fontWeight: 500, color: GOLD }}>Decision needed: </span>
+                    {latestBrief.decisionsRequired}
+                  </p>
+                )}
+              </div>
+            )}
           </section>
+        ) : (
+          currentReadParagraphs.length > 0 && (
+            <section style={{ marginBottom: SECTION_GAP }}>
+              <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD, marginBottom: 14 }}>
+                Current Read
+              </p>
+              <div style={{ borderLeft: "3px solid #B8935A", paddingLeft: 24 }} className="space-y-3">
+                {currentReadParagraphs.map((paragraph, i) => (
+                  <p
+                    key={i}
+                    style={{
+                      fontFamily: SERIF,
+                      fontSize: "clamp(0.95rem, 1.3vw, 1.05rem)",
+                      fontWeight: 400,
+                      lineHeight: 1.7,
+                      color: "#12120F",
+                    }}
+                  >
+                    {paragraph}
+                  </p>
+                ))}
+              </div>
+            </section>
+          )
         )}
 
         {/* Immediate priorities — compact, links through to the full Initiatives tab for detail */}
