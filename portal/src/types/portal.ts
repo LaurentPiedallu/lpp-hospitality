@@ -99,6 +99,8 @@ export interface Action {
   clientVisible: boolean;
 }
 
+export type DemandContext = "Capacity-Constrained" | "Demand-Constrained" | "Mixed";
+
 export interface Opportunity {
   id: string;
   propertyId: string;
@@ -112,6 +114,12 @@ export interface Opportunity {
   // No field on Opportunity itself captures the causal "why" distinct from
   // the headline — that lives on the linked Intelligence finding instead.
   sourceIntelligenceId: string | null;
+  // Whether the underlying issue is "full and mismanaging it" vs. "empty
+  // and needs filling" — changes what kind of action makes sense
+  // (reservation/pricing tools vs. promotion/distribution tools). Null on
+  // Opportunities generated before this field existed (confirmed real:
+  // most of Lex Yard's current Published Opportunities predate it).
+  demandContext: DemandContext | null;
 }
 
 export interface Risk {

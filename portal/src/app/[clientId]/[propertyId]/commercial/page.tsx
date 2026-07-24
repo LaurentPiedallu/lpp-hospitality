@@ -191,31 +191,52 @@ const STAGE_VARIANT: Record<string, "green" | "amber" | "blue" | "gray"> = {
   Closed: "gray",
 };
 
+// Demand Context — whether the underlying issue is "full and mismanaging
+// it" (Capacity-Constrained) vs. "empty and needs filling"
+// (Demand-Constrained), which changes what kind of action makes sense.
+// Reuses StatusBadge's existing amber/gray variants rather than inventing
+// new colors — Demand-Constrained and Mixed intentionally share the same
+// muted gray treatment (distinguished by label text only, not a third
+// color), consistent with the restrained palette used everywhere else.
+// Null on Opportunities generated before this field existed — no tag,
+// not a placeholder.
+const DEMAND_CONTEXT_TAG: Record<string, { label: string; variant: "amber" | "gray" }> = {
+  "Capacity-Constrained": { label: "At Capacity", variant: "amber" },
+  "Demand-Constrained": { label: "Building Demand", variant: "gray" },
+  Mixed: { label: "Mixed", variant: "gray" },
+};
+
 function OpportunitiesPanel({ opportunities }: { opportunities: Opportunity[] }) {
   if (opportunities.length === 0) return null;
   return (
     <section className="space-y-4">
       <SectionHeader title="Value Creation Opportunities" />
       <div className="grid gap-3 md:grid-cols-2">
-        {opportunities.map((opp) => (
-          <div key={opp.id} className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] p-5">
-            <div className="flex items-start justify-between gap-3 mb-2">
-              <p className="text-sm font-medium text-gray-900 leading-snug">{opp.title}</p>
-              <StatusBadge
-                label={opp.stage}
-                variant={STAGE_VARIANT[opp.stage] ?? "gray"}
-              />
+        {opportunities.map((opp) => {
+          const demandTag = opp.demandContext ? DEMAND_CONTEXT_TAG[opp.demandContext] : null;
+          return (
+            <div key={opp.id} className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] p-5">
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <p className="text-sm font-medium text-gray-900 leading-snug">{opp.title}</p>
+                <div className="flex items-center flex-shrink-0" style={{ gap: 6 }}>
+                  {demandTag && <StatusBadge label={demandTag.label} variant={demandTag.variant} />}
+                  <StatusBadge
+                    label={opp.stage}
+                    variant={STAGE_VARIANT[opp.stage] ?? "gray"}
+                  />
+                </div>
+              </div>
+              {opp.nextStep && (
+                <p className="text-xs text-gray-500 leading-relaxed mb-3">Next: {opp.nextStep}</p>
+              )}
+              {opp.estimatedAnnualImpact != null && (
+                <p className="text-xs text-gray-400">
+                  Est. impact: <span className="font-medium text-gray-700">{usd(opp.estimatedAnnualImpact)} / yr</span>
+                </p>
+              )}
             </div>
-            {opp.nextStep && (
-              <p className="text-xs text-gray-500 leading-relaxed mb-3">Next: {opp.nextStep}</p>
-            )}
-            {opp.estimatedAnnualImpact != null && (
-              <p className="text-xs text-gray-400">
-                Est. impact: <span className="font-medium text-gray-700">{usd(opp.estimatedAnnualImpact)} / yr</span>
-              </p>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );

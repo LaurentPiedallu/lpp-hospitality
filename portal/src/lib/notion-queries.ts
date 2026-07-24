@@ -240,6 +240,7 @@ export async function getOpportunities(propertyId: string, periodIso?: string): 
     priority: select(p, "Priority"),
     nextStep: richText(p, "Next Step"),
     sourceIntelligenceId: relationId(p, "Source Intelligence") || null,
+    demandContext: (select(p, "Demand Context") || null) as import("@/types/portal").DemandContext | null,
   }));
 }
 
