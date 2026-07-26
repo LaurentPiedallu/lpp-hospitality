@@ -96,22 +96,35 @@ function PrimarySectionHeader({ title }: { title: string }) {
   );
 }
 
-// Compact summary — name, category, priority, and only the single
-// highest-priority open Action's short description. Full Action-level
-// detail (status, due date, every action) lives only on the Initiatives
-// page. Priority is sourced from the top linked Action, not the Initiative
-// itself — Initiative.priority is unset on every real Initiative record
-// (Notion's own default silently renders as "Medium" for all of them,
-// which isn't a real signal), while linked Actions carry genuine,
-// varied Critical/High/Medium priority.
+// Compact summary — name, category, priority, and a one-line next-step
+// instruction. Full Action-level detail (status, due date, every action)
+// lives only on the Initiatives page. Priority is sourced from the top
+// linked Action, not the Initiative itself — Initiative.priority is unset
+// on every real Initiative record (Notion's own default silently renders
+// as "Medium" for all of them, which isn't a real signal), while linked
+// Actions carry genuine, varied Critical/High/Medium priority.
+//
+// The next-step text itself is Initiative.nextMilestone — a Make.com
+// scenario (runs every 4 hours) keeps this synced to the current top
+// Action's full mitigation/next-step text, so it's already a direct,
+// actionable instruction, not a label needing a "Next ·" prefix. Falls
+// back to the top Action's own title only when nextMilestone hasn't been
+// populated for this cycle (real, accurate, always-available content
+// rather than a placeholder — nextMilestone being blank here almost always
+// means the sync hasn't caught up to a newly-promoted Action yet, since
+// the card doesn't render at all unless a qualifying Action already
+// exists). No truncation/line-clamp — matches the only other place this
+// exact field is already rendered (Initiatives tab), which lets the full
+// text wrap naturally rather than clipping it.
 function InitiativeCompactCard({ initiative, openActions, propertyName }: { initiative: Initiative; openActions: Action[]; propertyName: string }) {
   if (openActions.length === 0) return null;
   const next = topAction(openActions);
   const displayTitle = stripPropertyPrefix(initiative.title, propertyName);
+  const nextStepText = initiative.nextMilestone?.trim() || next?.title || "";
 
   return (
     <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "22px 26px", marginBottom: 12 }}>
-      <div className="flex items-start justify-between gap-3" style={{ marginBottom: next ? 10 : 0 }}>
+      <div className="flex items-start justify-between gap-3" style={{ marginBottom: nextStepText ? 10 : 0 }}>
         <div>
           <h3 style={{ fontFamily: SERIF, fontSize: "1.2rem", fontWeight: 400, color: "#12120F" }}>{displayTitle}</h3>
           {initiative.category && (
@@ -136,9 +149,9 @@ function InitiativeCompactCard({ initiative, openActions, propertyName }: { init
           </span>
         )}
       </div>
-      {next && (
+      {nextStepText && (
         <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.55)", lineHeight: 1.6 }}>
-          Next · {next.title}
+          {nextStepText}
         </p>
       )}
     </div>
