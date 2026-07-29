@@ -81,6 +81,7 @@ export async function getKpiMetrics(propertyId: string): Promise<KpiMetric[]> {
     benchmarkHigh: p.properties?.["Benchmark High"]?.number ?? null,
     targetValue: p.properties?.["Target Value"]?.number ?? null,
     interpretation: richText(p, "LPP Interpretation"),
+    sourceNotes: richText(p, "Source Notes"),
     periodStart: p.properties?.["Reporting Period"]?.date?.start ?? null,
     processedAt: (p.last_edited_time as string) ?? null,
   }));

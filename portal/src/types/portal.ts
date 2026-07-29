@@ -32,7 +32,8 @@ export type LppMetricKey =
   | "covers" | "avg_spend" | "avg_check"
   | "labor_pct" | "cogs_pct" | "net_profit_pct"
   | "opex" | "opex_pct"
-  | "guest_overall" | "guest_food" | "guest_service" | "guest_ambiance";
+  | "guest_overall" | "guest_food" | "guest_service" | "guest_ambiance"
+  | "revpash";
 
 // KPI Records are one row per metric — we work with them individually
 export interface KpiMetric {
@@ -57,6 +58,12 @@ export interface KpiMetric {
   benchmarkHigh: number | null;
   targetValue: number | null;
   interpretation: string;
+  // Free-text supplementary data on some records that don't fit the
+  // Metric Value / Segment model — e.g. the "Daypart Pattern Summary"
+  // record (LPP Metric Key unset) carries a semicolon-separated
+  // day-of-week covers breakdown here. See parseDaypartPattern in
+  // lib/format.ts for the parser. Empty on every other record.
+  sourceNotes: string;
   periodStart: string | null; // ISO date
   // Notion's own last_edited_time — no "Processed At" property exists on
   // this database, this is the closest honest proxy for "when was this

@@ -4,7 +4,9 @@ import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastU
 import {
   usd, pct, compact, buildTrendData, looksLikeIndividualStaffMetric, findMetricByKey,
   extractIndividualStaffNames, mentionsIndividualStaff,
+  parseDaypartPattern, CANONICAL_DAY_ORDER, CANONICAL_DAYPART_ORDER,
 } from "@/lib/format";
+import type { DaypartCoversEntry } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
@@ -364,6 +366,124 @@ function DaypartCheckBars({ items }: { items: { label: string; value: number }[]
   );
 }
 
+// ─── RevPASH by segment — comparative bars, sorted by value ──────────────────
+// Revenue Per Available Seat Hour — capacity-efficiency, not a P&L figure,
+// so it's kept in its own section rather than mixed with revenue/COGS/labor
+// panels elsewhere on this page. $0 and a missing record are both treated
+// as "not yet available" (per confirmed real data: Lex Yard's Brunch
+// segment carries a real Published $0 record meaning no average-check data
+// has been captured for that daypart yet, not zero revenue), never
+// rendered as a real zero-height bar. Shown to 2 decimal places — this is
+// a small per-hour dollar figure where cents are the signal, unlike the
+// whole-dollar amounts usd() is built for elsewhere on this page.
+function revpashFmt(value: number): string {
+  return `$${value.toFixed(2)}`;
+}
+
+function RevpashBars({ items }: { items: { label: string; value: number | null }[] }) {
+  const available = items.filter((i): i is { label: string; value: number } => i.value != null && i.value > 0);
+  const max = available.length > 0 ? Math.max(...available.map((i) => i.value)) : 0;
+  const sorted = [...items].sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
+
+  return (
+    <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: 20 }}>
+      <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 16 }}>
+        RevPASH by Segment
+      </p>
+      <div className="space-y-3">
+        {sorted.map((item) => {
+          const isAvailable = item.value != null && item.value > 0;
+          return (
+            <div key={item.label}>
+              <div className="flex items-baseline justify-between" style={{ marginBottom: 4 }}>
+                <span style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.65)" }}>{item.label}</span>
+                {isAvailable ? (
+                  <span style={{ fontFamily: JOST, fontSize: 12, color: "#12120F", fontWeight: 500 }}>{revpashFmt(item.value!)}</span>
+                ) : (
+                  <span style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.3)", fontStyle: "italic" }}>Not yet available</span>
+                )}
+              </div>
+              <div style={{ height: 5, background: "rgba(18,18,15,0.06)" }}>
+                {isAvailable && (
+                  <div style={{ height: "100%", width: `${(item.value! / max) * 100}%`, background: "#B8935A" }} />
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Daypart demand heatmap — day of week × daypart, cell = covers ───────────
+// Columns are whichever dayparts actually appear in the parsed data, not a
+// fixed set — confirmed real data has different dayparts present on
+// different days (e.g. Saturday has Brunch+Dinner, not Breakfast+Lunch).
+// Rows are always the full canonical Monday→Sunday order regardless of
+// which days happen to have data, so a property missing a day still reads
+// as a normal week grid with an empty row rather than a shorter list.
+
+function DaypartHeatmap({ entries }: { entries: DaypartCoversEntry[] }) {
+  const daypartsPresent = CANONICAL_DAYPART_ORDER.filter((dp) => entries.some((e) => e.daypart === dp));
+  const max = Math.max(...entries.map((e) => e.covers));
+  const cellFor = (day: string, daypart: string) => entries.find((e) => e.day === day && e.daypart === daypart) ?? null;
+
+  return (
+    <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: 20, overflowX: "auto" }}>
+      <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 16 }}>
+        Demand Pattern by Day &amp; Daypart
+      </p>
+      <table style={{ borderCollapse: "collapse", width: "100%" }}>
+        <thead>
+          <tr>
+            <th style={{ textAlign: "left", fontFamily: JOST, fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", padding: "0 12px 10px 0" }}>
+              Day
+            </th>
+            {daypartsPresent.map((dp) => (
+              <th
+                key={dp}
+                style={{ textAlign: "center", fontFamily: JOST, fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", padding: "0 12px 10px" }}
+              >
+                {dp}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {CANONICAL_DAY_ORDER.map((day) => (
+            <tr key={day}>
+              <td style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.65)", padding: "6px 12px 6px 0", whiteSpace: "nowrap" }}>
+                {day}
+              </td>
+              {daypartsPresent.map((dp) => {
+                const cell = cellFor(day, dp);
+                const intensity = cell ? cell.covers / max : 0;
+                return (
+                  <td key={dp} style={{ textAlign: "center", padding: 4 }}>
+                    <div
+                      style={{
+                        background: cell ? `rgba(184,147,90,${(0.12 + intensity * 0.68).toFixed(2)})` : "rgba(18,18,15,0.02)",
+                        padding: "8px 4px",
+                        fontFamily: JOST,
+                        fontSize: 12,
+                        fontWeight: cell && intensity > 0.6 ? 500 : 400,
+                        color: cell ? "#12120F" : "rgba(18,18,15,0.25)",
+                      }}
+                    >
+                      {cell ? cell.covers : "—"}
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function CommercialPage({
@@ -490,6 +610,50 @@ export default async function CommercialPage({
     .filter((e): e is { label: string; metric: KpiMetric } => e.metric != null);
   const daypartAvgCheck = daypartAvgCheckEntries.length >= 2 ? daypartAvgCheckEntries : null;
 
+  // RevPASH (Revenue Per Available Seat Hour) — a capacity-efficiency
+  // metric, deliberately kept in its own section rather than mixed with the
+  // demand/revenue panels above. KPI Category "Reservations", canonical key
+  // "revpash", Segment scoped to each of the 5 real operating
+  // configurations. The two dinner segments are genuinely different
+  // physical setups, not duplicates — Monday/Sunday run bar-only dinner
+  // service, Tuesday-Saturday run both floors (confirmed against the
+  // property's own published hours), so they're labeled accordingly rather
+  // than just "Dinner A" / "Dinner B".
+  const REVPASH_LABELS: Record<string, string> = {
+    Breakfast: "Breakfast",
+    Lunch: "Lunch",
+    Brunch: "Brunch",
+    "Dinner Bar Only": "Dinner — Bar Only (Mon/Sun)",
+    "Dinner Both Floors": "Dinner — Both Floors (Tue–Sat)",
+  };
+  const REVPASH_SEGMENTS = Object.keys(REVPASH_LABELS);
+  const revpashEntries = REVPASH_SEGMENTS.map((seg) => ({
+    segment: seg,
+    label: REVPASH_LABELS[seg],
+    metric: byKey("revpash", "Reservations", seg),
+  }));
+  const hasRevpashData = revpashEntries.some((e) => e.metric != null);
+
+  // Trend per segment — only where a segment actually has 2+ distinct
+  // periods of revpash data (none do yet in the live dataset; this is
+  // built for when a second period exists, following the same
+  // allMetrics.length >= 2 gating pattern used throughout this page).
+  const revpashTrendFor = (segment: string) =>
+    allMetrics.filter((m) => m.lppMetricKey === "revpash" && (m.segment ?? "Total") === segment);
+  const revpashTrendSegments = revpashEntries.filter((e) => revpashTrendFor(e.segment).length >= 2);
+
+  // Daypart demand pattern — the "Daypart Pattern Summary" record has no
+  // canonical LPP Metric Key (per the source data), so it's matched by its
+  // exact Metric Name instead; its Source Notes field is parsed by
+  // parseDaypartPattern (see lib/format.ts for the real-data quirks that
+  // parser is defensive against).
+  const daypartSummaryMetric = currentMetrics.find((m) => m.metricName === "Daypart Pattern Summary") ?? null;
+  const daypartPatternEntries = daypartSummaryMetric?.sourceNotes
+    ? parseDaypartPattern(daypartSummaryMetric.sourceNotes)
+    : [];
+
+  const hasCapacitySection = hasRevpashData || daypartPatternEntries.length > 0;
+
   // Page-level synthesis — built from the same verified figures the sections
   // below display, connecting guest-experience strength to the specific
   // revenue-capture gap and the quantified opportunities that follow. Only
@@ -609,6 +773,36 @@ export default async function CommercialPage({
             />
           )}
         </CommercialSection>
+
+        {/* ── Seat Efficiency (RevPASH) — capacity-efficiency, kept distinct
+             from the P&L-style panels elsewhere on this page. Hidden
+             entirely for properties with no RevPASH/Daypart Pattern data
+             yet (Peacock Alley and Yoshoku, as of this writing). ────────── */}
+        {hasCapacitySection && (
+          <section className="space-y-4">
+            <SectionHeader title="Seat Efficiency — RevPASH" />
+            <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.5)", marginTop: -8, lineHeight: 1.6 }}>
+              Revenue Per Available Seat Hour — which daypart and dinner configuration converts capacity into revenue most efficiently.
+            </p>
+
+            {hasRevpashData && (
+              <RevpashBars items={revpashEntries.map((e) => ({ label: e.label, value: e.metric?.metricValue ?? null }))} />
+            )}
+
+            {revpashTrendSegments.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {revpashTrendSegments.map((e) => (
+                  <div key={e.segment} className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] p-4">
+                    <p className="text-xs text-gray-400 mb-3 uppercase tracking-widest">{e.label} Trend</p>
+                    <TrendChart data={buildTrendData(revpashTrendFor(e.segment))} unit="$" color="#B8935A" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {daypartPatternEntries.length > 0 && <DaypartHeatmap entries={daypartPatternEntries} />}
+          </section>
+        )}
 
         {/* ── Performance vs Benchmarks — commercial-relevant metrics only ── */}
         {(() => {

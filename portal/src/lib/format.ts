@@ -228,6 +228,71 @@ export function parseTextLines(raw: string): string[] {
     .filter((line) => line.length > 0);
 }
 
+export interface DaypartCoversEntry {
+  day: string;      // canonical day name, e.g. "Monday"
+  daypart: string;  // canonical daypart name, e.g. "Breakfast"
+  covers: number;
+}
+
+// Fixed display order — not derived from the source string, which isn't
+// reliable (see parseDaypartPattern below).
+export const CANONICAL_DAY_ORDER = [
+  "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+];
+export const CANONICAL_DAYPART_ORDER = ["Breakfast", "Brunch", "Lunch", "Dinner"];
+
+const DAY_ALIASES: Record<string, string> = {
+  mon: "Monday", monday: "Monday",
+  tue: "Tuesday", tues: "Tuesday", tuesday: "Tuesday",
+  wed: "Wednesday", weds: "Wednesday", wednesday: "Wednesday",
+  thu: "Thursday", thur: "Thursday", thurs: "Thursday", thursday: "Thursday",
+  fri: "Friday", friday: "Friday",
+  sat: "Saturday", saturday: "Saturday",
+  sun: "Sunday", sunday: "Sunday",
+};
+
+const DAYPART_ALIASES: Record<string, string> = {
+  bkft: "Breakfast", brkfst: "Breakfast", bfast: "Breakfast", breakfast: "Breakfast",
+  brunch: "Brunch",
+  lunch: "Lunch",
+  dinner: "Dinner",
+};
+
+// Parses a "Daypart Pattern Summary" KPI Record's Source Notes field —
+// semicolon-separated day segments, each "{Day}: {Daypart} {covers} /
+// {Daypart} {covers} / ...". Deliberately tolerant of real inconsistency
+// confirmed directly against the live API payload: day/daypart
+// abbreviations vary between records for the same property/period ("Bkft"
+// / "Brkfst" / "Breakfast" all seen for the same daypart across draft
+// revisions), the string's own day order isn't reliable (one real record
+// started on Sunday instead of Monday), and not every day has the same set
+// of dayparts present. Unrecognized day or daypart tokens are skipped
+// rather than thrown on, so one malformed segment doesn't take down the
+// whole grid — callers should re-sort into CANONICAL_DAY_ORDER themselves
+// rather than trust the order entries come back in.
+export function parseDaypartPattern(sourceNotes: string): DaypartCoversEntry[] {
+  const entries: DaypartCoversEntry[] = [];
+  const daySegments = sourceNotes.split(";").map((s) => s.trim()).filter(Boolean);
+
+  for (const segment of daySegments) {
+    const colonIdx = segment.indexOf(":");
+    if (colonIdx === -1) continue;
+    const day = DAY_ALIASES[segment.slice(0, colonIdx).trim().toLowerCase()];
+    if (!day) continue;
+
+    const dayparts = segment.slice(colonIdx + 1).split("/");
+    for (const token of dayparts) {
+      const match = token.trim().match(/^([A-Za-z]+)\s+(\d+)$/);
+      if (!match) continue;
+      const daypart = DAYPART_ALIASES[match[1].toLowerCase()];
+      if (!daypart) continue;
+      entries.push({ day, daypart, covers: parseInt(match[2], 10) });
+    }
+  }
+
+  return entries;
+}
+
 export interface TrendDataPoint {
   period: string;
   value: number;
