@@ -7,6 +7,7 @@ import { getSessionFromRequest } from "@/lib/api-helpers";
 import { getProperty } from "@/lib/notion-queries";
 import { NOTION_DBS } from "@/lib/notion-ids";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import * as XLSX from "xlsx";
 
 const NOTION_VERSION = "2022-06-28";
 
@@ -35,6 +36,38 @@ function isValidFormat(format: FileFormat, fileName: string, mimeType: string): 
 function mismatchMessage(format: FileFormat, fileName: string): string {
   const ext = extOf(fileName);
   return `You selected ${format} but the file is a .${ext}. Please correct the format or choose a different file.`;
+}
+
+// ─── Excel → CSV conversion ───────────────────────────────────────────────────
+// The extraction pipeline reads plain text (Claude parses the file content);
+// it has no way to parse Excel's binary/compressed format, so a raw .xlsx
+// reaching Make silently fails or produces garbage. Applies to any upload
+// with an .xlsx/.xls extension, not just Menu Engineering specifically —
+// File Format and Upload Type are independent selections in the upload form,
+// so any upload type can already be submitted as Excel today.
+//
+// Multi-sheet workbooks get a "--- Sheet: {name} ---" header before each
+// sheet's rows so sheet boundaries survive being flattened into one file —
+// real Menu Engineering reports have separate sheets per daypart/category
+// and that structure matters for extraction accuracy.
+function convertExcelToCsv(buffer: ArrayBuffer): string {
+  const workbook = XLSX.read(new Uint8Array(buffer), { type: "array" });
+  const { SheetNames } = workbook;
+  const multiSheet = SheetNames.length > 1;
+
+  const parts = SheetNames.map((name) => {
+    const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[name]);
+    return multiSheet ? `--- Sheet: ${name} ---\n${csv}` : csv;
+  });
+
+  return parts.join("\n\n");
+}
+
+// Same key with the extension swapped to .csv — kept alongside the original
+// binary file in R2 (not overwritten), so the converted version has its own
+// stable object rather than colliding with the source upload.
+function csvKeyFor(originalKey: string): string {
+  return originalKey.replace(/\.(xlsx|xls)$/i, ".csv");
 }
 
 // ─── R2 URL helpers ───────────────────────────────────────────────────────────
@@ -176,8 +209,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "File storage failed — please try again" }, { status: 500 });
   }
 
+  // 1b. Excel files can't be read by the extraction pipeline as-is — convert
+  // to CSV and store alongside the original, then point everything
+  // downstream (Notion's File URL, the extraction webhook) at the CSV
+  // instead. The original binary file is kept in R2, not overwritten.
+  // Conversion failure doesn't fail the whole upload — the raw file is
+  // already safely stored — it falls back to the original key so the
+  // upload still completes, just without the fix this step was for.
+  let downstreamKey = key;
+  if (fmt === "Excel") {
+    try {
+      const csvText = convertExcelToCsv(fileBuffer);
+      const csvKey = csvKeyFor(key);
+      await env.R2.put(csvKey, csvText, {
+        httpMetadata: { contentType: "text/csv" },
+      });
+      downstreamKey = csvKey;
+    } catch (err) {
+      console.error("Excel-to-CSV conversion failed, falling back to original file:", err);
+    }
+  }
+
   // 2. Resolve public/signed URL for the R2 object
-  const fileUrl = await getFileUrl(key);
+  const fileUrl = await getFileUrl(downstreamKey);
 
   // 3. Create Notion Uploads record
   const today = new Date().toISOString().slice(0, 10);
@@ -216,12 +270,20 @@ export async function POST(req: NextRequest) {
 
   const notionPage = await notionRes.json() as { id: string };
 
-  // 4. Trigger the KPI extraction pipeline for this Upload record.
+  // 4. Trigger the extraction pipeline for this Upload record. Menu
+  // Engineering routes to its own separate Make automation — different
+  // output shape (many item-level records with relational rollups, not
+  // simple scalar metrics) — everything else keeps going through the
+  // standard extraction webhook, unchanged. Same payload shape either way;
+  // only the destination URL differs.
   // Processing Status in Notion is just a label — this webhook is the only
   // thing that actually kicks off extraction, so a failure here means the
   // upload is stored correctly but sits inert until someone retries it.
   let extractionTriggered = false;
-  const extractionWebhook = process.env.MAKE_WEBHOOK_URL_EXTRACTION;
+  const extractionWebhook =
+    uploadType?.trim() === "Menu Engineering"
+      ? process.env.MAKE_WEBHOOK_URL_MENU_ENGINEERING
+      : process.env.MAKE_WEBHOOK_URL_EXTRACTION;
   if (extractionWebhook) {
     try {
       const webhookRes = await fetch(extractionWebhook, {
@@ -237,7 +299,8 @@ export async function POST(req: NextRequest) {
       console.error("Extraction webhook request failed:", err);
     }
   } else {
-    console.error("MAKE_WEBHOOK_URL_EXTRACTION is not configured — upload recorded but extraction was not triggered");
+    const missingVar = uploadType?.trim() === "Menu Engineering" ? "MAKE_WEBHOOK_URL_MENU_ENGINEERING" : "MAKE_WEBHOOK_URL_EXTRACTION";
+    console.error(`${missingVar} is not configured — upload recorded but extraction was not triggered`);
   }
 
   return NextResponse.json({ ok: true, key, notionPageId: notionPage.id, extractionTriggered });
