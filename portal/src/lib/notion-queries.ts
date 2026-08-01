@@ -4,13 +4,15 @@
 import {
   queryDatabase, publishedAnd, relationFilter, dateEqualsFilter,
   title, richText, select, num, email, url, checkbox,
-  relationId, relationIds, rollupNumber, updateSelectProperty, getPage,
+  relationId, relationIds, rollupNumber, formulaNumber, formulaString,
+  updateSelectProperty, getPage,
 } from "./notion-fetch";
 import { NOTION_DBS } from "./notion-ids";
 import { maxIso } from "./format";
 import type {
   Client, Property, KpiMetric, KpiSummary, Action, Opportunity,
   Risk, Intelligence, Initiative, Brief, Benchmark, Upload,
+  MenuBatch, MenuItem, MenuQuadrant,
   DataConfidence, Severity, RiskStatus, InitiativeStatus, InitiativeColumn,
   OverallHealth, ClientStatus, PropertyStatus, PublishGateStatus, PublishStatus,
 } from "@/types/portal";
@@ -473,6 +475,50 @@ export async function getUploads(clientId: string, propertyId: string): Promise<
     notes: richText(p, "Validation Notes"),
     uploadType: select(p, "Upload Type"),
     reportingPeriod: p.properties?.["Reporting Period"]?.date?.start ?? null,
+  }));
+}
+
+// ─── Menu Engineering ─────────────────────────────────────────────────────────
+// Menu Batches: one per property + reporting period. Menu Items: one per dish,
+// linked back to a batch. Both Published-only, same convention as everywhere
+// else on this page.
+
+export async function getMenuBatches(propertyId: string): Promise<MenuBatch[]> {
+  const pages = await queryDatabase({
+    databaseId: NOTION_DBS.MENU_BATCHES,
+    filter: publishedAnd(relationFilter("Batch Property", propertyId)),
+    sorts: [{ property: "Reporting Period", direction: "descending" }],
+  });
+  return pages.map((p) => ({
+    id: p.id,
+    propertyId,
+    reportingPeriod: p.properties?.["Reporting Period"]?.date?.start ?? null,
+    totalPortions: rollupNumber(p, "Total Portions"),
+    itemCount: rollupNumber(p, "Item Count"),
+    avgMarginPct: rollupNumber(p, "Average Margin Pct"),
+  }));
+}
+
+export async function getMenuItems(menuBatchId: string): Promise<MenuItem[]> {
+  const pages = await queryDatabase({
+    databaseId: NOTION_DBS.MENU_ITEMS,
+    filter: publishedAnd(relationFilter("Menu Batch", menuBatchId)),
+  });
+  return pages.map((p) => ({
+    id: p.id,
+    menuBatchId,
+    itemName: title(p, "Item Name"),
+    category: select(p, "Category"),
+    daypart: select(p, "Daypart"),
+    portionsSold: num(p, "Portions Sold"),
+    price: num(p, "Price"),
+    foodCost: num(p, "Food Cost"),
+    contributionMargin: formulaNumber(p, "Contribution Margin"),
+    marginPct: formulaNumber(p, "Margin Pct"),
+    foodCostPct: formulaNumber(p, "Food Cost Pct"),
+    revenue: formulaNumber(p, "Revenue"),
+    popularityIndex: formulaNumber(p, "Popularity Index"),
+    quadrant: (formulaString(p, "Quadrant") || "Pending") as MenuQuadrant,
   }));
 }
 

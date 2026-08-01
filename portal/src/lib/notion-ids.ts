@@ -11,4 +11,6 @@ export const NOTION_DBS = {
   RISKS:        "dd90a03d-301f-4710-b175-443e7b2a3ca8",
   BRIEFS:       "c0d00307-2d0a-4517-88a9-7d9c5ffa28f9",
   BENCHMARKS:   "bd6a8e99-dea1-43c5-aded-7fef1ae35da3",
+  MENU_BATCHES: "257f8d39-3cf8-46e7-95fc-f78f9158079c",
+  MENU_ITEMS:   "72472111-49e9-4293-a231-927ea8bd7e32",
 } as const;

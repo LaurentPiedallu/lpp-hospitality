@@ -69,6 +69,21 @@ export function files(page: NotionPage, prop: string): string {
   return f?.file?.url ?? f?.external?.url ?? "";
 }
 
+// Formula properties nest their resolved value under `.formula`, typed by
+// the formula's own result type (number/string/boolean/date). Only the
+// number and string shapes are needed so far (Menu Items' computed fields).
+export function formulaNumber(page: NotionPage, prop: string): number | null {
+  const formula = page.properties?.[prop]?.formula;
+  if (!formula || formula.type !== "number") return null;
+  return formula.number ?? null;
+}
+
+export function formulaString(page: NotionPage, prop: string): string {
+  const formula = page.properties?.[prop]?.formula;
+  if (!formula || formula.type !== "string") return "";
+  return formula.string ?? "";
+}
+
 // ─── Query helper ─────────────────────────────────────────────────────────────
 
 interface QueryOptions {

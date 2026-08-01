@@ -222,6 +222,38 @@ export interface Benchmark {
   unit: string;
 }
 
+// One record per property + reporting period, aggregating its Menu Items.
+export interface MenuBatch {
+  id: string;
+  propertyId: string;
+  reportingPeriod: string | null; // ISO date
+  totalPortions: number | null;   // rollup
+  itemCount: number | null;       // rollup
+  avgMarginPct: number | null;    // rollup
+}
+
+export type MenuQuadrant = "Star" | "Plowhorse" | "Puzzle" | "Dog" | "Pending";
+
+// One record per dish per Menu Batch. Raw fields come from the upload;
+// the six computed fields are Notion formulas (already correct, read-only
+// here) — see formulaNumber/formulaString in lib/notion-fetch.ts.
+export interface MenuItem {
+  id: string;
+  menuBatchId: string;
+  itemName: string;
+  category: string; // Starters | Mains | Sides | Desserts | Cocktails | Wine | Beer | Non-Alcoholic | Other
+  daypart: string;  // Breakfast | Lunch | Brunch | Dinner | All Day
+  portionsSold: number;
+  price: number;
+  foodCost: number;
+  contributionMargin: number | null; // $, formula
+  marginPct: number | null;          // %, formula
+  foodCostPct: number | null;        // %, formula
+  revenue: number | null;            // $, formula
+  popularityIndex: number | null;    // %, formula
+  quadrant: MenuQuadrant;            // formula — "Pending" if the batch lacks enough data
+}
+
 export type UploadStatus =
   | "Uploaded" | "Pending" | "Processing" | "In Progress"
   | "Needs Review" | "Processed" | "Published" | "Failed" | "Archived";
