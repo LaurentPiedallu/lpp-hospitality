@@ -31,6 +31,7 @@ jobs:
           NEXT_PUBLIC_SITE_URL: https://lpphospitality.com
         run: npm run pages:build
 
+      # CLOUDFLARE_API_TOKEN rotated 2026-08-01 (was expired, blocking every deploy)
       - name: Deploy to Cloudflare Workers
         working-directory: portal
         env:
