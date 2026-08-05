@@ -208,6 +208,19 @@ export interface Brief {
   publishedDateStart: string | null;
   biggestOpportunityId: string | null;
   biggestRiskId: string | null;
+  // Outlook — not yet a real Notion property as of this writing; richText()
+  // safely returns "" for any property that doesn't exist on a page, so
+  // this stays wired and ready rather than needing a follow-up change once
+  // it's added. Same "\n"-separated convention as criticalDrivers: line 1
+  // = what happens if nothing changes, line 2 = recovery likelihood/
+  // timeline. Deliberately not a third line for "confidence rating" — the
+  // Outlook section reuses the `confidence` field above instead of
+  // duplicating it with a second, possibly-inconsistent value.
+  outlook: string;
+  // Ownership Discussion — same not-yet-real-property status as outlook
+  // above. "\n"-separated, 2-3 open strategic questions for discussion,
+  // not action items (kept visually distinct from Top 3 Priorities).
+  ownershipQuestions: string;
 }
 
 export interface Benchmark {

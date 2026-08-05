@@ -363,6 +363,11 @@ function toBrief(p: Awaited<ReturnType<typeof queryDatabase>>[number], clientId:
     publishedDateStart: p.properties?.["Published Date"]?.date?.start ?? null,
     biggestOpportunityId: relationId(p, "Biggest Opportunity") || null,
     biggestRiskId: relationId(p, "Biggest Risk") || null,
+    // Not yet real Briefs properties — see the Brief type's comments on
+    // these two fields. richText() returns "" for a property that doesn't
+    // exist on the page, so this is safe to read now.
+    outlook: richText(p, "Outlook"),
+    ownershipQuestions: richText(p, "Ownership Discussion"),
   };
 }
 

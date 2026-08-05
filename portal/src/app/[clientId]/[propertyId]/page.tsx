@@ -437,6 +437,13 @@ export default async function PropertyPage({
   const hasNewBriefFormat = !!latestBrief?.executiveRead?.trim();
   const criticalDrivers = latestBrief?.criticalDrivers ? parseTextLines(latestBrief.criticalDrivers) : [];
 
+  // Outlook / Ownership Discussion — genuinely new content, not yet
+  // populated in Notion for any property (see the Brief type's comments on
+  // outlook/ownershipQuestions). Both stay hidden until real content
+  // lands; nothing here fabricates a placeholder in the meantime.
+  const outlookLines = latestBrief?.outlook ? parseTextLines(latestBrief.outlook) : [];
+  const ownershipQuestionLines = latestBrief?.ownershipQuestions ? parseTextLines(latestBrief.ownershipQuestions) : [];
+
   // Since Last Review — month-over-month deltas against the prior
   // *reviewed* period (priorPeriod, above), not just any prior KPI period.
   // Canonical key lookup (findMetricByKey), same pattern used everywhere
@@ -797,7 +804,7 @@ export default async function PropertyPage({
 
         {/* Emerging Risk — real selected Intelligence finding, see selectEmergingRisk above */}
         {emergingRisk && (
-          <section style={{ marginBottom: hasSinceLastReview ? SECTION_GAP : 0 }}>
+          <section style={{ marginBottom: SECTION_GAP }}>
             <SectionHeader title="Emerging Risk" />
             <CalloutBlock>
               <p>{emergingRisk.finding}</p>
@@ -805,6 +812,64 @@ export default async function PropertyPage({
                 <p style={{ marginTop: 8, opacity: 0.8 }}>{emergingRisk.currentRead}</p>
               )}
             </CalloutBlock>
+          </section>
+        )}
+
+        {/* Outlook — new content, hidden until latestBrief.outlook is
+            actually populated in Notion (see comments on outlookLines
+            above). Three bullets: if-nothing-changes and recovery-outlook
+            are independently gated (each renders only if its own line has
+            content); Confidence reuses the Brief's existing confidence
+            field rather than requiring a fourth, likely-redundant one. */}
+        {outlookLines.length > 0 && latestBrief && (
+          <section style={{ marginBottom: SECTION_GAP }}>
+            <SectionHeader title="Outlook" />
+            <div className="space-y-3">
+              {outlookLines[0] && (
+                <div className="flex items-start" style={{ gap: 10 }}>
+                  <span style={{ width: 6, height: 6, background: GOLD, flexShrink: 0, marginTop: 7 }} />
+                  <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.7)", lineHeight: 1.6 }}>
+                    <span style={{ fontWeight: 500, color: "#12120F" }}>If nothing changes: </span>
+                    {outlookLines[0]}
+                  </p>
+                </div>
+              )}
+              {outlookLines[1] && (
+                <div className="flex items-start" style={{ gap: 10 }}>
+                  <span style={{ width: 6, height: 6, background: GOLD, flexShrink: 0, marginTop: 7 }} />
+                  <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.7)", lineHeight: 1.6 }}>
+                    <span style={{ fontWeight: 500, color: "#12120F" }}>Recovery outlook: </span>
+                    {outlookLines[1]}
+                  </p>
+                </div>
+              )}
+              <div className="flex items-center" style={{ gap: 10 }}>
+                <span style={{ width: 6, height: 6, background: GOLD, flexShrink: 0 }} />
+                <span style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.7)" }}>Confidence:</span>
+                <StatusBadge label={latestBrief.confidence} variant={CONFIDENCE_VARIANT[latestBrief.confidence]} />
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Ownership Discussion — new content, same hidden-until-populated
+            status as Outlook above. Deliberately not the Top 3 Priorities
+            card style — italic serif pull-quote treatment, a thin gold
+            rule instead of a bordered box, so these read as open questions
+            for discussion rather than another action-item list. */}
+        {ownershipQuestionLines.length > 0 && (
+          <section style={{ marginBottom: SECTION_GAP }}>
+            <SectionHeader title="Ownership Discussion" />
+            <div style={{ borderTop: "1px solid rgba(184,147,90,0.3)", paddingTop: 24 }} className="space-y-5">
+              {ownershipQuestionLines.map((question, i) => (
+                <p
+                  key={i}
+                  style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: "1.15rem", fontWeight: 300, color: "rgba(18,18,15,0.75)", lineHeight: 1.6 }}
+                >
+                  {question}
+                </p>
+              ))}
+            </div>
           </section>
         )}
 
