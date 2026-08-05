@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import {
-  getProperty, getLatestKpiSummary, getKpiMetrics, getActions, getInitiatives,
+  getProperty, getLatestKpiSummary, getKpiMetrics, getActions,
   getOpportunities, getRisks, getIntelligence, hasUnpublishedFinancialData,
   getPublishedBriefs,
 } from "@/lib/notion-queries";
@@ -14,7 +14,8 @@ import PropertyHeader from "@/components/PropertyHeader";
 import PropertyTabs from "@/components/PropertyTabs";
 import SectionHeader from "@/components/SectionHeader";
 import CalloutBlock from "@/components/CalloutBlock";
-import type { Action, Opportunity, Intelligence, Initiative, KpiMetric } from "@/types/portal";
+import StatusBadge from "@/components/StatusBadge";
+import type { Action, Opportunity, Intelligence, KpiMetric, DataConfidence } from "@/types/portal";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 const SERIF = "'Cormorant Garamond', Georgia, serif";
@@ -38,20 +39,14 @@ const SECTION_GAP = 53;
 
 const PRIORITY_RANK: Record<string, number> = { Critical: 0, High: 1, Medium: 2, Low: 3 };
 
-function topAction(actions: Action[]): Action | null {
-  if (actions.length === 0) return null;
-  return [...actions].sort((a, b) => (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9))[0];
-}
-
-// Initiative titles are the raw Notion page title (e.g. "Lex Yard — Commercial"),
-// not a frontend-constructed string. On this single-property page the property
-// name is already shown in the header and tab bar, so strip it here for display
-// only — the underlying Notion title, and every other page that reads it
-// (e.g. the Initiatives tab), is untouched.
-function stripPropertyPrefix(title: string, propertyName: string): string {
-  const prefix = `${propertyName} — `;
-  return title.startsWith(prefix) ? title.slice(prefix.length) : title;
-}
+// Confidence badge variant mapping — reuses the shared StatusBadge component
+// rather than inventing a parallel badge style for this one field.
+const CONFIDENCE_VARIANT: Record<DataConfidence, "green" | "amber" | "red" | "gray"> = {
+  High: "green",
+  Medium: "amber",
+  Low: "red",
+  "Requires Validation": "gray",
+};
 
 // Emerging Risk — a genuine "not yet critical, but worth watching" signal,
 // not a hardcoded Guest Commentary pick. Prefers Severity=Monitor (the
@@ -96,62 +91,76 @@ function PrimarySectionHeader({ title }: { title: string }) {
   );
 }
 
-// Compact summary — name, category, priority, and a one-line next-step
-// instruction. Full Action-level detail (status, due date, every action)
-// lives only on the Initiatives page. Priority is sourced from the top
-// linked Action, not the Initiative itself — Initiative.priority is unset
-// on every real Initiative record (Notion's own default silently renders
-// as "Medium" for all of them, which isn't a real signal), while linked
-// Actions carry genuine, varied Critical/High/Medium priority.
-//
-// The next-step text itself is Initiative.nextMilestone — a Make.com
-// scenario (runs every 4 hours) keeps this synced to the current top
-// Action's full mitigation/next-step text, so it's already a direct,
-// actionable instruction, not a label needing a "Next ·" prefix. Falls
-// back to the top Action's own title only when nextMilestone hasn't been
-// populated for this cycle (real, accurate, always-available content
-// rather than a placeholder — nextMilestone being blank here almost always
-// means the sync hasn't caught up to a newly-promoted Action yet, since
-// the card doesn't render at all unless a qualifying Action already
-// exists). No truncation/line-clamp — matches the only other place this
-// exact field is already rendered (Initiatives tab), which lets the full
-// text wrap naturally rather than clipping it.
-function InitiativeCompactCard({ initiative, openActions, propertyName }: { initiative: Initiative; openActions: Action[]; propertyName: string }) {
-  if (openActions.length === 0) return null;
-  const next = topAction(openActions);
-  const displayTitle = stripPropertyPrefix(initiative.title, propertyName);
-  const nextStepText = initiative.nextMilestone?.trim() || next?.title || "";
+// Top 3 Priorities — replaces the old Immediate Priorities grid (Initiative-
+// driven, no real $ or priority of its own — Initiative.expectedImpact and
+// Initiative.priority are null on every real record; only linked Actions
+// carry genuine priority) and the old standalone Biggest Opportunity lookup
+// (a single record resolved via Brief.biggestOpportunityId). Opportunities
+// carry real, populated Estimated Annual Impact and Priority for the
+// current dataset, so this ranks across Opportunities directly — item #1
+// naturally reproduces (and generalizes) what Biggest Opportunity used to
+// single out, since it's the same top-impact record either way.
+interface TopPriority {
+  id: string;
+  title: string;
+  category: string;
+  impactAnnual: number;
+  confidence: DataConfidence | null;
+  nextStep: string;
+}
 
+function selectTopPriorities(opportunities: Opportunity[], intelligence: Intelligence[]): TopPriority[] {
+  const ranked = [...opportunities].sort((a, b) => {
+    if (b.estimatedAnnualImpact !== a.estimatedAnnualImpact) {
+      return b.estimatedAnnualImpact - a.estimatedAnnualImpact;
+    }
+    return (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9);
+  });
+  return ranked.slice(0, 3).map((o) => ({
+    id: o.id,
+    title: o.title,
+    category: o.category,
+    impactAnnual: o.estimatedAnnualImpact,
+    // Opportunity itself has no confidence field — resolved from the
+    // Intelligence finding that drove it, same relation already used for
+    // opportunityDriver text. Null (not shown) when there's no linked
+    // finding or it predates this relation being populated.
+    confidence: o.sourceIntelligenceId
+      ? intelligence.find((i) => i.id === o.sourceIntelligenceId)?.confidence ?? null
+      : null,
+    nextStep: o.nextStep,
+  }));
+}
+
+// Standard-treatment card for priorities #2–3 — #1 gets the full-bleed hero
+// treatment inline in the page body below instead (see "Top priority — hero").
+function TopPriorityCard({ priority }: { priority: TopPriority }) {
   return (
-    <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "22px 26px", marginBottom: 12 }}>
-      <div className="flex items-start justify-between gap-3" style={{ marginBottom: nextStepText ? 10 : 0 }}>
+    <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "26px 28px" }}>
+      <div className="flex items-start justify-between gap-3" style={{ marginBottom: 10 }}>
         <div>
-          <h3 style={{ fontFamily: SERIF, fontSize: "1.2rem", fontWeight: 400, color: "#12120F" }}>{displayTitle}</h3>
-          {initiative.category && (
-            <span
-              style={{
-                fontFamily: JOST,
-                fontSize: 9,
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                color: "rgba(18,18,15,0.4)",
-                marginTop: 4,
-                display: "inline-block",
-              }}
-            >
-              {initiative.category}
+          <h3 style={{ fontFamily: SERIF, fontSize: "1.2rem", fontWeight: 400, color: "#12120F" }}>{priority.title}</h3>
+          {priority.category && (
+            <span style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(18,18,15,0.4)", marginTop: 4, display: "inline-block" }}>
+              {priority.category}
             </span>
           )}
         </div>
-        {next?.priority && (
-          <span style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: GOLD, flexShrink: 0 }}>
-            {next.priority}
+        {priority.confidence && (
+          <span style={{ flexShrink: 0 }}>
+            <StatusBadge label={priority.confidence} variant={CONFIDENCE_VARIANT[priority.confidence]} />
           </span>
         )}
       </div>
-      {nextStepText && (
+      {priority.impactAnnual > 0 && (
+        <p style={{ fontFamily: SERIF, fontSize: "1.7rem", fontWeight: 400, color: GOLD, lineHeight: 1, marginBottom: 10 }}>
+          {compact(priority.impactAnnual)}
+          <span style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.35)", marginLeft: 8 }}>est. annual impact</span>
+        </p>
+      )}
+      {priority.nextStep && (
         <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.55)", lineHeight: 1.6 }}>
-          {nextStepText}
+          {priority.nextStep}
         </p>
       )}
     </div>
@@ -169,12 +178,11 @@ export default async function PropertyPage({
   const { clientId, propertyId } = await params;
   if (session.role !== "admin" && session.clientId !== clientId) redirect("/dashboard");
 
-  const [property, kpi, allMetrics, actions, initiatives, intelligence, briefs] = await Promise.all([
+  const [property, kpi, allMetrics, actions, intelligence, briefs] = await Promise.all([
     getProperty(propertyId, clientId),
     getLatestKpiSummary(propertyId),
     getKpiMetrics(propertyId),
     getActions(propertyId),
-    getInitiatives(propertyId),
     getIntelligence(propertyId),
     getPublishedBriefs(propertyId, clientId),
   ]);
@@ -205,25 +213,13 @@ export default async function PropertyPage({
   const health = deriveHealth(kpi);
   const openActions = (actions as Action[]).filter((a) => a.clientVisible && a.status !== "Complete");
 
-  // Initiatives with at least one Client Visible, still-open Action — the
-  // grouped replacement for the old flat Actions list. Initiatives with
-  // nothing left for the client to act on are omitted entirely below.
-  const initiativesWithOpenWork = (initiatives as Initiative[]).filter((init) =>
-    (actions as Action[]).some(
-      (a) => init.actionIds.includes(a.id) && a.clientVisible && a.status !== "Complete"
-    )
-  );
   const annualOpportunity = (opportunities as Opportunity[]).reduce((s, o) => s + o.estimatedAnnualImpact, 0);
-  const biggestOpportunity = latestBrief?.biggestOpportunityId
-    ? (opportunities as Opportunity[]).find((o) => o.id === latestBrief.biggestOpportunityId) ?? null
-    : null;
 
-  // The Opportunity record itself has no field for the causal "why" (only
-  // a headline title and a "Next Step" action) — the driving Intelligence
-  // finding behind it does, so pull that instead of fabricating a field.
-  const opportunityDriver = biggestOpportunity?.sourceIntelligenceId
-    ? (intelligence as Intelligence[]).find((i) => i.id === biggestOpportunity.sourceIntelligenceId)?.finding ?? null
-    : null;
+  // Top 3 Priorities — see selectTopPriorities above. topPriorities[0] gets
+  // the full-bleed hero treatment below (absorbing what the old standalone
+  // Biggest Opportunity section used to be); [1] and [2] render as standard
+  // cards.
+  const topPriorities = selectTopPriorities(opportunities as Opportunity[], intelligence as Intelligence[]);
 
   // Emerging Risk — see selectEmergingRisk above for the selection logic.
   const emergingRisk = selectEmergingRisk(intelligence as Intelligence[], currentPeriod);
@@ -316,7 +312,6 @@ export default async function PropertyPage({
   // Executive Summary rendering above instead.
   const hasNewBriefFormat = !!latestBrief?.executiveRead?.trim();
   const criticalDrivers = latestBrief?.criticalDrivers ? parseTextLines(latestBrief.criticalDrivers) : [];
-  const recommendedFocusItems = latestBrief?.recommendedFocus ? parseTextLines(latestBrief.recommendedFocus) : [];
 
   // Since Last Review — month-over-month deltas against the prior
   // *reviewed* period (priorPeriod, above), not just any prior KPI period.
@@ -365,10 +360,13 @@ export default async function PropertyPage({
         </section>
 
         {/* Executive briefing — hierarchical layout (Executive Read / Critical
-            Drivers / LPP Perspective / Recommended Focus + Decisions Required)
-            once a Brief has the new fields populated; falls back to the old
-            single-paragraph Executive Summary rendering for Briefs generated
-            before this schema change (see hasNewBriefFormat above). */}
+            Drivers / LPP Perspective / Decisions Required) once a Brief has
+            the new fields populated; falls back to the old single-paragraph
+            Executive Summary rendering for Briefs generated before this
+            schema change (see hasNewBriefFormat above). Recommended Focus
+            used to render here as its own numbered zone — removed now that
+            Top 3 Priorities (below) is the single ranked-priority mechanism
+            on this page; Decisions Required is a distinct field and stays. */}
         {hasNewBriefFormat && latestBrief ? (
           <section style={{ marginBottom: SECTION_GAP }} className="space-y-8">
             {/* Zone 1 — Executive Read: the dominant visual moment. Heavier
@@ -416,44 +414,15 @@ export default async function PropertyPage({
               </div>
             )}
 
-            {/* Zone 4 — Recommended Focus + Decisions Required: what happens next */}
-            {(recommendedFocusItems.length > 0 || latestBrief.decisionsRequired) && (
-              <div>
-                {recommendedFocusItems.length > 0 && (
-                  <>
-                    <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD, marginBottom: 14 }}>
-                      Recommended Focus
-                    </p>
-                    {/* A single item reads as an orphaned "1." with nothing
-                        after it — the underlying generation currently only
-                        ever produces one recommendation. Numbering only
-                        earns its keep once there's a second item to count
-                        against; below that, plain text. */}
-                    {recommendedFocusItems.length > 1 ? (
-                      <ol className="space-y-2">
-                        {recommendedFocusItems.map((item, i) => (
-                          <li key={i} className="flex" style={{ gap: 10 }}>
-                            <span style={{ fontFamily: SERIF, fontSize: 15, color: GOLD, flexShrink: 0 }}>{i + 1}.</span>
-                            <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.75)", lineHeight: 1.6 }}>
-                              {item}
-                            </p>
-                          </li>
-                        ))}
-                      </ol>
-                    ) : (
-                      <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.75)", lineHeight: 1.6 }}>
-                        {recommendedFocusItems[0]}
-                      </p>
-                    )}
-                  </>
-                )}
-                {latestBrief.decisionsRequired && (
-                  <p style={{ fontFamily: JOST, fontSize: 13, color: "#12120F", lineHeight: 1.6, marginTop: recommendedFocusItems.length > 0 ? 14 : 0 }}>
-                    <span style={{ fontWeight: 500, color: GOLD }}>Decision needed: </span>
-                    {latestBrief.decisionsRequired}
-                  </p>
-                )}
-              </div>
+            {/* Zone 4 — Decisions Required: what happens next. Recommended
+                Focus used to render above this as its own numbered zone —
+                removed; Top 3 Priorities below is the ranked-priority
+                mechanism now. */}
+            {latestBrief.decisionsRequired && (
+              <p style={{ fontFamily: JOST, fontSize: 13, color: "#12120F", lineHeight: 1.6 }}>
+                <span style={{ fontWeight: 500, color: GOLD }}>Decision needed: </span>
+                {latestBrief.decisionsRequired}
+              </p>
             )}
           </section>
         ) : (
@@ -482,54 +451,39 @@ export default async function PropertyPage({
           )
         )}
 
-        {/* Immediate priorities — compact, links through to the full Initiatives tab for detail */}
-        {initiativesWithOpenWork.length > 0 && (
-          <section style={{ marginBottom: SECTION_GAP }}>
-            <PrimarySectionHeader title="Immediate Priorities" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {initiativesWithOpenWork.map((initiative) => (
-                <InitiativeCompactCard
-                  key={initiative.id}
-                  initiative={initiative}
-                  propertyName={property.name}
-                  openActions={(actions as Action[]).filter(
-                    (a) => initiative.actionIds.includes(a.id) && a.clientVisible && a.status !== "Complete"
-                  )}
-                />
-              ))}
-            </div>
-            <div className="text-right" style={{ marginTop: 4 }}>
-              <Link
-                href={`/${clientId}/${propertyId}/initiatives`}
-                className="hover:text-[#D4AF7A]"
-                style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: GOLD, textDecoration: "none", transition: "color 0.25s ease" }}
-              >
-                View all Initiatives →
-              </Link>
-            </div>
-          </section>
-        )}
+        {/* Top 3 Priorities — header sits in the constrained-width column;
+            item #1 breaks out full-bleed right below (next block), items
+            #2–3 render as standard cards once the constrained column
+            reopens, ahead of Financial Snapshot. */}
+        {topPriorities.length > 0 && <PrimarySectionHeader title="Top 3 Priorities" />}
       </div>
 
-      {/* Biggest opportunity — full-bleed hero treatment, rivals the property Hero above */}
-      {biggestOpportunity && (
-        <section style={{ marginBottom: SECTION_GAP }}>
+      {/* Top priority — hero, full-bleed treatment (what Biggest Opportunity used to be) */}
+      {topPriorities[0] && (
+        <section style={{ marginBottom: topPriorities.length > 1 ? 20 : SECTION_GAP }}>
           <div style={{ marginLeft: "calc(50% - 50vw)", marginRight: "calc(50% - 50vw)", background: "#12120F" }}>
             <div style={{ maxWidth: 1100, margin: "0 auto", padding: "64px 60px" }}>
-              <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD, marginBottom: 18 }}>
-                Biggest Opportunity
+              <div className="flex items-center flex-wrap" style={{ gap: 14, marginBottom: 18 }}>
+                <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD }}>
+                  Top Priority
+                </p>
+                {topPriorities[0].category && (
+                  <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(242,237,228,0.4)" }}>
+                    {topPriorities[0].category}
+                  </p>
+                )}
+              </div>
+              <p style={{ fontFamily: SERIF, fontSize: "clamp(1.3rem, 2vw, 1.6rem)", fontWeight: 300, color: "rgba(242,237,228,0.85)", lineHeight: 1.5, maxWidth: 640, marginBottom: topPriorities[0].nextStep ? 10 : 22 }}>
+                {topPriorities[0].title}
               </p>
-              <p style={{ fontFamily: SERIF, fontSize: "clamp(1.3rem, 2vw, 1.6rem)", fontWeight: 300, color: "rgba(242,237,228,0.85)", lineHeight: 1.5, maxWidth: 640, marginBottom: opportunityDriver ? 10 : 22 }}>
-                {biggestOpportunity.title}
-              </p>
-              {opportunityDriver && (
+              {topPriorities[0].nextStep && (
                 <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(242,237,228,0.45)", maxWidth: 640, marginBottom: 22 }}>
-                  {opportunityDriver}
+                  {topPriorities[0].nextStep}
                 </p>
               )}
-              {biggestOpportunity.estimatedAnnualImpact > 0 && (
+              {topPriorities[0].impactAnnual > 0 && (
                 <p style={{ fontFamily: SERIF, fontSize: "clamp(2.8rem, 6vw, 4.2rem)", fontWeight: 300, color: "#B8935A", lineHeight: 1 }}>
-                  {compact(biggestOpportunity.estimatedAnnualImpact)}
+                  {compact(topPriorities[0].impactAnnual)}
                   <span style={{ fontFamily: JOST, fontSize: "0.95rem", color: "rgba(242,237,228,0.4)", marginLeft: 14 }}>
                     estimated annual impact
                   </span>
@@ -541,6 +495,17 @@ export default async function PropertyPage({
       )}
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 60px 80px" }}>
+
+        {/* Priorities #2–3 — standard card treatment */}
+        {topPriorities.length > 1 && (
+          <section style={{ marginBottom: SECTION_GAP }}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {topPriorities.slice(1).map((priority) => (
+                <TopPriorityCard key={priority.id} priority={priority} />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Financial snapshot */}
         {kpi && (
