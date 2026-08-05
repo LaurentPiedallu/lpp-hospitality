@@ -116,6 +116,33 @@ function TrendDelta({
   );
 }
 
+// Deep-link target for a Top Priority item, by its real Opportunity
+// Category — checked the real destination pages before mapping rather than
+// guessing: Financial Review has dedicated Revenue/Labor/Food & Beverage
+// COGS/Operating Expenses/Profitability sections (financial/page.tsx),
+// Commercial Review covers Guest Experience/Volume & Conversion/RevPASH
+// (commercial/page.tsx), Menu Engineering covers per-item food cost/margin.
+//
+// One deliberate deviation from a literal read of the brief: it named
+// "Kitchen Allocation" opportunities as menu-related, routing to Menu
+// Engineering. The real Financial Review page's Operating Expenses section
+// explicitly covers Kitchen Allocation ("the Kitchen Allocation charge
+// below does not flex with revenue...") — Menu Engineering covers per-dish
+// costing, a different, non-overlapping topic. OpEx-category items
+// (Kitchen Allocation's real category) route to Financial Review, where
+// the content actually lives; only the real "Menu" category routes to
+// Menu Engineering.
+const PRIORITY_TAB_BY_CATEGORY: Record<string, { segment: string; label: string }> = {
+  Menu:            { segment: "/menu",       label: "Menu Engineering" },
+  OpEx:            { segment: "/financial",  label: "Financial Review" },
+  Labor:           { segment: "/financial",  label: "Financial Review" },
+  Purchasing:      { segment: "/financial",  label: "Financial Review" },
+  Reservations:    { segment: "/commercial", label: "Commercial Review" },
+  "Revenue Mix":   { segment: "/commercial", label: "Commercial Review" },
+  "Guest Retention": { segment: "/commercial", label: "Commercial Review" },
+  Pricing:         { segment: "/commercial", label: "Commercial Review" },
+};
+
 // Top 3 Priorities — replaces the old Immediate Priorities grid (Initiative-
 // driven, no real $ or priority of its own — Initiative.expectedImpact and
 // Initiative.priority are null on every real record; only linked Actions
@@ -159,7 +186,8 @@ function selectTopPriorities(opportunities: Opportunity[], intelligence: Intelli
 
 // Standard-treatment card for priorities #2–3 — #1 gets the full-bleed hero
 // treatment inline in the page body below instead (see "Top priority — hero").
-function TopPriorityCard({ priority }: { priority: TopPriority }) {
+function TopPriorityCard({ priority, clientId, propertyId }: { priority: TopPriority; clientId: string; propertyId: string }) {
+  const target = PRIORITY_TAB_BY_CATEGORY[priority.category];
   return (
     <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "26px 28px" }}>
       <div className="flex items-start justify-between gap-3" style={{ marginBottom: 10 }}>
@@ -184,9 +212,18 @@ function TopPriorityCard({ priority }: { priority: TopPriority }) {
         </p>
       )}
       {priority.nextStep && (
-        <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.55)", lineHeight: 1.6 }}>
+        <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.55)", lineHeight: 1.6, marginBottom: target ? 12 : 0 }}>
           {priority.nextStep}
         </p>
+      )}
+      {target && (
+        <Link
+          href={`/${clientId}/${propertyId}${target.segment}`}
+          className="hover:text-[#D4AF7A]"
+          style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: GOLD, textDecoration: "none", transition: "color 0.25s ease" }}
+        >
+          View in {target.label} →
+        </Link>
       )}
     </div>
   );
@@ -497,6 +534,30 @@ export default async function PropertyPage({
     },
   ];
 
+  // One-line synthesis above the Since Last Review grid — reuses each
+  // metric's own formatDelta (same source as the cards below and the
+  // compact strip up top), just stripped of its sign glyph and paired
+  // with a direction word, so the sentence and the numbers underneath it
+  // can never drift apart into two different claims.
+  const sinceLastReviewSynthesis = (() => {
+    const present = sinceLastReviewMetrics.filter(
+      (m): m is typeof m & { data: NonNullable<typeof m.data> } => m.data != null
+    );
+    if (present.length === 0) return null;
+    const clauses = present.map((m) => {
+      const magnitude = m.formatDelta(m.data.delta).replace(/^[+−]/, "");
+      const direction = m.data.delta >= 0 ? "up" : "down";
+      return `${m.label.toLowerCase()} is ${direction} ${magnitude}`;
+    });
+    const joined =
+      clauses.length === 1
+        ? clauses[0]
+        : clauses.length === 2
+        ? `${clauses[0]} and ${clauses[1]}`
+        : `${clauses.slice(0, -1).join(", ")}, and ${clauses[clauses.length - 1]}`;
+    return `Since the last review, ${joined}`;
+  })();
+
   return (
     <PageWrapper noTopPadding>
       <NavBar session={session} transparentAtTop />
@@ -674,12 +735,21 @@ export default async function PropertyPage({
                 </p>
               )}
               {topPriorities[0].impactAnnual > 0 && (
-                <p style={{ fontFamily: SERIF, fontSize: "clamp(2.8rem, 6vw, 4.2rem)", fontWeight: 300, color: "#B8935A", lineHeight: 1 }}>
+                <p style={{ fontFamily: SERIF, fontSize: "clamp(2.8rem, 6vw, 4.2rem)", fontWeight: 300, color: "#B8935A", lineHeight: 1, marginBottom: PRIORITY_TAB_BY_CATEGORY[topPriorities[0].category] ? 22 : 0 }}>
                   {compact(topPriorities[0].impactAnnual)}
                   <span style={{ fontFamily: JOST, fontSize: "0.95rem", color: "rgba(242,237,228,0.4)", marginLeft: 14 }}>
                     estimated annual impact
                   </span>
                 </p>
+              )}
+              {PRIORITY_TAB_BY_CATEGORY[topPriorities[0].category] && (
+                <Link
+                  href={`/${clientId}/${propertyId}${PRIORITY_TAB_BY_CATEGORY[topPriorities[0].category].segment}`}
+                  className="hover:text-[#D4AF7A]"
+                  style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: GOLD, textDecoration: "none", transition: "color 0.25s ease" }}
+                >
+                  View in {PRIORITY_TAB_BY_CATEGORY[topPriorities[0].category].label} →
+                </Link>
               )}
             </div>
           </div>
@@ -693,7 +763,7 @@ export default async function PropertyPage({
           <section style={{ marginBottom: SECTION_GAP }}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {topPriorities.slice(1).map((priority) => (
-                <TopPriorityCard key={priority.id} priority={priority} />
+                <TopPriorityCard key={priority.id} priority={priority} clientId={clientId} propertyId={propertyId} />
               ))}
             </div>
           </section>
@@ -799,6 +869,19 @@ export default async function PropertyPage({
                 </div>
               ))}
             </div>
+
+            {/* Deep-dive link — Commercial Review has its own Guest
+                Experience section (commercial/page.tsx); same "Full ___
+                review →" pattern as Financial Snapshot above. */}
+            <div className="text-right" style={{ marginTop: 12 }}>
+              <Link
+                href={`/${clientId}/${propertyId}/commercial`}
+                className="hover:text-[#D4AF7A]"
+                style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#B8935A", textDecoration: "none", transition: "color 0.25s ease" }}
+              >
+                Full commercial review →
+              </Link>
+            </div>
           </section>
         )}
 
@@ -888,6 +971,11 @@ export default async function PropertyPage({
                 </span>
               )}
             </div>
+            {sinceLastReviewSynthesis && (
+              <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.55)", lineHeight: 1.6, marginBottom: 16 }}>
+                {sinceLastReviewSynthesis}.
+              </p>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {sinceLastReviewMetrics.map(({ label, data, favorable, format, formatDelta }) =>
                 data ? (
