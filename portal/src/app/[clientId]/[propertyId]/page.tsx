@@ -91,6 +91,31 @@ function PrimarySectionHeader({ title }: { title: string }) {
   );
 }
 
+// Shared trend-arrow treatment — used by the compact delta strip, Since
+// Last Review, and Guest Experience below, so there's one place that
+// decides "favorable = ink, unfavorable = red, arrow follows sign" rather
+// than three drifting copies. Inherits font-family/size from its parent
+// (each call site already sets those to its own context), and only
+// controls color + the arrow glyph's own smaller size.
+function TrendDelta({
+  delta,
+  formatDelta,
+  favorable,
+  arrowSize = 14,
+}: {
+  delta: number;
+  formatDelta: (d: number) => string;
+  favorable: boolean;
+  arrowSize?: number;
+}) {
+  return (
+    <span style={{ color: favorable ? "#12120F" : "#C0392B" }}>
+      {formatDelta(delta)}
+      <span style={{ fontFamily: JOST, fontSize: arrowSize, marginLeft: 4 }}>{delta >= 0 ? "↑" : "↓"}</span>
+    </span>
+  );
+}
+
 // Top 3 Priorities — replaces the old Immediate Priorities grid (Initiative-
 // driven, no real $ or priority of its own — Initiative.expectedImpact and
 // Initiative.priority are null on every real record; only linked Actions
@@ -252,6 +277,91 @@ export default async function PropertyPage({
   const cogsInterpretation       = metricInterpretation("cogs_pct");
   const netProfitInterpretation  = metricInterpretation("net_profit_pct");
 
+  // Target Value — the real "budget" field on KPI Records. Checked the
+  // live June data for all four Financial Snapshot metrics and Target
+  // Value is null across the board; the "$1.03M budget" language inside
+  // the Revenue interpretation caption isn't backed by any structured
+  // field anywhere in KPI Records (confirmed: no Budget-segment record
+  // exists either). Benchmark Low/High exist for Labor/COGS/Net Profit,
+  // but those are industry ranges, not this property's own budget, so
+  // they're deliberately not substituted here as a stand-in — a different
+  // signal under a "vs budget" label would be misleading. This stays
+  // wired to the real field so the variance badge activates the moment
+  // Target Value gets populated, per Phase 5's "leave room for it."
+  function metricTarget(key: string): number | null {
+    return (allMetrics as KpiMetric[])
+      .find((m) => m.lppMetricKey === key && m.periodStart === latestPeriod)
+      ?.targetValue ?? null;
+  }
+
+  // Financial Snapshot — one consistent template for all four cards
+  // (metric name -> value -> variance vs budget -> one-line driver
+  // sentence), replacing four separately hand-coded card bodies.
+  interface FinancialCard {
+    label: string;
+    value: string;
+    valueColor: string;
+    subLine: string | null;
+    interpretation: string;
+    variance: { text: string; favorable: boolean } | null;
+  }
+  const financialCards: FinancialCard[] = kpi
+    ? [
+        {
+          label: "Revenue",
+          value: kpi.revenue != null ? compact(kpi.revenue) : "—",
+          valueColor: "#12120F",
+          subLine: kpi.covers != null ? `${kpi.covers.toLocaleString()} covers` : null,
+          interpretation: revenueInterpretation,
+          variance: (() => {
+            const target = metricTarget("total_revenue");
+            if (kpi.revenue == null || target == null) return null;
+            const diff = kpi.revenue - target;
+            return { text: `${diff >= 0 ? "+" : "−"}${compact(Math.abs(diff))} vs budget`, favorable: diff >= 0 };
+          })(),
+        },
+        {
+          label: "Labor",
+          value: kpi.laborPct != null ? pct(kpi.laborPct) : "—",
+          valueColor: kpi.laborPct == null ? "#12120F" : kpi.laborPct <= 42 ? "#12120F" : "#C0392B",
+          subLine: kpi.laborDollars != null ? usd(kpi.laborDollars) : null,
+          interpretation: laborInterpretation,
+          variance: (() => {
+            const target = metricTarget("labor_pct");
+            if (kpi.laborPct == null || target == null) return null;
+            const diff = kpi.laborPct - target;
+            return { text: `${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)} pts vs budget`, favorable: diff <= 0 };
+          })(),
+        },
+        {
+          label: "Food COGS",
+          value: kpi.cogsPct != null ? pct(kpi.cogsPct) : "—",
+          valueColor: kpi.cogsPct == null ? "#12120F" : kpi.cogsPct <= 34 ? "#12120F" : "#C0392B",
+          subLine: kpi.cogsDollars != null ? usd(kpi.cogsDollars) : null,
+          interpretation: cogsInterpretation,
+          variance: (() => {
+            const target = metricTarget("cogs_pct");
+            if (kpi.cogsPct == null || target == null) return null;
+            const diff = kpi.cogsPct - target;
+            return { text: `${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)} pts vs budget`, favorable: diff <= 0 };
+          })(),
+        },
+        {
+          label: "Net Profit",
+          value: kpi.netProfitPct != null ? pct(kpi.netProfitPct) : "—",
+          valueColor: kpi.netProfitPct == null ? "#12120F" : kpi.netProfitPct >= 6 ? "#12120F" : "#C0392B",
+          subLine: kpi.netProfitDollars != null ? usd(kpi.netProfitDollars) : null,
+          interpretation: netProfitInterpretation,
+          variance: (() => {
+            const target = metricTarget("net_profit_pct");
+            if (kpi.netProfitPct == null || target == null) return null;
+            const diff = kpi.netProfitPct - target;
+            return { text: `${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)} pts vs budget`, favorable: diff >= 0 };
+          })(),
+        },
+      ]
+    : [];
+
   // "Last updated" — no "Processed At" property exists on KPI Records or
   // Intelligence; this uses Notion's own last_edited_time as the honest
   // proxy, taken across this property's current-period records.
@@ -282,6 +392,15 @@ export default async function PropertyPage({
   // Snapshot above (metricInterpretation), keyed to each card's own canonical
   // metric. Empty string, not a placeholder, when the record or its
   // interpretation doesn't exist yet — same convention as Financial Snapshot.
+  //
+  // Trend delta uses periodDelta (defined below — hoisted function
+  // declaration, safe to call here) against priorPeriod, the same
+  // review-over-review computation Since Last Review uses. Deliberately
+  // NOT parsed from the interpretation caption text below, which for the
+  // real current data references a "May 2026" comparison that has no
+  // backing KPI Record for any of the four guest metrics (only March and
+  // June actually exist) — the caption's stated delta and this computed
+  // one won't always agree, and this one is the verified one.
   const guestCards = [
     { label: "Overall",  key: "guest_overall",  fallback: kpi?.guestOverall ?? null },
     { label: "Food",     key: "guest_food",     fallback: kpi?.guestFood ?? null },
@@ -292,10 +411,15 @@ export default async function PropertyPage({
       label,
       metric: guestMetric(key, fallback),
       interpretation: metricInterpretation(key),
+      delta: priorPeriod ? periodDelta(key) : null,
     }))
     .filter(
-      (c): c is { label: string; metric: { display: string; isRange: boolean }; interpretation: string } =>
-        c.metric != null
+      (c): c is {
+        label: string;
+        metric: { display: string; isRange: boolean };
+        interpretation: string;
+        delta: { current: number; prior: number; delta: number } | null;
+      } => c.metric != null
     );
 
   // Structural split only — groups sentences into shorter paragraphs, does
@@ -411,9 +535,8 @@ export default async function PropertyPage({
                     <span style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)" }}>
                       {m.label}
                     </span>
-                    <span style={{ fontFamily: SERIF, fontSize: "1.4rem", fontWeight: 400, color: m.favorable ? "#12120F" : "#C0392B" }}>
-                      {m.formatDelta(m.data.delta)}
-                      <span style={{ fontFamily: JOST, fontSize: 13, marginLeft: 4 }}>{m.data.delta >= 0 ? "↑" : "↓"}</span>
+                    <span style={{ fontFamily: SERIF, fontSize: "1.4rem", fontWeight: 400 }}>
+                      <TrendDelta delta={m.data.delta} formatDelta={m.formatDelta} favorable={m.favorable} arrowSize={13} />
                     </span>
                   </div>
                 ))}
@@ -584,45 +707,27 @@ export default async function PropertyPage({
               </div>
             )}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {/* Revenue */}
-              <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "24px 28px" }}>
-                <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 8 }}>Revenue</p>
-                <p style={{ fontFamily: SERIF, fontSize: "2.2rem", fontWeight: 400, color: "#12120F", lineHeight: 1 }}>
-                  {kpi.revenue != null ? compact(kpi.revenue) : "—"}
-                </p>
-                {kpi.covers != null && <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 6 }}>{kpi.covers.toLocaleString()} covers</p>}
-                {revenueInterpretation && <p style={captionStyle}>{revenueInterpretation}</p>}
-              </div>
-
-              {/* Labor */}
-              <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "24px 28px" }}>
-                <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 8 }}>Labor</p>
-                <p style={{ fontFamily: SERIF, fontSize: "2.2rem", fontWeight: 400, lineHeight: 1, color: kpi.laborPct == null ? "#12120F" : kpi.laborPct <= 42 ? "#12120F" : "#C0392B" }}>
-                  {kpi.laborPct != null ? pct(kpi.laborPct) : "—"}
-                </p>
-                {kpi.laborDollars != null && <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 6 }}>{usd(kpi.laborDollars)}</p>}
-                {laborInterpretation && <p style={captionStyle}>{laborInterpretation}</p>}
-              </div>
-
-              {/* COGS */}
-              <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "24px 28px" }}>
-                <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 8 }}>Food COGS</p>
-                <p style={{ fontFamily: SERIF, fontSize: "2.2rem", fontWeight: 400, lineHeight: 1, color: kpi.cogsPct == null ? "#12120F" : kpi.cogsPct <= 34 ? "#12120F" : "#C0392B" }}>
-                  {kpi.cogsPct != null ? pct(kpi.cogsPct) : "—"}
-                </p>
-                {kpi.cogsDollars != null && <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 6 }}>{usd(kpi.cogsDollars)}</p>}
-                {cogsInterpretation && <p style={captionStyle}>{cogsInterpretation}</p>}
-              </div>
-
-              {/* Net profit */}
-              <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "24px 28px" }}>
-                <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 8 }}>Net Profit</p>
-                <p style={{ fontFamily: SERIF, fontSize: "2.2rem", fontWeight: 400, lineHeight: 1, color: kpi.netProfitPct == null ? "#12120F" : kpi.netProfitPct >= 6 ? "#12120F" : "#C0392B" }}>
-                  {kpi.netProfitPct != null ? pct(kpi.netProfitPct) : "—"}
-                </p>
-                {kpi.netProfitDollars != null && <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 6 }}>{usd(kpi.netProfitDollars)}</p>}
-                {netProfitInterpretation && <p style={captionStyle}>{netProfitInterpretation}</p>}
-              </div>
+              {financialCards.map((card) => (
+                <div key={card.label} style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "24px 28px" }}>
+                  <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 8 }}>
+                    {card.label}
+                  </p>
+                  <p style={{ fontFamily: SERIF, fontSize: "2.2rem", fontWeight: 400, color: card.valueColor, lineHeight: 1 }}>
+                    {card.value}
+                  </p>
+                  {card.subLine && <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 6 }}>{card.subLine}</p>}
+                  {/* Variance vs budget — only renders once Target Value is
+                      populated in Notion (see financialCards above); the
+                      template is ready for it, nothing fakes it in the
+                      meantime. */}
+                  {card.variance && (
+                    <div style={{ marginTop: 8 }}>
+                      <StatusBadge label={card.variance.text} variant={card.variance.favorable ? "green" : "red"} />
+                    </div>
+                  )}
+                  {card.interpretation && <p style={captionStyle}>{card.interpretation}</p>}
+                </div>
+              ))}
             </div>
 
             {/* Deep-dive link */}
@@ -643,7 +748,7 @@ export default async function PropertyPage({
           <section style={{ marginBottom: SECTION_GAP }}>
             <SectionHeader title="Guest Experience" />
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {guestCards.map(({ label, metric, interpretation }) => (
+              {guestCards.map(({ label, metric, interpretation, delta }) => (
                 <div
                   key={label}
                   style={{
@@ -665,6 +770,16 @@ export default async function PropertyPage({
                   {metric.isRange && (
                     <p style={{ fontFamily: JOST, fontSize: 10, color: "rgba(18,18,15,0.35)", marginTop: 4 }}>
                       Range across {`${label.toLowerCase()}`} sources this period
+                    </p>
+                  )}
+                  {delta && (
+                    <p style={{ fontFamily: JOST, fontSize: 12, marginTop: 4 }}>
+                      <TrendDelta
+                        delta={delta.delta}
+                        formatDelta={(d) => `${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(1)} pts`}
+                        favorable={delta.delta >= 0}
+                        arrowSize={11}
+                      />
                     </p>
                   )}
                   {/* flex: 1 slot, present on every card regardless of whether this
@@ -715,9 +830,8 @@ export default async function PropertyPage({
                     <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 8 }}>
                       {label}
                     </p>
-                    <p style={{ fontFamily: SERIF, fontSize: "2.2rem", fontWeight: 400, lineHeight: 1, color: favorable ? "#12120F" : "#C0392B" }}>
-                      {formatDelta(data.delta)}
-                      <span style={{ fontFamily: JOST, fontSize: 14, marginLeft: 6 }}>{data.delta >= 0 ? "↑" : "↓"}</span>
+                    <p style={{ fontFamily: SERIF, fontSize: "2.2rem", fontWeight: 400, lineHeight: 1 }}>
+                      <TrendDelta delta={data.delta} formatDelta={formatDelta} favorable={favorable} />
                     </p>
                     <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 6 }}>
                       {format(data.prior)} → {format(data.current)}
