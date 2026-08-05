@@ -371,12 +371,16 @@ export default async function PropertyPage({
             before this schema change (see hasNewBriefFormat above). */}
         {hasNewBriefFormat && latestBrief ? (
           <section style={{ marginBottom: SECTION_GAP }} className="space-y-8">
-            {/* Zone 1 — Executive Read: the dominant visual moment */}
-            <div style={{ background: "#12120F", padding: "40px 44px" }}>
+            {/* Zone 1 — Executive Read: the dominant visual moment. Heavier
+                left-accent (6px vs CalloutBlock's 3px) and larger padding
+                than LPP Perspective below keep this reading as the higher
+                emphasis of the two cream/gold cards, without the solid
+                black fill it used to have. */}
+            <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderLeft: "6px solid #B8935A", padding: "40px 44px" }}>
               <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD, marginBottom: 14 }}>
                 Executive Read
               </p>
-              <p style={{ fontFamily: SERIF, fontSize: "clamp(1.3rem, 2vw, 1.6rem)", fontWeight: 300, color: "#F2EDE4", lineHeight: 1.5 }}>
+              <p style={{ fontFamily: SERIF, fontSize: "clamp(1.3rem, 2vw, 1.6rem)", fontWeight: 300, color: "#12120F", lineHeight: 1.5 }}>
                 {latestBrief.executiveRead}
               </p>
             </div>
@@ -420,16 +424,27 @@ export default async function PropertyPage({
                     <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD, marginBottom: 14 }}>
                       Recommended Focus
                     </p>
-                    <ol className="space-y-2">
-                      {recommendedFocusItems.map((item, i) => (
-                        <li key={i} className="flex" style={{ gap: 10 }}>
-                          <span style={{ fontFamily: SERIF, fontSize: 15, color: GOLD, flexShrink: 0 }}>{i + 1}.</span>
-                          <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.75)", lineHeight: 1.6 }}>
-                            {item}
-                          </p>
-                        </li>
-                      ))}
-                    </ol>
+                    {/* A single item reads as an orphaned "1." with nothing
+                        after it — the underlying generation currently only
+                        ever produces one recommendation. Numbering only
+                        earns its keep once there's a second item to count
+                        against; below that, plain text. */}
+                    {recommendedFocusItems.length > 1 ? (
+                      <ol className="space-y-2">
+                        {recommendedFocusItems.map((item, i) => (
+                          <li key={i} className="flex" style={{ gap: 10 }}>
+                            <span style={{ fontFamily: SERIF, fontSize: 15, color: GOLD, flexShrink: 0 }}>{i + 1}.</span>
+                            <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.75)", lineHeight: 1.6 }}>
+                              {item}
+                            </p>
+                          </li>
+                        ))}
+                      </ol>
+                    ) : (
+                      <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.75)", lineHeight: 1.6 }}>
+                        {recommendedFocusItems[0]}
+                      </p>
+                    )}
                   </>
                 )}
                 {latestBrief.decisionsRequired && (
