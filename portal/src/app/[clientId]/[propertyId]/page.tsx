@@ -332,6 +332,40 @@ export default async function PropertyPage({
   const hasSinceLastReview =
     priorPeriod != null && (revenueDelta != null || laborDelta != null || guestDelta != null);
 
+  // Shared source for both the compact delta strip (under Hero) and the
+  // full Since Last Review cards further down — same three metrics, same
+  // favorable/unfavorable and formatting rules, just two different render
+  // treatments of one data source, not two separate computations.
+  const sinceLastReviewMetrics: {
+    label: string;
+    data: { current: number; prior: number; delta: number } | null;
+    favorable: boolean;
+    format: (v: number) => string;
+    formatDelta: (d: number) => string;
+  }[] = [
+    {
+      label: "Revenue",
+      data: revenueDelta,
+      favorable: revenueDelta != null && revenueDelta.delta >= 0,
+      format: (v) => compact(v),
+      formatDelta: (d) => `${d >= 0 ? "+" : "−"}${compact(Math.abs(d))}`,
+    },
+    {
+      label: "Labor",
+      data: laborDelta,
+      favorable: laborDelta != null && laborDelta.delta <= 0,
+      format: (v) => pct(v),
+      formatDelta: (d) => `${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(1)} pts`,
+    },
+    {
+      label: "Guest",
+      data: guestDelta,
+      favorable: guestDelta != null && guestDelta.delta >= 0,
+      format: (v) => v.toFixed(1),
+      formatDelta: (d) => `${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(1)} pts`,
+    },
+  ];
+
   return (
     <PageWrapper noTopPadding>
       <NavBar session={session} transparentAtTop />
@@ -340,14 +374,18 @@ export default async function PropertyPage({
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 0" }}>
 
-        {/* At a glance — a quiet reference strip; Current Read below is the page's visual anchor */}
-        <section style={{ marginBottom: SECTION_GAP }}>
+        {/* At a glance — a quiet reference strip; Current Read below is the
+            page's visual anchor. Labels read as KPIs (Portfolio Status /
+            Financial Opportunity / Open Actions / Data Reliability) rather
+            than internal-metadata names — same four values as before, this
+            is a copy change only. */}
+        <section style={{ marginBottom: 20 }}>
           <div className="flex flex-wrap items-center gap-x-8 gap-y-2" style={{ paddingBottom: 12, borderBottom: "1px solid rgba(18,18,15,0.06)" }}>
             {[
-              { label: "Overall Health", value: health.status },
-              { label: "Annual Opportunity", value: annualOpportunity > 0 ? compact(annualOpportunity) : "—" },
-              { label: "Actions Needed", value: String(openActions.length) },
-              { label: "Data Confidence", value: property.dataConfidence },
+              { label: "Portfolio Status", value: health.status },
+              { label: "Financial Opportunity", value: annualOpportunity > 0 ? compact(annualOpportunity) : "—" },
+              { label: "Open Actions", value: String(openActions.length) },
+              { label: "Data Reliability", value: property.dataConfidence },
             ].map(({ label, value }) => (
               <div key={label} style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
                 <span style={{ fontFamily: JOST, fontSize: 8, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(18,18,15,0.3)" }}>
@@ -358,6 +396,30 @@ export default async function PropertyPage({
             ))}
           </div>
         </section>
+
+        {/* Delta strip — compact preview of Since Last Review (same
+            sinceLastReviewMetrics source, see below), three raw numbers
+            with a trend arrow and nothing else. Hidden under the same
+            hasSinceLastReview gate — no prior period, no strip. */}
+        {hasSinceLastReview && (
+          <section style={{ marginBottom: SECTION_GAP }}>
+            <div className="flex flex-wrap items-baseline" style={{ gap: 36 }}>
+              {sinceLastReviewMetrics
+                .filter((m): m is typeof m & { data: NonNullable<typeof m.data> } => m.data != null)
+                .map((m) => (
+                  <div key={m.label} style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                    <span style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)" }}>
+                      {m.label}
+                    </span>
+                    <span style={{ fontFamily: SERIF, fontSize: "1.4rem", fontWeight: 400, color: m.favorable ? "#12120F" : "#C0392B" }}>
+                      {m.formatDelta(m.data.delta)}
+                      <span style={{ fontFamily: JOST, fontSize: 13, marginLeft: 4 }}>{m.data.delta >= 0 ? "↑" : "↓"}</span>
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </section>
+        )}
 
         {/* Executive briefing — hierarchical layout (Executive Read / Critical
             Drivers / LPP Perspective / Decisions Required) once a Brief has
@@ -647,29 +709,7 @@ export default async function PropertyPage({
               )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {[
-                {
-                  label: "Revenue",
-                  data: revenueDelta,
-                  favorable: revenueDelta != null && revenueDelta.delta >= 0,
-                  format: (v: number) => compact(v),
-                  formatDelta: (d: number) => `${d >= 0 ? "+" : "−"}${compact(Math.abs(d))}`,
-                },
-                {
-                  label: "Labor",
-                  data: laborDelta,
-                  favorable: laborDelta != null && laborDelta.delta <= 0,
-                  format: (v: number) => pct(v),
-                  formatDelta: (d: number) => `${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(1)} pts`,
-                },
-                {
-                  label: "Guest",
-                  data: guestDelta,
-                  favorable: guestDelta != null && guestDelta.delta >= 0,
-                  format: (v: number) => v.toFixed(1),
-                  formatDelta: (d: number) => `${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(1)} pts`,
-                },
-              ].map(({ label, data, favorable, format, formatDelta }) =>
+              {sinceLastReviewMetrics.map(({ label, data, favorable, format, formatDelta }) =>
                 data ? (
                   <div key={label} style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "24px 28px" }}>
                     <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 8 }}>
