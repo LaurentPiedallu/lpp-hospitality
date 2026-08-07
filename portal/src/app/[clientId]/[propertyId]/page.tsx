@@ -8,6 +8,7 @@ import {
 } from "@/lib/notion-queries";
 import { deriveHealth } from "@/lib/health";
 import { usd, pct, compact, formatPeriod, splitIntoParagraphs, parseTextLines, maxIso, findMetricByKey } from "@/lib/format";
+import { selectTopPriorities, type TopPriority } from "@/lib/priorities";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
@@ -15,6 +16,7 @@ import PropertyTabs from "@/components/PropertyTabs";
 import SectionHeader from "@/components/SectionHeader";
 import CalloutBlock from "@/components/CalloutBlock";
 import StatusBadge from "@/components/StatusBadge";
+import CollapsibleOnMobile from "@/components/CollapsibleOnMobile";
 import type { Action, Opportunity, Intelligence, KpiMetric, DataConfidence } from "@/types/portal";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
@@ -36,8 +38,6 @@ const captionStyle: React.CSSProperties = {
 
 // ~10% more breathing room than the prior 48px section rhythm.
 const SECTION_GAP = 53;
-
-const PRIORITY_RANK: Record<string, number> = { Critical: 0, High: 1, Medium: 2, Low: 3 };
 
 // Confidence badge variant mapping — reuses the shared StatusBadge component
 // rather than inventing a parallel badge style for this one field.
@@ -142,47 +142,6 @@ const PRIORITY_TAB_BY_CATEGORY: Record<string, { segment: string; label: string 
   "Guest Retention": { segment: "/commercial", label: "Commercial Review" },
   Pricing:         { segment: "/commercial", label: "Commercial Review" },
 };
-
-// Top 3 Priorities — replaces the old Immediate Priorities grid (Initiative-
-// driven, no real $ or priority of its own — Initiative.expectedImpact and
-// Initiative.priority are null on every real record; only linked Actions
-// carry genuine priority) and the old standalone Biggest Opportunity lookup
-// (a single record resolved via Brief.biggestOpportunityId). Opportunities
-// carry real, populated Estimated Annual Impact and Priority for the
-// current dataset, so this ranks across Opportunities directly — item #1
-// naturally reproduces (and generalizes) what Biggest Opportunity used to
-// single out, since it's the same top-impact record either way.
-interface TopPriority {
-  id: string;
-  title: string;
-  category: string;
-  impactAnnual: number;
-  confidence: DataConfidence | null;
-  nextStep: string;
-}
-
-function selectTopPriorities(opportunities: Opportunity[], intelligence: Intelligence[]): TopPriority[] {
-  const ranked = [...opportunities].sort((a, b) => {
-    if (b.estimatedAnnualImpact !== a.estimatedAnnualImpact) {
-      return b.estimatedAnnualImpact - a.estimatedAnnualImpact;
-    }
-    return (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9);
-  });
-  return ranked.slice(0, 3).map((o) => ({
-    id: o.id,
-    title: o.title,
-    category: o.category,
-    impactAnnual: o.estimatedAnnualImpact,
-    // Opportunity itself has no confidence field — resolved from the
-    // Intelligence finding that drove it, same relation already used for
-    // opportunityDriver text. Null (not shown) when there's no linked
-    // finding or it predates this relation being populated.
-    confidence: o.sourceIntelligenceId
-      ? intelligence.find((i) => i.id === o.sourceIntelligenceId)?.confidence ?? null
-      : null,
-    nextStep: o.nextStep,
-  }));
-}
 
 // Standard-treatment card for priorities #2–3 — #1 gets the full-bleed hero
 // treatment inline in the page body below instead (see "Top priority — hero").
@@ -769,15 +728,19 @@ export default async function PropertyPage({
           </section>
         )}
 
-        {/* Financial snapshot */}
+        {/* Financial snapshot — Layer 2, collapsed by default on mobile */}
         {kpi && (
           <section style={{ marginBottom: SECTION_GAP }}>
-            <div className="flex items-center justify-between" style={{ marginBottom: 20 }}>
-              <SectionHeader title="Financial Snapshot" />
-              {latestPeriod && (
-                <span style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.4)" }}>{formatPeriod(latestPeriod)}</span>
-              )}
-            </div>
+          <CollapsibleOnMobile
+            header={
+              <div className="flex items-center justify-between">
+                <SectionHeader title="Financial Snapshot" />
+                {latestPeriod && (
+                  <span style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.4)" }}>{formatPeriod(latestPeriod)}</span>
+                )}
+              </div>
+            }
+          >
             {unpublishedFinancialData && (
               <div style={{ marginBottom: 16, padding: "10px 16px", background: "rgba(192,57,43,0.06)", border: "1px solid rgba(192,57,43,0.15)", fontFamily: JOST, fontSize: 13, color: "#C0392B" }}>
                 Admin only: financial data exists in Notion for this property but isn&apos;t Published — it won&apos;t appear until published.
@@ -817,13 +780,14 @@ export default async function PropertyPage({
                 Full financial review →
               </Link>
             </div>
+          </CollapsibleOnMobile>
           </section>
         )}
 
-        {/* Guest experience */}
+        {/* Guest experience — Layer 2, collapsed by default on mobile */}
         {guestCards.length > 0 && (
           <section style={{ marginBottom: SECTION_GAP }}>
-            <SectionHeader title="Guest Experience" />
+          <CollapsibleOnMobile header={<SectionHeader title="Guest Experience" />}>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {guestCards.map(({ label, metric, interpretation, delta }) => (
                 <div
@@ -882,19 +846,21 @@ export default async function PropertyPage({
                 Full commercial review →
               </Link>
             </div>
+          </CollapsibleOnMobile>
           </section>
         )}
 
-        {/* Emerging Risk — real selected Intelligence finding, see selectEmergingRisk above */}
+        {/* Emerging Risk — Layer 2, collapsed by default on mobile */}
         {emergingRisk && (
           <section style={{ marginBottom: SECTION_GAP }}>
-            <SectionHeader title="Emerging Risk" />
+          <CollapsibleOnMobile header={<SectionHeader title="Emerging Risk" />}>
             <CalloutBlock>
               <p>{emergingRisk.finding}</p>
               {emergingRisk.currentRead && (
                 <p style={{ marginTop: 8, opacity: 0.8 }}>{emergingRisk.currentRead}</p>
               )}
             </CalloutBlock>
+          </CollapsibleOnMobile>
           </section>
         )}
 
@@ -906,7 +872,7 @@ export default async function PropertyPage({
             field rather than requiring a fourth, likely-redundant one. */}
         {outlookLines.length > 0 && latestBrief && (
           <section style={{ marginBottom: SECTION_GAP }}>
-            <SectionHeader title="Outlook" />
+          <CollapsibleOnMobile header={<SectionHeader title="Outlook" />}>
             <div className="space-y-3">
               {outlookLines[0] && (
                 <div className="flex items-start" style={{ gap: 10 }}>
@@ -932,6 +898,7 @@ export default async function PropertyPage({
                 <StatusBadge label={latestBrief.confidence} variant={CONFIDENCE_VARIANT[latestBrief.confidence]} />
               </div>
             </div>
+          </CollapsibleOnMobile>
           </section>
         )}
 
@@ -942,7 +909,7 @@ export default async function PropertyPage({
             for discussion rather than another action-item list. */}
         {ownershipQuestionLines.length > 0 && (
           <section style={{ marginBottom: SECTION_GAP }}>
-            <SectionHeader title="Ownership Discussion" />
+          <CollapsibleOnMobile header={<SectionHeader title="Ownership Discussion" />}>
             <div style={{ borderTop: "1px solid rgba(184,147,90,0.3)", paddingTop: 24 }} className="space-y-5">
               {ownershipQuestionLines.map((question, i) => (
                 <p
@@ -953,6 +920,7 @@ export default async function PropertyPage({
                 </p>
               ))}
             </div>
+          </CollapsibleOnMobile>
           </section>
         )}
 
@@ -963,14 +931,18 @@ export default async function PropertyPage({
             the equivalent "no prior cycle" case. */}
         {hasSinceLastReview && (
           <section>
-            <div className="flex items-center justify-between" style={{ marginBottom: 20 }}>
-              <SectionHeader title="Since Last Review" />
-              {priorPeriod && (
-                <span style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.4)" }}>
-                  vs. {formatPeriod(priorPeriod)}
-                </span>
-              )}
-            </div>
+          <CollapsibleOnMobile
+            header={
+              <div className="flex items-center justify-between">
+                <SectionHeader title="Since Last Review" />
+                {priorPeriod && (
+                  <span style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.4)" }}>
+                    vs. {formatPeriod(priorPeriod)}
+                  </span>
+                )}
+              </div>
+            }
+          >
             {sinceLastReviewSynthesis && (
               <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.55)", lineHeight: 1.6, marginBottom: 16 }}>
                 {sinceLastReviewSynthesis}.
@@ -993,6 +965,7 @@ export default async function PropertyPage({
                 ) : null
               )}
             </div>
+          </CollapsibleOnMobile>
           </section>
         )}
 
