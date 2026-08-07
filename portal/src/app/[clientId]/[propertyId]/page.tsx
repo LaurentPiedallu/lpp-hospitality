@@ -36,8 +36,16 @@ const captionStyle: React.CSSProperties = {
   lineHeight: 1.4,
 };
 
-// ~10% more breathing room than the prior 48px section rhythm.
-const SECTION_GAP = 53;
+// Phase 7 polish: ~20% tighter than the prior 53px section rhythm (which
+// was itself ~10% looser than an even earlier 48px baseline). This is the
+// single lever for spacing between major sections — every section below
+// derives its inter-section gap from this one constant (or, for the Top
+// Priority hero's tighter gap to items #2-3 immediately below it, from
+// HERO_CLUSTER_GAP, scaled by the same ratio) rather than each section
+// carrying its own hand-picked margin, so tightening happens consistently
+// in one place, not section-by-section.
+const SECTION_GAP = 42;
+const HERO_CLUSTER_GAP = 16;
 
 // Confidence badge variant mapping — reuses the shared StatusBadge component
 // rather than inventing a parallel badge style for this one field.
@@ -672,7 +680,7 @@ export default async function PropertyPage({
 
       {/* Top priority — hero, full-bleed treatment (what Biggest Opportunity used to be) */}
       {topPriorities[0] && (
-        <section style={{ marginBottom: topPriorities.length > 1 ? 20 : SECTION_GAP }}>
+        <section style={{ marginBottom: topPriorities.length > 1 ? HERO_CLUSTER_GAP : SECTION_GAP }}>
           <div style={{ marginLeft: "calc(50% - 50vw)", marginRight: "calc(50% - 50vw)", background: "#12120F" }}>
             <div style={{ maxWidth: 1100, margin: "0 auto", padding: "64px 60px" }}>
               <div className="flex items-center flex-wrap" style={{ gap: 14, marginBottom: 18 }}>
