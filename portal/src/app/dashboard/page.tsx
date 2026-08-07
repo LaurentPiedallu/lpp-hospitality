@@ -1,13 +1,17 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
-import { getClients, getClient, getProperties, getLatestKpiSummary, getActions, hasUnpublishedFinancialData } from "@/lib/notion-queries";
+import {
+  getClients, getClient, getProperties, getLatestKpiSummary, getActions,
+  hasUnpublishedFinancialData, getPublishedBriefs, getOpportunities, getIntelligence,
+} from "@/lib/notion-queries";
 import { deriveHealth } from "@/lib/health";
-import { compact, pct } from "@/lib/format";
+import { compact } from "@/lib/format";
+import { selectTopPriorities } from "@/lib/priorities";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import { propertyPhoto } from "@/lib/property-photos";
-import type { Client, Property, KpiSummary } from "@/types/portal";
+import type { Client, Property, KpiSummary, Opportunity, Intelligence } from "@/types/portal";
 import type { HealthColor } from "@/lib/health";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
@@ -27,6 +31,12 @@ interface PropertyCard {
   openActions: number;
   health: ReturnType<typeof deriveHealth>;
   unpublishedFinancialData: boolean;
+  // Same three "at a glance" signals as the property Overview page's
+  // scorecard/Top 3 Priorities, at portfolio level: annual $ across the
+  // current period's Opportunities, and the #1-ranked priority's title
+  // (selectTopPriorities — shared with Overview, see src/lib/priorities.ts).
+  annualOpportunity: number;
+  topPriorityTitle: string | null;
 }
 
 interface ClientGroup {
@@ -49,10 +59,23 @@ async function loadDashboard(session: Awaited<ReturnType<typeof getSession>>): P
 
       const cards: PropertyCard[] = await Promise.all(
         properties.map(async (property) => {
-          const [kpi, actions] = await Promise.all([
+          const [kpi, actions, briefs, intelligence] = await Promise.all([
             getLatestKpiSummary(property.id),
             getActions(property.id),
+            getPublishedBriefs(property.id, client.id),
+            getIntelligence(property.id),
           ]);
+
+          // Same convention as the property Overview page: Opportunities are
+          // scoped to the current period (the most recent Published Brief's
+          // Reporting Period), never aggregated across every period ever
+          // generated for this property.
+          const currentPeriod = briefs[0]?.reportingPeriodStart ?? null;
+          const opportunities: Opportunity[] = currentPeriod
+            ? await getOpportunities(property.id, currentPeriod)
+            : [];
+          const annualOpportunity = opportunities.reduce((s, o) => s + o.estimatedAnnualImpact, 0);
+          const topPriorities = selectTopPriorities(opportunities, intelligence as Intelligence[]);
 
           // Admin-only signal: financial numbers are all missing even though
           // a summary exists — check whether that's because real data is
@@ -69,9 +92,18 @@ async function loadDashboard(session: Awaited<ReturnType<typeof getSession>>): P
           return {
             property,
             kpi,
-            openActions: actions.filter((a) => a.status !== "Complete").length,
+            // clientVisible + not Complete — same definition the property
+            // Overview page's own "Open Actions" count already uses. This
+            // used to only gate whether the Action Required badge showed,
+            // never a displayed number, so the missing clientVisible filter
+            // was invisible; now that it's a real KPI cell, a mismatched
+            // count against the same property's Overview page would be a
+            // real, visible bug, not a stylistic difference.
+            openActions: actions.filter((a) => a.clientVisible && a.status !== "Complete").length,
             health: deriveHealth(kpi),
             unpublishedFinancialData,
+            annualOpportunity,
+            topPriorityTitle: topPriorities[0]?.title ?? null,
           };
         })
       );
@@ -150,8 +182,7 @@ function Kpi({ label, value, sub, negative }: { label: string; value: string; su
 // ─── Property card ────────────────────────────────────────────────────────────
 
 function PropertyOverviewCard({ card, clientId }: { card: PropertyCard; clientId: string }) {
-  const { property, kpi, openActions, health, unpublishedFinancialData } = card;
-  const declining = kpi?.financialSeverity === "Critical" || kpi?.financialSeverity === "Action Required";
+  const { property, openActions, health, unpublishedFinancialData, annualOpportunity, topPriorityTitle } = card;
   const photoUrl = propertyPhoto(property.id);
 
   return (
@@ -204,39 +235,30 @@ function PropertyOverviewCard({ card, clientId }: { card: PropertyCard; clientId
         </p>
       )}
 
-      {/* KPI row */}
-      {kpi ? (
-        <div
-          className="grid grid-cols-2 sm:grid-cols-4"
-          style={{ borderTop: `1px solid rgba(18,18,15,0.06)`, paddingTop: 20, marginBottom: 20, rowGap: 20 }}
-        >
-          <Kpi
-            label="Total Revenue"
-            value={kpi.revenue != null ? compact(kpi.revenue) : "—"}
-            sub={kpi.covers != null ? `${kpi.covers.toLocaleString()} covers` : undefined}
-          />
-          <Kpi
-            label="COGS"
-            value={kpi.cogsPct != null ? pct(kpi.cogsPct) : "—"}
-            sub={kpi.cogsDollars != null ? compact(kpi.cogsDollars) : undefined}
-          />
-          <Kpi
-            label="Labor"
-            value={kpi.laborPct != null ? pct(kpi.laborPct) : "—"}
-            sub={kpi.laborDollars != null ? compact(kpi.laborDollars) : undefined}
-          />
-          <Kpi
-            label="Total Profit"
-            value={(kpi.netProfitDollars != null ? compact(kpi.netProfitDollars) : "—") + (declining ? " ↓" : "")}
-            sub={kpi.netProfitPct != null ? pct(kpi.netProfitPct) : undefined}
-            negative={kpi.netProfitDollars != null && kpi.netProfitDollars < 0}
-          />
+      {/* KPI row — same three signals as the property Overview page's
+          At-a-glance scorecard/Top 3 Priorities, at portfolio level. None
+          of the three require a KpiSummary to exist (unlike the old
+          Revenue/COGS/Labor/Profit row), so this always renders — each
+          cell falls back to its own "—" independently rather than gating
+          the whole row on one field. */}
+      <div
+        className="grid grid-cols-1 sm:grid-cols-3"
+        style={{ borderTop: `1px solid rgba(18,18,15,0.06)`, paddingTop: 20, marginBottom: 20, rowGap: 20, columnGap: 20 }}
+      >
+        <Kpi
+          label="Financial Opportunity"
+          value={annualOpportunity > 0 ? compact(annualOpportunity) : "—"}
+        />
+        <Kpi label="Open Actions" value={String(openActions)} />
+        <div>
+          <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: INK_QUIET, marginBottom: 6 }}>
+            Top Priority
+          </p>
+          <p style={{ fontFamily: SERIF, fontSize: "1.15rem", fontWeight: 400, color: INK, lineHeight: 1.35 }}>
+            {topPriorityTitle ?? "—"}
+          </p>
         </div>
-      ) : (
-        <div style={{ borderTop: `1px solid rgba(18,18,15,0.06)`, paddingTop: 20, marginBottom: 20 }}>
-          <p style={{ fontSize: 12, color: INK_QUIET, fontFamily: JOST }}>No KPI data published</p>
-        </div>
-      )}
+      </div>
 
       {/* Footer */}
       <div
