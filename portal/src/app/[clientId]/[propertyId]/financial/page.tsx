@@ -11,11 +11,38 @@ import KpiCard from "@/components/KpiCard";
 import BenchmarkGauge from "@/components/BenchmarkGauge";
 import EmptyState from "@/components/EmptyState";
 import FindingSection from "@/components/FindingSection";
+import ScrollToSection from "@/components/ScrollToSection";
 import type { KpiMetric, Intelligence, Severity } from "@/types/portal";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 const SERIF = "'Cormorant Garamond', Georgia, serif";
 const GOLD = "#B8935A";
+
+// ─── Deep-link anchors (Cross-tab audit Part 4) ────────────────────────────────
+// Resolves an incoming ?metric=<LppMetricKey> or ?category=<Intelligence or
+// Opportunity category> into one of this page's 5 FindingSection ids (see
+// their id= props below). "Purchasing" and "OpEx" have no FindingSection of
+// their own — Purchasing is food/beverage buying, which is what the COGS
+// section covers, and OpEx-category Opportunities are Kitchen-Allocation
+// items whose actual content lives in the Execution-sourced Operating
+// Expenses section (see PRIORITY_TAB_BY_CATEGORY's comment on Overview for
+// the same reasoning applied to which tab an OpEx item routes to).
+const METRIC_KEY_SECTION: Record<string, string> = {
+  total_revenue: "revenue", covers: "revenue", avg_spend: "revenue", avg_check: "revenue",
+  labor_pct: "labor", total_payroll: "labor",
+  cogs_pct: "cogs", total_cogs: "cogs",
+  opex: "opex", opex_pct: "opex",
+  net_profit: "profitability", net_profit_pct: "profitability",
+};
+const CATEGORY_SECTION: Record<string, string> = {
+  Financial: "revenue",
+  Labor: "labor",
+  COGS: "cogs",
+  Purchasing: "cogs",
+  Execution: "opex",
+  OpEx: "opex",
+  Profitability: "profitability",
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -128,14 +155,22 @@ function StackedSplit({
 
 export default async function FinancialPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ clientId: string; propertyId: string }>;
+  searchParams: Promise<{ metric?: string; category?: string }>;
 }) {
   const session = await getSession();
   if (!session) redirect("/login");
 
   const { clientId, propertyId } = await params;
   if (session.role !== "admin" && session.clientId !== clientId) redirect("/dashboard");
+
+  const { metric: metricParam, category: categoryParam } = await searchParams;
+  const scrollTargetId =
+    (metricParam && METRIC_KEY_SECTION[metricParam]) ||
+    (categoryParam && CATEGORY_SECTION[categoryParam]) ||
+    null;
 
   const [property, allMetrics, allIntelligence, lastUpdated] = await Promise.all([
     getProperty(propertyId, clientId),
@@ -243,6 +278,7 @@ export default async function FinancialPage({
 
   return (
     <PageWrapper noTopPadding>
+      <ScrollToSection targetId={scrollTargetId} />
       <NavBar session={session} transparentAtTop />
       <PropertyHeader property={property} lastUpdated={lastUpdated} />
       <PropertyTabs clientId={clientId} propertyId={propertyId} active="financial" />
@@ -308,6 +344,7 @@ export default async function FinancialPage({
 
         {/* ── Revenue ──────────────────────────────────────────────────── */}
         <FindingSection
+          id="revenue"
           heading="Revenue"
           connector="The shortfall referenced above starts here, with cover volume and check average."
           intelligence={intel("Financial")}
@@ -337,6 +374,7 @@ export default async function FinancialPage({
 
         {/* ── Labor ────────────────────────────────────────────────────── */}
         <FindingSection
+          id="labor"
           heading="Labor"
           connector="Following the dinner shortfall above, labor did not scale down to match the reduced volume."
           intelligence={intel("Labor")}
@@ -379,6 +417,7 @@ export default async function FinancialPage({
 
         {/* ── COGS ─────────────────────────────────────────────────────── */}
         <FindingSection
+          id="cogs"
           heading="Food & Beverage COGS"
           connector="Unlike labor, food and beverage cost control held through the same volume decline."
           intelligence={intel("COGS")}
@@ -422,6 +461,7 @@ export default async function FinancialPage({
 
         {/* ── OpEx ─────────────────────────────────────────────────────── */}
         <FindingSection
+          id="opex"
           heading="Operating Expenses"
           connector="The larger structural pressure sits here — the Kitchen Allocation charge below does not flex with revenue the way labor or COGS do."
           intelligence={intel("Execution")}
@@ -459,6 +499,7 @@ export default async function FinancialPage({
 
         {/* ── Profitability — distinct layout as the page's conclusion ──── */}
         <FindingSection
+          id="profitability"
           heading="Profitability"
           connector="The combined effect of the revenue shortfall, labor ratio, and OpEx allocation above nets out below."
           intelligence={intel("Profitability")}

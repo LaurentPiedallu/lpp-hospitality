@@ -33,6 +33,7 @@ export default function FindingSection({
   allMetrics,
   primarySeverity,
   trendColor = "#2563eb",
+  id,
   children,
 }: {
   heading: string;
@@ -48,12 +49,16 @@ export default function FindingSection({
   // any line item in the category and mislead the badge.
   primarySeverity?: Severity;
   trendColor?: string;
+  // Deep-link anchor (Cross-tab audit Part 4) — lets ScrollToSection find
+  // and scroll-highlight this section from a query-param-driven landing.
+  // Optional: sections that aren't a deep-link destination don't need one.
+  id?: string;
   children?: React.ReactNode; // KPI cards / driver visuals — caller owns layout
 }) {
   const severity = intelligence?.severity ?? primarySeverity ?? "Monitor";
 
   return (
-    <section className="space-y-4">
+    <section id={id} className="space-y-4">
       <SectionHeader title={heading} />
 
       {connector && (

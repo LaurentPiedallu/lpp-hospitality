@@ -13,6 +13,7 @@ import EmptyState from "@/components/EmptyState";
 import MenuQuadrantScatter from "@/components/MenuQuadrantScatter";
 import MenuItemsTable from "@/components/MenuItemsTable";
 import FindingSection from "@/components/FindingSection";
+import ScrollToSection from "@/components/ScrollToSection";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 
@@ -65,14 +66,20 @@ export default async function MenuPage({
   searchParams,
 }: {
   params: Promise<{ clientId: string; propertyId: string }>;
-  searchParams: Promise<{ batch?: string }>;
+  searchParams: Promise<{ batch?: string; category?: string }>;
 }) {
   const session = await getSession();
   if (!session) redirect("/login");
 
   const { clientId, propertyId } = await params;
-  const { batch: batchParam } = await searchParams;
+  const { batch: batchParam, category: categoryParam } = await searchParams;
   if (session.role !== "admin" && session.clientId !== clientId) redirect("/dashboard");
+
+  // Deep-link anchor (Cross-tab audit Part 4) — the only category that maps
+  // here is Menu, landing on the Menu Insights FindingSection below (which
+  // itself only renders when a Menu-category Intelligence finding exists
+  // for the active batch's period — ScrollToSection no-ops if it's absent).
+  const scrollTargetId = categoryParam === "Menu" ? "menu-insights" : null;
 
   const [property, menuBatches, lastUpdated] = await Promise.all([
     getProperty(propertyId, clientId),
@@ -86,6 +93,7 @@ export default async function MenuPage({
 
   return (
     <PageWrapper noTopPadding>
+      <ScrollToSection targetId={scrollTargetId} />
       <NavBar session={session} transparentAtTop />
       <PropertyHeader property={property} lastUpdated={lastUpdated} />
       <PropertyTabs clientId={clientId} propertyId={propertyId} active="menu" />
@@ -161,7 +169,7 @@ async function MenuBatchView({
       </div>
 
       {(menuIntel?.currentRead || menuIntel?.whyItMatters || menuIntel?.suggestedDecision) && (
-        <FindingSection heading="Menu Insights" intelligence={menuIntel} metrics={[]} allMetrics={[]} trendColor="#B8935A" />
+        <FindingSection id="menu-insights" heading="Menu Insights" intelligence={menuIntel} metrics={[]} allMetrics={[]} trendColor="#B8935A" />
       )}
 
       {items.length === 0 ? (

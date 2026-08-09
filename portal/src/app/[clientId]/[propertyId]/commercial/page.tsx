@@ -18,11 +18,33 @@ import StatusBadge from "@/components/StatusBadge";
 import TrendChart from "@/components/TrendChart";
 import BenchmarkGauge from "@/components/BenchmarkGauge";
 import EmptyState from "@/components/EmptyState";
+import ScrollToSection from "@/components/ScrollToSection";
 import type { KpiMetric, Intelligence, Opportunity, Severity } from "@/types/portal";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 const SERIF = "'Cormorant Garamond', Georgia, serif";
 const GOLD = "#B8935A";
+
+// ─── Deep-link anchors (Cross-tab audit Part 4) ────────────────────────────────
+// Resolves an incoming ?metric=<LppMetricKey> or ?category=<Intelligence or
+// Opportunity category> into one of this page's section ids (see id= props
+// below). Revenue Mix and Pricing have no dedicated KPI section of their
+// own — they're purely Opportunity-driven — so they land on the
+// Opportunities list itself rather than a specific metric panel. Reservations
+// does have a real KPI-category match (RevPASH is sourced from KPI Category
+// "Reservations"), so it lands there instead.
+const METRIC_KEY_SECTION: Record<string, string> = {
+  guest_overall: "guest-experience", guest_food: "guest-experience",
+  guest_service: "guest-experience", guest_ambiance: "guest-experience",
+};
+const CATEGORY_SECTION: Record<string, string> = {
+  Guest: "guest-experience",
+  "Guest Retention": "guest-experience",
+  Commercial: "volume-conversion",
+  Reservations: "seat-efficiency",
+  "Revenue Mix": "opportunities",
+  Pricing: "opportunities",
+};
 
 // Rating-unit Guest Experience metrics that duplicate a canonical score
 // already shown under its own card (e.g. "Atmosphere Sub-Score" alongside
@@ -88,6 +110,7 @@ function CommercialSection({
   allMetrics,
   trendUnit,
   hideCallout,
+  id,
   children,
 }: {
   heading: string;
@@ -96,13 +119,15 @@ function CommercialSection({
   allMetrics: KpiMetric[];
   trendUnit?: string;
   hideCallout?: boolean;
+  // Deep-link anchor (Cross-tab audit Part 4) — see ScrollToSection.
+  id?: string;
   children: React.ReactNode;
 }) {
   const severity = intelligence?.severity ?? (metrics[0]?.severity ?? "Monitor");
   const unit = trendUnit ?? allMetrics[0]?.unit ?? "%";
 
   return (
-    <section className="space-y-4">
+    <section id={id} className="space-y-4">
       <SectionHeader title={heading} />
 
       {hideCallout ? null : intelligence?.currentRead ? (
@@ -224,10 +249,10 @@ const DEMAND_CONTEXT_TAG: Record<string, { label: string; variant: "amber" | "gr
   Mixed: { label: "Mixed", variant: "gray" },
 };
 
-function OpportunitiesPanel({ opportunities }: { opportunities: Opportunity[] }) {
+function OpportunitiesPanel({ opportunities, id }: { opportunities: Opportunity[]; id?: string }) {
   if (opportunities.length === 0) return null;
   return (
-    <section className="space-y-4">
+    <section id={id} className="space-y-4">
       <SectionHeader title="Value Creation Opportunities" />
       <div className="grid gap-3 md:grid-cols-2">
         {opportunities.map((opp) => {
@@ -504,14 +529,22 @@ function DaypartHeatmap({ entries }: { entries: DaypartCoversEntry[] }) {
 
 export default async function CommercialPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ clientId: string; propertyId: string }>;
+  searchParams: Promise<{ metric?: string; category?: string }>;
 }) {
   const session = await getSession();
   if (!session) redirect("/login");
 
   const { clientId, propertyId } = await params;
   if (session.role !== "admin" && session.clientId !== clientId) redirect("/dashboard");
+
+  const { metric: metricParam, category: categoryParam } = await searchParams;
+  const scrollTargetId =
+    (metricParam && METRIC_KEY_SECTION[metricParam]) ||
+    (categoryParam && CATEGORY_SECTION[categoryParam]) ||
+    null;
 
   const [property, allMetrics, allIntelligence, lastUpdated] = await Promise.all([
     getProperty(propertyId, clientId),
@@ -685,6 +718,7 @@ export default async function CommercialPage({
 
   return (
     <PageWrapper noTopPadding>
+      <ScrollToSection targetId={scrollTargetId} />
       <NavBar session={session} transparentAtTop />
       <PropertyHeader property={property} lastUpdated={lastUpdated} />
       <PropertyTabs clientId={clientId} propertyId={propertyId} active="commercial" />
@@ -714,10 +748,11 @@ export default async function CommercialPage({
         )}
 
         {/* ── Opportunities — promoted from the bottom ────────────────────── */}
-        <OpportunitiesPanel opportunities={commercialOpportunities} />
+        <OpportunitiesPanel opportunities={commercialOpportunities} id="opportunities" />
 
         {/* ── Guest Experience ─────────────────────────────────────────── */}
         <CommercialSection
+          id="guest-experience"
           heading="Guest Experience"
           intelligence={intel("Guest")}
           metrics={guestRatings}
@@ -745,6 +780,7 @@ export default async function CommercialPage({
 
         {/* ── Volume & Conversion ──────────────────────────────────────── */}
         <CommercialSection
+          id="volume-conversion"
           heading="Volume & Conversion"
           intelligence={intel("Commercial")}
           metrics={catMetrics("Commercial")}
@@ -798,7 +834,7 @@ export default async function CommercialPage({
              entirely for properties with no RevPASH/Daypart Pattern data
              yet (Peacock Alley and Yoshoku, as of this writing). ────────── */}
         {hasCapacitySection && (
-          <section className="space-y-4">
+          <section id="seat-efficiency" className="space-y-4">
             <SectionHeader title="Seat Efficiency — RevPASH" />
             <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.5)", marginTop: -8, lineHeight: 1.6 }}>
               Revenue Per Available Seat Hour — which daypart and dinner configuration converts capacity into revenue most efficiently.

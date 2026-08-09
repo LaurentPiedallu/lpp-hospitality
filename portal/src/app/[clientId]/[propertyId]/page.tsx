@@ -151,6 +151,21 @@ const PRIORITY_TAB_BY_CATEGORY: Record<string, { segment: string; label: string 
   Pricing:         { segment: "/commercial", label: "Commercial Review" },
 };
 
+// Same tab-routing idea as PRIORITY_TAB_BY_CATEGORY above, but keyed by
+// Intelligence category (Financial | Labor | COGS | Commercial | Menu |
+// Guest | Execution | Data Quality) rather than Opportunity category — used
+// by Emerging Risk below, whose source is always an Intelligence record.
+// "Data Quality" intentionally absent — never client-facing (Part 6).
+const INTEL_CATEGORY_TAB: Record<string, { segment: string; label: string }> = {
+  Financial:  { segment: "/financial",  label: "Financial Review" },
+  Labor:      { segment: "/financial",  label: "Financial Review" },
+  COGS:       { segment: "/financial",  label: "Financial Review" },
+  Execution:  { segment: "/financial",  label: "Financial Review" },
+  Commercial: { segment: "/commercial", label: "Commercial Review" },
+  Guest:      { segment: "/commercial", label: "Commercial Review" },
+  Menu:       { segment: "/menu",       label: "Menu Engineering" },
+};
+
 // Standard-treatment card for priorities #2–3 — #1 gets the full-bleed hero
 // treatment inline in the page body below instead (see "Top priority — hero").
 function TopPriorityCard({ priority, clientId, propertyId }: { priority: TopPriority; clientId: string; propertyId: string }) {
@@ -185,7 +200,7 @@ function TopPriorityCard({ priority, clientId, propertyId }: { priority: TopPrio
       )}
       {target && (
         <Link
-          href={`/${clientId}/${propertyId}${target.segment}`}
+          href={`/${clientId}/${propertyId}${target.segment}?category=${encodeURIComponent(priority.category)}`}
           className="hover:text-[#D4AF7A]"
           style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: GOLD, textDecoration: "none", transition: "color 0.25s ease" }}
         >
@@ -303,6 +318,10 @@ export default async function PropertyPage({
   // sentence), replacing four separately hand-coded card bodies.
   interface FinancialCard {
     label: string;
+    // LPP Metric Key backing this card — used to build the deep-link into
+    // Financial Review's matching section (Cross-tab audit Part 4, see
+    // METRIC_KEY_SECTION in financial/page.tsx).
+    metricKey: string;
     value: string;
     valueColor: string;
     subLine: string | null;
@@ -313,6 +332,7 @@ export default async function PropertyPage({
     ? [
         {
           label: "Revenue",
+          metricKey: "total_revenue",
           value: kpi.revenue != null ? compact(kpi.revenue) : "—",
           valueColor: "#12120F",
           subLine: kpi.covers != null ? `${kpi.covers.toLocaleString()} covers` : null,
@@ -326,6 +346,7 @@ export default async function PropertyPage({
         },
         {
           label: "Labor",
+          metricKey: "labor_pct",
           value: kpi.laborPct != null ? pct(kpi.laborPct) : "—",
           valueColor: kpi.laborPct == null ? "#12120F" : kpi.laborPct <= 42 ? "#12120F" : "#C0392B",
           subLine: kpi.laborDollars != null ? usd(kpi.laborDollars) : null,
@@ -339,6 +360,7 @@ export default async function PropertyPage({
         },
         {
           label: "Food COGS",
+          metricKey: "cogs_pct",
           value: kpi.cogsPct != null ? pct(kpi.cogsPct) : "—",
           valueColor: kpi.cogsPct == null ? "#12120F" : kpi.cogsPct <= 34 ? "#12120F" : "#C0392B",
           subLine: kpi.cogsDollars != null ? usd(kpi.cogsDollars) : null,
@@ -352,6 +374,7 @@ export default async function PropertyPage({
         },
         {
           label: "Net Profit",
+          metricKey: "net_profit_pct",
           value: kpi.netProfitPct != null ? pct(kpi.netProfitPct) : "—",
           valueColor: kpi.netProfitPct == null ? "#12120F" : kpi.netProfitPct >= 6 ? "#12120F" : "#C0392B",
           subLine: kpi.netProfitDollars != null ? usd(kpi.netProfitDollars) : null,
@@ -413,6 +436,7 @@ export default async function PropertyPage({
   ]
     .map(({ label, key, fallback }) => ({
       label,
+      metricKey: key,
       metric: guestMetric(key, fallback),
       interpretation: metricInterpretation(key),
       delta: priorPeriod ? periodDelta(key) : null,
@@ -420,6 +444,7 @@ export default async function PropertyPage({
     .filter(
       (c): c is {
         label: string;
+        metricKey: string;
         metric: { display: string; isRange: boolean };
         interpretation: string;
         delta: { current: number; prior: number; delta: number } | null;
@@ -767,7 +792,7 @@ export default async function PropertyPage({
               )}
               {PRIORITY_TAB_BY_CATEGORY[topPriorities[0].category] && (
                 <Link
-                  href={`/${clientId}/${propertyId}${PRIORITY_TAB_BY_CATEGORY[topPriorities[0].category].segment}`}
+                  href={`/${clientId}/${propertyId}${PRIORITY_TAB_BY_CATEGORY[topPriorities[0].category].segment}?category=${encodeURIComponent(topPriorities[0].category)}`}
                   className="hover:text-[#D4AF7A]"
                   style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: GOLD, textDecoration: "none", transition: "color 0.25s ease" }}
                 >
@@ -812,7 +837,11 @@ export default async function PropertyPage({
             )}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {financialCards.map((card) => (
-                <div key={card.label} style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "24px 28px" }}>
+                <Link
+                  key={card.label}
+                  href={`/${clientId}/${propertyId}/financial?metric=${card.metricKey}`}
+                  style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "24px 28px", display: "block", textDecoration: "none", color: "inherit" }}
+                >
                   <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 8 }}>
                     {card.label}
                   </p>
@@ -830,7 +859,7 @@ export default async function PropertyPage({
                     </div>
                   )}
                   {card.interpretation && <p style={captionStyle}>{card.interpretation}</p>}
-                </div>
+                </Link>
               ))}
             </div>
 
@@ -853,9 +882,10 @@ export default async function PropertyPage({
           <section style={{ marginBottom: SECTION_GAP }}>
           <CollapsibleOnMobile header={<SectionHeader title="Guest Experience" />}>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {guestCards.map(({ label, metric, interpretation, delta }) => (
-                <div
+              {guestCards.map(({ label, metricKey, metric, interpretation, delta }) => (
+                <Link
                   key={label}
+                  href={`/${clientId}/${propertyId}/commercial?metric=${metricKey}`}
                   style={{
                     background: "#FFFFFF",
                     border: "1px solid rgba(18,18,15,0.08)",
@@ -863,6 +893,8 @@ export default async function PropertyPage({
                     padding: "24px 28px",
                     display: "flex",
                     flexDirection: "column",
+                    textDecoration: "none",
+                    color: "inherit",
                   }}
                 >
                   <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 8 }}>
@@ -894,7 +926,7 @@ export default async function PropertyPage({
                   <div style={{ flex: 1 }}>
                     {interpretation && <p style={captionStyle}>{interpretation}</p>}
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
 
@@ -924,6 +956,17 @@ export default async function PropertyPage({
                 <p style={{ marginTop: 8, opacity: 0.8 }}>{emergingRisk.currentRead}</p>
               )}
             </CalloutBlock>
+            {INTEL_CATEGORY_TAB[emergingRisk.category] && (
+              <div className="text-right" style={{ marginTop: 12 }}>
+                <Link
+                  href={`/${clientId}/${propertyId}${INTEL_CATEGORY_TAB[emergingRisk.category].segment}?category=${encodeURIComponent(emergingRisk.category)}`}
+                  className="hover:text-[#D4AF7A]"
+                  style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#B8935A", textDecoration: "none", transition: "color 0.25s ease" }}
+                >
+                  View in {INTEL_CATEGORY_TAB[emergingRisk.category].label} →
+                </Link>
+              </div>
+            )}
           </CollapsibleOnMobile>
           </section>
         )}
