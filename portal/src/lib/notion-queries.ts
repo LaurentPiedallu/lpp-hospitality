@@ -272,10 +272,30 @@ export async function getRisks(propertyId: string, periodIso?: string): Promise<
 
 // ─── Intelligence ─────────────────────────────────────────────────────────────
 
-export async function getIntelligence(propertyId: string): Promise<Intelligence[]> {
+// clientVisibleOnly: apply at every call site that surfaces Intelligence
+// *content* (finding/currentRead/whyItMatters/suggestedDecision text) to a
+// client session — Overview, Financial Review, Commercial Review, the
+// Intelligence tab, and the /api/data/intelligence REST endpoint. The
+// "Client Visible" checkbox is already backfilled false for Data Quality
+// category records and any record naming an individual by name (verified
+// against live data: zero exceptions across all three properties among
+// Published records). Deliberately NOT the default — two real callers need
+// every record regardless of visibility: the rate-limit check in
+// /api/intelligence/request (must see the true most-recent record per
+// category, not just the client-visible one, or it under-limits) and
+// getLastUpdated below (a max-timestamp computation, never renders
+// content, so filtering it would just be a wrong "last updated" figure).
+export async function getIntelligence(
+  propertyId: string,
+  opts?: { clientVisibleOnly?: boolean }
+): Promise<Intelligence[]> {
+  const propertyFilter = relationFilter("Property", propertyId);
+  const scoped = opts?.clientVisibleOnly
+    ? { and: [propertyFilter, { property: "Client Visible", checkbox: { equals: true } }] }
+    : propertyFilter;
   const pages = await queryDatabase({
     databaseId: NOTION_DBS.INTELLIGENCE,
-    filter: publishedAnd(relationFilter("Property", propertyId)),
+    filter: publishedAnd(scoped),
     sorts: [{ property: "Reporting Period", direction: "descending" }],
   });
   return pages.map((p) => ({

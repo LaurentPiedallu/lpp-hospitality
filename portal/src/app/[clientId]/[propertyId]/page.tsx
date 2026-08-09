@@ -212,7 +212,7 @@ export default async function PropertyPage({
     getLatestKpiSummary(propertyId),
     getKpiMetrics(propertyId),
     getActions(propertyId),
-    getIntelligence(propertyId),
+    getIntelligence(propertyId, { clientVisibleOnly: true }),
     getPublishedBriefs(propertyId, clientId),
   ]);
 

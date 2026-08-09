@@ -516,7 +516,7 @@ export default async function CommercialPage({
   const [property, allMetrics, allIntelligence, lastUpdated] = await Promise.all([
     getProperty(propertyId, clientId),
     getKpiMetrics(propertyId),
-    getIntelligence(propertyId),
+    getIntelligence(propertyId, { clientVisibleOnly: true }),
     getLastUpdated(propertyId, clientId),
   ]);
 

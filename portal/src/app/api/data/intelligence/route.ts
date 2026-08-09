@@ -15,7 +15,10 @@ export async function GET(req: NextRequest) {
   if (!property) return err("Property not found", 404);
 
   try {
-    return ok(await getIntelligence(propertyId));
+    // Client-authenticated (requireClient above) — must not leak internal
+    // Data Quality findings or individual-staff-named records over the API
+    // any more than the pages that read this same data are allowed to.
+    return ok(await getIntelligence(propertyId, { clientVisibleOnly: true }));
   } catch (e) {
     console.error("GET /api/data/intelligence", e);
     return err("Failed to fetch intelligence");

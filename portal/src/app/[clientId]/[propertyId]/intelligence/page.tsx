@@ -102,7 +102,7 @@ export default async function IntelligencePage({
 
   const [property, allIntelligence, lastUpdated] = await Promise.all([
     getProperty(propertyId, clientId),
-    getIntelligence(propertyId),
+    getIntelligence(propertyId, { clientVisibleOnly: true }),
     getLastUpdated(propertyId, clientId),
   ]);
 
