@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { getProperty, getMenuBatches, getMenuItems, getLastUpdated } from "@/lib/notion-queries";
-import { formatPeriod } from "@/lib/format";
+import { getProperty, getMenuBatches, getMenuItems, getIntelligence, getLastUpdated } from "@/lib/notion-queries";
+import { formatPeriod, findIntelligence } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
@@ -12,6 +12,7 @@ import KpiCard from "@/components/KpiCard";
 import EmptyState from "@/components/EmptyState";
 import MenuQuadrantScatter from "@/components/MenuQuadrantScatter";
 import MenuItemsTable from "@/components/MenuItemsTable";
+import FindingSection from "@/components/FindingSection";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 
@@ -113,6 +114,7 @@ export default async function MenuPage({
 // Split out so the batch-scoped Menu Items fetch only happens once a batch
 // is resolved (needs an await, so it can't live inline in the JSX above).
 async function MenuBatchView({
+  propertyId,
   batches,
   activeBatchId,
   basePath,
@@ -124,7 +126,20 @@ async function MenuBatchView({
   basePath: string;
 }) {
   const activeBatch = batches.find((b) => b.id === activeBatchId)!;
-  const items = await getMenuItems(activeBatchId);
+  const [items, intelligence] = await Promise.all([
+    getMenuItems(activeBatchId),
+    getIntelligence(propertyId, { clientVisibleOnly: true }),
+  ]);
+
+  // Same Executive Interpretation + Evidence pattern Financial Review uses
+  // (Cross-tab audit Part 3), via the shared FindingSection component.
+  // Menu Engineering has no KpiMetric data (Menu Items/Batches are a
+  // different shape entirely), so metrics/allMetrics are always empty —
+  // FindingSection already degrades gracefully for that (no Evidence
+  // table, no Trend chart), leaving just the current-read callout and
+  // Executive Interpretation toggle, driven entirely by the Menu-category
+  // Intelligence finding for this batch's own Reporting Period.
+  const menuIntel = findIntelligence(intelligence, "Menu", activeBatch.reportingPeriod);
 
   return (
     <>
@@ -144,6 +159,10 @@ async function MenuBatchView({
           variant="amber"
         />
       </div>
+
+      {(menuIntel?.currentRead || menuIntel?.whyItMatters || menuIntel?.suggestedDecision) && (
+        <FindingSection heading="Menu Insights" intelligence={menuIntel} metrics={[]} allMetrics={[]} trendColor="#B8935A" />
+      )}
 
       {items.length === 0 ? (
         <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.4)", padding: "24px 0" }}>

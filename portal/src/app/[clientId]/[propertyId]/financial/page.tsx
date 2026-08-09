@@ -1,18 +1,16 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getProperty, getKpiMetrics, getIntelligence, getLastUpdated } from "@/lib/notion-queries";
-import { usd, pct, buildTrendData, findMetricByKey, findIntelligence } from "@/lib/format";
+import { usd, pct, findMetricByKey, findIntelligence } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
 import PropertyTabs from "@/components/PropertyTabs";
 import SectionHeader from "@/components/SectionHeader";
-import CalloutBlock from "@/components/CalloutBlock";
 import KpiCard from "@/components/KpiCard";
-import StatusBadge from "@/components/StatusBadge";
-import TrendChart from "@/components/TrendChart";
 import BenchmarkGauge from "@/components/BenchmarkGauge";
 import EmptyState from "@/components/EmptyState";
+import FindingSection from "@/components/FindingSection";
 import type { KpiMetric, Intelligence, Severity } from "@/types/portal";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
@@ -123,149 +121,8 @@ function StackedSplit({
   );
 }
 
-// ─── Section component ────────────────────────────────────────────────────────
-
-function FinancialSection({
-  heading,
-  connector,
-  intelligence,
-  metrics,
-  allMetrics,
-  primarySeverity,
-  children,
-}: {
-  heading: string;
-  // Short line at the top of the section linking back to what came before —
-  // keeps the throughline alive for a reader going straight through without
-  // making the section unreadable on its own for someone who jumped here.
-  connector?: string;
-  intelligence: Intelligence | null;
-  metrics: KpiMetric[];   // latest period metrics for this section
-  allMetrics: KpiMetric[]; // all periods — for trend chart
-  // Severity of this section's own primary metric (e.g. labor_pct for
-  // Labor) — not an arbitrary first-in-array metric, which could belong to
-  // any line item in the category and mislead the badge.
-  primarySeverity?: Severity;
-  children: React.ReactNode; // KPI cards / driver visuals — caller owns layout
-}) {
-  const severity = intelligence?.severity ?? primarySeverity ?? "Monitor";
-
-  return (
-    <section className="space-y-4">
-      <SectionHeader title={heading} />
-
-      {connector && (
-        <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.45)", fontStyle: "italic", marginTop: -8 }}>
-          {connector}
-        </p>
-      )}
-
-      {/* Current read callout — badge first, paragraph below */}
-      {intelligence?.currentRead ? (
-        <CalloutBlock>
-          <div className="space-y-3">
-            <StatusBadge label={severity} variant={severityVariant(severity)} />
-            <p>{intelligence.currentRead}</p>
-          </div>
-        </CalloutBlock>
-      ) : metrics.length > 0 ? (
-        <CalloutBlock>
-          <div className="space-y-3">
-            <StatusBadge label={severity} variant={severityVariant(severity)} />
-            <p className="text-sm opacity-70 italic">No commentary published for this period.</p>
-          </div>
-        </CalloutBlock>
-      ) : null}
-
-      {/* KPI cards / driver visuals */}
-      {children}
-
-      {/* Trend chart — shown if 2+ periods available */}
-      {allMetrics.length >= 2 && (() => {
-        const trendData = buildTrendData(allMetrics);
-        const unit = allMetrics[0]?.unit ?? "%";
-        const bLow = allMetrics[0]?.benchmarkLow;
-        const bHigh = allMetrics[0]?.benchmarkHigh;
-        return (
-          <div className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] p-4">
-            <p className="text-xs text-gray-400 mb-3 uppercase tracking-widest">Trend</p>
-            <TrendChart
-              data={trendData}
-              unit={unit}
-              benchmarkLow={bLow}
-              benchmarkHigh={bHigh}
-              color="#2563eb"
-            />
-          </div>
-        );
-      })()}
-
-      {/* Executive Interpretation toggle */}
-      {(intelligence?.whyItMatters || intelligence?.suggestedDecision) && (
-        <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden group">
-          <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between select-none hover:bg-gray-50 transition">
-            <span>Executive Interpretation</span>
-            <span className="text-gray-400 text-xs group-open:rotate-180 transition-transform">▼</span>
-          </summary>
-          <div className="px-5 pb-5 pt-2 space-y-4 border-t border-gray-50">
-            {intelligence.whyItMatters && (
-              <div>
-                <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Why It Matters</p>
-                <p className="text-sm text-gray-700 leading-relaxed">{intelligence.whyItMatters}</p>
-              </div>
-            )}
-            {intelligence.suggestedDecision && (
-              <div>
-                <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Recommendation</p>
-                <p className="text-sm text-gray-700 leading-relaxed">{intelligence.suggestedDecision}</p>
-              </div>
-            )}
-          </div>
-        </details>
-      )}
-
-      {/* Evidence toggle — raw metrics */}
-      {metrics.length > 0 && (
-        <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden">
-          <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between select-none hover:bg-gray-50 transition">
-            <span>Evidence</span>
-            <span className="text-gray-400 text-xs">▼</span>
-          </summary>
-          <div className="border-t border-gray-50 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-50">
-                  <th className="text-left px-5 py-2.5 text-xs text-gray-400 font-medium">Metric</th>
-                  <th className="text-right px-5 py-2.5 text-xs text-gray-400 font-medium">Value</th>
-                  <th className="text-right px-5 py-2.5 text-xs text-gray-400 font-medium">Benchmark</th>
-                  <th className="text-right px-5 py-2.5 text-xs text-gray-400 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {metrics.map((m) => (
-                  <tr key={m.id} className="border-b border-gray-50 last:border-0">
-                    <td className="px-5 py-2.5 text-gray-700">{m.metricName || m.kpiRecord}</td>
-                    <td className="px-5 py-2.5 text-right font-medium text-gray-900">
-                      {m.unit === "$" ? usd(m.metricValue) : m.unit === "%" ? pct(m.metricValue) : m.metricValue}
-                    </td>
-                    <td className="px-5 py-2.5 text-right text-gray-400 text-xs">
-                      {m.benchmarkLow != null && m.benchmarkHigh != null
-                        ? `${m.benchmarkLow}–${m.benchmarkHigh}${m.unit}`
-                        : "—"}
-                    </td>
-                    <td className="px-5 py-2.5 text-right">
-                      <StatusBadge label={m.severity} variant={severityVariant(m.severity)} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </details>
-      )}
-    </section>
-  );
-}
+// FinancialSection extracted to src/components/FindingSection.tsx (Cross-tab
+// audit Part 3) — see call sites below, now <FindingSection ...>.
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -450,7 +307,7 @@ export default async function FinancialPage({
         })()}
 
         {/* ── Revenue ──────────────────────────────────────────────────── */}
-        <FinancialSection
+        <FindingSection
           heading="Revenue"
           connector="The shortfall referenced above starts here, with cover volume and check average."
           intelligence={intel("Financial")}
@@ -476,10 +333,10 @@ export default async function FinancialPage({
                 variant={severityVariant(avgCheck.severity)} />
             )}
           </div>
-        </FinancialSection>
+        </FindingSection>
 
         {/* ── Labor ────────────────────────────────────────────────────── */}
-        <FinancialSection
+        <FindingSection
           heading="Labor"
           connector="Following the dinner shortfall above, labor did not scale down to match the reduced volume."
           intelligence={intel("Labor")}
@@ -518,10 +375,10 @@ export default async function FinancialPage({
               />
             )}
           </div>
-        </FinancialSection>
+        </FindingSection>
 
         {/* ── COGS ─────────────────────────────────────────────────────── */}
-        <FinancialSection
+        <FindingSection
           heading="Food & Beverage COGS"
           connector="Unlike labor, food and beverage cost control held through the same volume decline."
           intelligence={intel("COGS")}
@@ -561,10 +418,10 @@ export default async function FinancialPage({
               />
             )}
           </div>
-        </FinancialSection>
+        </FindingSection>
 
         {/* ── OpEx ─────────────────────────────────────────────────────── */}
-        <FinancialSection
+        <FindingSection
           heading="Operating Expenses"
           connector="The larger structural pressure sits here — the Kitchen Allocation charge below does not flex with revenue the way labor or COGS do."
           intelligence={intel("Execution")}
@@ -598,10 +455,10 @@ export default async function FinancialPage({
               />
             )}
           </div>
-        </FinancialSection>
+        </FindingSection>
 
         {/* ── Profitability — distinct layout as the page's conclusion ──── */}
-        <FinancialSection
+        <FindingSection
           heading="Profitability"
           connector="The combined effect of the revenue shortfall, labor ratio, and OpEx allocation above nets out below."
           intelligence={intel("Profitability")}
@@ -636,7 +493,7 @@ export default async function FinancialPage({
               </div>
             )}
           </div>
-        </FinancialSection>
+        </FindingSection>
 
         {/* Empty state */}
         {allMetrics.length === 0 && (
