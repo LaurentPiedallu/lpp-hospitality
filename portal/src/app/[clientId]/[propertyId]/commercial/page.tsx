@@ -30,6 +30,22 @@ const GOLD = "#B8935A";
 // guest-experience display on this page (cards, table, benchmark gauges).
 const REDUNDANT_GUEST_METRIC_NAMES = new Set(["Atmosphere Sub-Score", "Food Taste Score"]);
 
+// Opportunity Category values that belong on this tab — pulled from the
+// real "Category Mapping (LPP internal)" Notion database, not guessed.
+// That table buckets every Opportunity/Risk/Intelligence category into six
+// groups matching Initiative.category (Labor, Finance, Commercial, Guest,
+// Menu, Execution); Commercial Review already legitimately combines Guest
+// and Commercial content on one tab (several real Opportunities explicitly
+// link guest sentiment to demand, e.g. "Convert 96 likelihood-to-recommend
+// guests into loyalty program enrollees"), so both buckets' categories
+// belong here: Commercial (Revenue Mix, Pricing, Reservations, Commercial)
+// + Guest (Guest, Guest Retention). Labor/Finance/Menu/Execution-category
+// items belong on their own tabs, not here — this was previously
+// unfiltered, showing every category regardless of tab.
+const COMMERCIAL_OPPORTUNITY_CATEGORIES = new Set([
+  "Revenue Mix", "Pricing", "Reservations", "Commercial", "Guest", "Guest Retention",
+]);
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function severityVariant(s: Severity): "green" | "amber" | "red" {
@@ -537,7 +553,10 @@ export default async function CommercialPage({
   // go through looksLikeIndividualStaffMetric at all.
   const staffNames = extractIndividualStaffNames(allMetrics);
   const commercialOpportunities = (opportunities as Opportunity[]).filter(
-    (o) => !mentionsIndividualStaff(o.title, staffNames) && !mentionsIndividualStaff(o.nextStep, staffNames)
+    (o) =>
+      COMMERCIAL_OPPORTUNITY_CATEGORIES.has(o.category) &&
+      !mentionsIndividualStaff(o.title, staffNames) &&
+      !mentionsIndividualStaff(o.nextStep, staffNames)
   );
 
   // Guest ratings — all Rating-unit metrics under Guest Experience category,
