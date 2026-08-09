@@ -388,6 +388,7 @@ function toBrief(p: Awaited<ReturnType<typeof queryDatabase>>[number], clientId:
     // exist on the page, so this is safe to read now.
     outlook: richText(p, "Outlook"),
     ownershipQuestions: richText(p, "Ownership Discussion"),
+    driverFindingIds: relationIds(p, "Driver Findings"),
   };
 }
 

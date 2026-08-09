@@ -221,6 +221,14 @@ export interface Brief {
   // above. "\n"-separated, 2-3 open strategic questions for discussion,
   // not action items (kept visually distinct from Top 3 Priorities).
   ownershipQuestions: string;
+  // Driver Findings — real Notion property (relation -> Intelligence),
+  // added for the Drivers grouping rebuild (Cross-tab audit Part 5).
+  // Confirmed empty on every Brief as of this writing (Scenario C hasn't
+  // been built yet to populate it) — the frontend reads this instead of
+  // the old unstructured criticalDrivers text, and criticalDrivers is
+  // deliberately no longer rendered on Overview once this field exists,
+  // per the explicit instruction not to backfill from the old field.
+  driverFindingIds: string[];
 }
 
 export interface Benchmark {

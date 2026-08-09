@@ -439,7 +439,33 @@ export default async function PropertyPage({
   // five new fields empty, and fall back to the old single-paragraph
   // Executive Summary rendering above instead.
   const hasNewBriefFormat = !!latestBrief?.executiveRead?.trim();
-  const criticalDrivers = latestBrief?.criticalDrivers ? parseTextLines(latestBrief.criticalDrivers) : [];
+
+  // Drivers grouping (Cross-tab audit Part 5) — replaces the old
+  // unstructured criticalDrivers text field with the real Driver Findings
+  // relation (Brief -> Intelligence), grouped into "Financial & Commercial"
+  // vs "Operational" per the confirmed bucket mapping. Deliberately does
+  // NOT fall back to parsing criticalDrivers text if Driver Findings is
+  // empty (it is, on every Brief, as of this writing — Scenario C hasn't
+  // been built to populate it yet) - per explicit instruction, so this
+  // section renders nothing today rather than a stale/mixed mechanism.
+  const driverBuckets = (() => {
+    const bucketOf: Record<string, "financial" | "operational"> = {
+      Financial: "financial", Labor: "financial", COGS: "financial",
+      Commercial: "financial", Menu: "financial",
+      Guest: "operational", Execution: "operational",
+      // "Data Quality" intentionally absent — never shown as a Driver.
+    };
+    const financial: Intelligence[] = [];
+    const operational: Intelligence[] = [];
+    for (const id of latestBrief?.driverFindingIds ?? []) {
+      const finding = (intelligence as Intelligence[]).find((i) => i.id === id);
+      if (!finding) continue;
+      const bucket = bucketOf[finding.category];
+      if (bucket === "financial") financial.push(finding);
+      else if (bucket === "operational") operational.push(finding);
+    }
+    return { financial, operational };
+  })();
 
   // Outlook / Ownership Discussion — genuinely new content, not yet
   // populated in Notion for any property (see the Brief type's comments on
@@ -603,21 +629,51 @@ export default async function PropertyPage({
               </p>
             </div>
 
-            {/* Zone 2 — Critical Drivers: a scan zone, one line each */}
-            {criticalDrivers.length > 0 && (
+            {/* Zone 2 — Critical Drivers: grouped Financial & Commercial vs
+                Operational, from Driver Findings (see driverBuckets above).
+                Each sub-group renders only if it has items; the whole zone
+                stays hidden if both are empty (no fallback to the old
+                criticalDrivers text, per explicit instruction). */}
+            {(driverBuckets.financial.length > 0 || driverBuckets.operational.length > 0) && (
               <div>
                 <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD, marginBottom: 14 }}>
                   Critical Drivers
                 </p>
-                <div className="space-y-2">
-                  {criticalDrivers.map((driver, i) => (
-                    <div key={i} className="flex items-center" style={{ gap: 10 }}>
-                      <span style={{ width: 6, height: 6, background: GOLD, flexShrink: 0 }} />
-                      <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.7)", lineHeight: 1.4 }}>
-                        {driver}
+                <div className="space-y-5">
+                  {driverBuckets.financial.length > 0 && (
+                    <div>
+                      <p style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(18,18,15,0.4)", marginBottom: 8 }}>
+                        Financial &amp; Commercial
                       </p>
+                      <div className="space-y-2">
+                        {driverBuckets.financial.map((f) => (
+                          <div key={f.id} className="flex items-center" style={{ gap: 10 }}>
+                            <span style={{ width: 6, height: 6, background: GOLD, flexShrink: 0 }} />
+                            <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.7)", lineHeight: 1.4 }}>
+                              {f.finding}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ))}
+                  )}
+                  {driverBuckets.operational.length > 0 && (
+                    <div>
+                      <p style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(18,18,15,0.4)", marginBottom: 8 }}>
+                        Operational
+                      </p>
+                      <div className="space-y-2">
+                        {driverBuckets.operational.map((f) => (
+                          <div key={f.id} className="flex items-center" style={{ gap: 10 }}>
+                            <span style={{ width: 6, height: 6, background: GOLD, flexShrink: 0 }} />
+                            <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.7)", lineHeight: 1.4 }}>
+                              {f.finding}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
