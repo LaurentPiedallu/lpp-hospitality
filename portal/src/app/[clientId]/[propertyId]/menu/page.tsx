@@ -15,6 +15,7 @@ import MenuItemsTable from "@/components/MenuItemsTable";
 import FindingSection from "@/components/FindingSection";
 import ScrollToSection from "@/components/ScrollToSection";
 import OpportunitiesPanel from "@/components/OpportunitiesPanel";
+import { MENU_CATEGORY_SECTION } from "@/lib/deep-links";
 import type { Opportunity } from "@/types/portal";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
@@ -77,11 +78,13 @@ export default async function MenuPage({
   const { batch: batchParam, category: categoryParam } = await searchParams;
   if (session.role !== "admin" && session.clientId !== clientId) redirect("/dashboard");
 
-  // Deep-link anchor (Cross-tab audit Part 4) — the only category that maps
-  // here is Menu, landing on the Menu Insights FindingSection below (which
-  // itself only renders when a Menu-category Intelligence finding exists
-  // for the active batch's period — ScrollToSection no-ops if it's absent).
-  const scrollTargetId = categoryParam === "Menu" ? "menu-insights" : null;
+  // Deep-link anchor (Cross-tab audit Part 4, routing map centralized in
+  // src/lib/deep-links.ts for Redesign prompt Step 5) — the only category
+  // that maps here is Menu, landing on the Menu Insights FindingSection
+  // below (which itself only renders when a Menu-category Intelligence
+  // finding exists for the active batch's period — ScrollToSection no-ops
+  // if it's absent).
+  const scrollTargetId = categoryParam ? MENU_CATEGORY_SECTION[categoryParam] ?? null : null;
 
   const [property, menuBatches, lastUpdated] = await Promise.all([
     getProperty(propertyId, clientId),

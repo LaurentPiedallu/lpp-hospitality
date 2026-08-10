@@ -21,31 +21,14 @@ import EmptyState from "@/components/EmptyState";
 import ScrollToSection from "@/components/ScrollToSection";
 import OpportunitiesPanel from "@/components/OpportunitiesPanel";
 import type { KpiMetric, Intelligence, Opportunity, Severity } from "@/types/portal";
+// Deep-link routing maps moved to src/lib/deep-links.ts (Redesign prompt
+// Step 5) so Intelligence's own cross-links resolve through the same
+// source of truth.
+import { COMMERCIAL_METRIC_SECTION as METRIC_KEY_SECTION, COMMERCIAL_CATEGORY_SECTION as CATEGORY_SECTION } from "@/lib/deep-links";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 const SERIF = "'Cormorant Garamond', Georgia, serif";
 const GOLD = "#B8935A";
-
-// ─── Deep-link anchors (Cross-tab audit Part 4) ────────────────────────────────
-// Resolves an incoming ?metric=<LppMetricKey> or ?category=<Intelligence or
-// Opportunity category> into one of this page's section ids (see id= props
-// below). Revenue Mix and Pricing have no dedicated KPI section of their
-// own — they're purely Opportunity-driven — so they land on the
-// Opportunities list itself rather than a specific metric panel. Reservations
-// does have a real KPI-category match (RevPASH is sourced from KPI Category
-// "Reservations"), so it lands there instead.
-const METRIC_KEY_SECTION: Record<string, string> = {
-  guest_overall: "guest-experience", guest_food: "guest-experience",
-  guest_service: "guest-experience", guest_ambiance: "guest-experience",
-};
-const CATEGORY_SECTION: Record<string, string> = {
-  Guest: "guest-experience",
-  "Guest Retention": "guest-experience",
-  Commercial: "volume-conversion",
-  Reservations: "seat-efficiency",
-  "Revenue Mix": "opportunities",
-  Pricing: "opportunities",
-};
 
 // Rating-unit Guest Experience metrics that duplicate a canonical score
 // already shown under its own card (e.g. "Atmosphere Sub-Score" alongside

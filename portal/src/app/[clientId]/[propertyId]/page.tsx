@@ -9,6 +9,7 @@ import {
 import { deriveHealth } from "@/lib/health";
 import { usd, pct, compact, formatPeriod, splitIntoParagraphs, parseTextLines, maxIso, findMetricByKey } from "@/lib/format";
 import { selectTopPriorities, type TopPriority } from "@/lib/priorities";
+import { PRIORITY_TAB_BY_CATEGORY, INTEL_CATEGORY_TAB } from "@/lib/deep-links";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
@@ -140,31 +141,9 @@ function TrendDelta({
 // (Kitchen Allocation's real category) route to Financial Review, where
 // the content actually lives; only the real "Menu" category routes to
 // Menu Engineering.
-const PRIORITY_TAB_BY_CATEGORY: Record<string, { segment: string; label: string }> = {
-  Menu:            { segment: "/menu",       label: "Menu Engineering" },
-  OpEx:            { segment: "/financial",  label: "Financial Review" },
-  Labor:           { segment: "/financial",  label: "Financial Review" },
-  Purchasing:      { segment: "/financial",  label: "Financial Review" },
-  Reservations:    { segment: "/commercial", label: "Commercial Review" },
-  "Revenue Mix":   { segment: "/commercial", label: "Commercial Review" },
-  "Guest Retention": { segment: "/commercial", label: "Commercial Review" },
-  Pricing:         { segment: "/commercial", label: "Commercial Review" },
-};
-
-// Same tab-routing idea as PRIORITY_TAB_BY_CATEGORY above, but keyed by
-// Intelligence category (Financial | Labor | COGS | Commercial | Menu |
-// Guest | Execution | Data Quality) rather than Opportunity category — used
-// by Emerging Risk below, whose source is always an Intelligence record.
-// "Data Quality" intentionally absent — never client-facing (Part 6).
-const INTEL_CATEGORY_TAB: Record<string, { segment: string; label: string }> = {
-  Financial:  { segment: "/financial",  label: "Financial Review" },
-  Labor:      { segment: "/financial",  label: "Financial Review" },
-  COGS:       { segment: "/financial",  label: "Financial Review" },
-  Execution:  { segment: "/financial",  label: "Financial Review" },
-  Commercial: { segment: "/commercial", label: "Commercial Review" },
-  Guest:      { segment: "/commercial", label: "Commercial Review" },
-  Menu:       { segment: "/menu",       label: "Menu Engineering" },
-};
+// PRIORITY_TAB_BY_CATEGORY and INTEL_CATEGORY_TAB moved to
+// src/lib/deep-links.ts (Redesign prompt Step 5) so the Intelligence tab's
+// own cross-links share the same routing instead of a fifth copy.
 
 // Standard-treatment card for priorities #2–3 — #1 gets the full-bleed hero
 // treatment inline in the page body below instead (see "Top priority — hero").

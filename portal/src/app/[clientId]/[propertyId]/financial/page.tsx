@@ -14,6 +14,10 @@ import FindingSection from "@/components/FindingSection";
 import ScrollToSection from "@/components/ScrollToSection";
 import OpportunitiesPanel from "@/components/OpportunitiesPanel";
 import type { KpiMetric, Intelligence, Opportunity, Severity } from "@/types/portal";
+// Deep-link routing maps moved to src/lib/deep-links.ts (Redesign prompt
+// Step 5) so Intelligence's own cross-links resolve through the same
+// source of truth.
+import { FINANCIAL_METRIC_SECTION as METRIC_KEY_SECTION, FINANCIAL_CATEGORY_SECTION as CATEGORY_SECTION } from "@/lib/deep-links";
 
 // Opportunity Category values that belong on this tab (Redesign prompt
 // Step 1) — the real "Opportunity Category" select field on Notion only
@@ -29,32 +33,6 @@ const FINANCIAL_OPPORTUNITY_CATEGORIES = new Set(["Labor", "OpEx", "Purchasing"]
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 const SERIF = "'Cormorant Garamond', Georgia, serif";
 const GOLD = "#B8935A";
-
-// ─── Deep-link anchors (Cross-tab audit Part 4) ────────────────────────────────
-// Resolves an incoming ?metric=<LppMetricKey> or ?category=<Intelligence or
-// Opportunity category> into one of this page's 5 FindingSection ids (see
-// their id= props below). "Purchasing" and "OpEx" have no FindingSection of
-// their own — Purchasing is food/beverage buying, which is what the COGS
-// section covers, and OpEx-category Opportunities are Kitchen-Allocation
-// items whose actual content lives in the Execution-sourced Operating
-// Expenses section (see PRIORITY_TAB_BY_CATEGORY's comment on Overview for
-// the same reasoning applied to which tab an OpEx item routes to).
-const METRIC_KEY_SECTION: Record<string, string> = {
-  total_revenue: "revenue", covers: "revenue", avg_spend: "revenue", avg_check: "revenue",
-  labor_pct: "labor", total_payroll: "labor",
-  cogs_pct: "cogs", total_cogs: "cogs",
-  opex: "opex", opex_pct: "opex",
-  net_profit: "profitability", net_profit_pct: "profitability",
-};
-const CATEGORY_SECTION: Record<string, string> = {
-  Financial: "revenue",
-  Labor: "labor",
-  COGS: "cogs",
-  Purchasing: "cogs",
-  Execution: "opex",
-  OpEx: "opex",
-  Profitability: "profitability",
-};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
