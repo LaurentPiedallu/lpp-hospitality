@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { getProperty, getKpiMetrics, getIntelligence, getLastUpdated } from "@/lib/notion-queries";
-import { usd, pct, findMetricByKey, findIntelligence } from "@/lib/format";
+import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastUpdated } from "@/lib/notion-queries";
+import { usd, pct, findMetricByKey, findIntelligence, extractIndividualStaffNames, mentionsIndividualStaff } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
@@ -12,7 +12,19 @@ import BenchmarkGauge from "@/components/BenchmarkGauge";
 import EmptyState from "@/components/EmptyState";
 import FindingSection from "@/components/FindingSection";
 import ScrollToSection from "@/components/ScrollToSection";
-import type { KpiMetric, Intelligence, Severity } from "@/types/portal";
+import OpportunitiesPanel from "@/components/OpportunitiesPanel";
+import type { KpiMetric, Intelligence, Opportunity, Severity } from "@/types/portal";
+
+// Opportunity Category values that belong on this tab (Redesign prompt
+// Step 1) — the real "Opportunity Category" select field on Notion only
+// ever contains [Labor, Pricing, Menu, Purchasing, Revenue Mix, Guest
+// Retention, Reservations, OpEx] (confirmed against the live schema and
+// every record, archived and published — zero exceptions). "COGS" is NOT
+// a valid value on this field (it exists on Intelligence Category and KPI
+// Category, a common source of confusion, but never on Opportunities), so
+// it's deliberately excluded here rather than included as a dead filter
+// clause that could never match anything.
+const FINANCIAL_OPPORTUNITY_CATEGORIES = new Set(["Labor", "OpEx", "Purchasing"]);
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 const SERIF = "'Cormorant Garamond', Georgia, serif";
@@ -185,6 +197,22 @@ export default async function FinancialPage({
   const currentMetrics = latest
     ? allMetrics.filter((m) => m.periodStart === latest)
     : allMetrics;
+
+  // Opportunities panel (Redesign prompt Step 1) — Labor/OpEx/Purchasing
+  // category items (e.g. kitchen allocation renegotiation) had no home
+  // anywhere in the client portal, since Commercial Review's own category
+  // filter correctly excludes them. Scoped to the current period, same
+  // convention getOpportunities already uses everywhere else it's called.
+  // Same individual-staff-name exclusion Commercial Review applies — a
+  // client-facing safety rule, not specific to any one tab.
+  const opportunities = latest ? await getOpportunities(propertyId, latest) : [];
+  const staffNames = extractIndividualStaffNames(allMetrics);
+  const financialOpportunities = (opportunities as Opportunity[]).filter(
+    (o) =>
+      FINANCIAL_OPPORTUNITY_CATEGORIES.has(o.category) &&
+      !mentionsIndividualStaff(o.title, staffNames) &&
+      !mentionsIndividualStaff(o.nextStep, staffNames)
+  );
 
   // Helper: current period metrics for a category
   const catMetrics = (cat: string) => currentMetrics.filter((m) => m.category === cat);
@@ -535,6 +563,9 @@ export default async function FinancialPage({
             )}
           </div>
         </FindingSection>
+
+        {/* ── Opportunities — Labor/OpEx/Purchasing, Redesign prompt Step 1 ── */}
+        <OpportunitiesPanel opportunities={financialOpportunities} id="opportunities" />
 
         {/* Empty state */}
         {allMetrics.length === 0 && (
