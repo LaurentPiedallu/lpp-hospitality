@@ -111,6 +111,7 @@ function CommercialSection({
   allMetrics,
   trendUnit,
   hideCallout,
+  hideEvidence,
   id,
   children,
 }: {
@@ -120,6 +121,14 @@ function CommercialSection({
   allMetrics: KpiMetric[];
   trendUnit?: string;
   hideCallout?: boolean;
+  // Suppresses the auto-generated Evidence table even though metrics.length
+  // > 0 (which still drives the "No commentary published" callout below).
+  // Needed when the caller already renders its own, more precise view of
+  // the same metrics — e.g. RevPASH's dollar-and-cents bars, where the
+  // generic usd() formatting in the Evidence table rounds away the cents
+  // that matter at this scale, and a real placeholder "not yet available"
+  // record would otherwise show as a misleading literal "$0".
+  hideEvidence?: boolean;
   // Deep-link anchor (Cross-tab audit Part 4) — see ScrollToSection.
   id?: string;
   children: React.ReactNode;
@@ -181,7 +190,7 @@ function CommercialSection({
         </details>
       )}
 
-      {metrics.length > 0 && (
+      {metrics.length > 0 && !hideEvidence && (
         <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden">
           <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between select-none hover:bg-gray-50 transition">
             <span>Supporting detail</span>
@@ -629,6 +638,18 @@ export default async function CommercialPage({
     metric: byKey("revpash", "Reservations", seg),
   }));
   const hasRevpashData = revpashEntries.some((e) => e.metric != null);
+  // Real KpiMetric rows behind the bars above — passed to CommercialSection
+  // below so its built-in Evidence table (metric/value/benchmark/status)
+  // renders for RevPASH the same way it does for every other section on
+  // this page. Deliberately no Intelligence category exists for
+  // Reservations/RevPASH (verified against the live schema), so this
+  // section gets the structural shell only — real data and benchmarks,
+  // no narrative commentary, same "No commentary published for this
+  // period" honesty every other section already falls back to when its
+  // own Intelligence record is missing (Redesign prompt Step 3).
+  const revpashMetrics = revpashEntries
+    .map((e) => e.metric)
+    .filter((m): m is KpiMetric => m != null);
 
   // Trend per segment — only where a segment actually has 2+ distinct
   // periods of revpash data (none do yet in the live dataset; this is
@@ -776,10 +797,25 @@ export default async function CommercialPage({
         {/* ── Seat Efficiency (RevPASH) — capacity-efficiency, kept distinct
              from the P&L-style panels elsewhere on this page. Hidden
              entirely for properties with no RevPASH/Daypart Pattern data
-             yet (Peacock Alley and Yoshoku, as of this writing). ────────── */}
+             yet (Peacock Alley and Yoshoku, as of this writing). Now uses
+             CommercialSection like every other section (Redesign prompt
+             Step 3) — intelligence=null since no Intelligence category
+             maps to Reservations, so it renders the honest "No commentary
+             published" callout plus a real Evidence table from revpashMetrics,
+             not a fabricated narrative. allMetrics=[] deliberately, so
+             CommercialSection's own single blended trend chart doesn't
+             duplicate the per-segment trend grid already in children below —
+             a single trend line wouldn't mean anything across 5 distinct
+             operating configurations anyway. ────────── */}
         {hasCapacitySection && (
-          <section id="seat-efficiency" className="space-y-4">
-            <SectionHeader title="Seat Efficiency — RevPASH" />
+          <CommercialSection
+            id="seat-efficiency"
+            heading="Seat Efficiency — RevPASH"
+            intelligence={null}
+            metrics={revpashMetrics}
+            allMetrics={[]}
+            hideEvidence
+          >
             <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.5)", marginTop: -8, lineHeight: 1.6 }}>
               Revenue Per Available Seat Hour — which daypart and dinner configuration converts capacity into revenue most efficiently.
             </p>
@@ -800,7 +836,7 @@ export default async function CommercialPage({
             )}
 
             {daypartPatternEntries.length > 0 && <DaypartHeatmap entries={daypartPatternEntries} />}
-          </section>
+          </CommercialSection>
         )}
 
         {/* ── Performance vs Benchmarks — commercial-relevant metrics only ── */}
