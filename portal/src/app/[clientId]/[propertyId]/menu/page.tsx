@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { getProperty, getMenuBatches, getMenuItems, getIntelligence, getLastUpdated } from "@/lib/notion-queries";
+import { getProperty, getMenuBatches, getMenuItems, getIntelligence, getOpportunities, getLastUpdated } from "@/lib/notion-queries";
 import { formatPeriod, findIntelligence } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
@@ -14,6 +14,8 @@ import MenuQuadrantScatter from "@/components/MenuQuadrantScatter";
 import MenuItemsTable from "@/components/MenuItemsTable";
 import FindingSection from "@/components/FindingSection";
 import ScrollToSection from "@/components/ScrollToSection";
+import OpportunitiesPanel from "@/components/OpportunitiesPanel";
+import type { Opportunity } from "@/types/portal";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 
@@ -134,10 +136,15 @@ async function MenuBatchView({
   basePath: string;
 }) {
   const activeBatch = batches.find((b) => b.id === activeBatchId)!;
-  const [items, intelligence] = await Promise.all([
+  const [items, intelligence, opportunities] = await Promise.all([
     getMenuItems(activeBatchId),
     getIntelligence(propertyId, { clientVisibleOnly: true }),
+    activeBatch.reportingPeriod ? getOpportunities(propertyId, activeBatch.reportingPeriod) : Promise.resolve([]),
   ]);
+
+  // Opportunities panel (Redesign prompt Step 2) — same pattern as Financial
+  // Review Step 1, filtered to Menu category and this batch's own period.
+  const menuOpportunities = (opportunities as Opportunity[]).filter((o) => o.category === "Menu");
 
   // Same Executive Interpretation + Evidence pattern Financial Review uses
   // (Cross-tab audit Part 3), via the shared FindingSection component.
@@ -171,6 +178,8 @@ async function MenuBatchView({
       {(menuIntel?.currentRead || menuIntel?.whyItMatters || menuIntel?.suggestedDecision) && (
         <FindingSection id="menu-insights" heading="Menu Insights" intelligence={menuIntel} metrics={[]} allMetrics={[]} trendColor="#B8935A" />
       )}
+
+      <OpportunitiesPanel opportunities={menuOpportunities} />
 
       {items.length === 0 ? (
         <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.4)", padding: "24px 0" }}>
