@@ -190,6 +190,19 @@ export default async function FinancialPage({
       !mentionsIndividualStaff(o.title, staffNames) &&
       !mentionsIndividualStaff(o.nextStep, staffNames)
   );
+  // Confidence badge (Financial Review refinement Fix 7) — resolved the
+  // same way lib/priorities.ts resolves it for Overview's Top 3 Priorities:
+  // via the linked Intelligence record's own Confidence field, not a field
+  // on Opportunity itself. The prompt's "Difficulty/Time" fields don't
+  // exist anywhere in the real Opportunity schema (checked directly against
+  // Notion) — only Confidence does, so only Confidence is added here.
+  const opportunityConfidence: Record<string, Intelligence["confidence"]> = {};
+  for (const o of financialOpportunities) {
+    const conf = o.sourceIntelligenceId
+      ? (allIntelligence as Intelligence[]).find((i) => i.id === o.sourceIntelligenceId)?.confidence
+      : undefined;
+    if (conf) opportunityConfidence[o.id] = conf;
+  }
 
   // Helper: current period metrics for a category
   const catMetrics = (cat: string) => currentMetrics.filter((m) => m.category === cat);
@@ -512,7 +525,7 @@ export default async function FinancialPage({
         </FindingSection>
 
         {/* ── Opportunities — Labor/OpEx/Purchasing, Redesign prompt Step 1 ── */}
-        <OpportunitiesPanel opportunities={financialOpportunities} id="opportunities" />
+        <OpportunitiesPanel opportunities={financialOpportunities} id="opportunities" confidenceById={opportunityConfidence} />
 
         {/* Empty state */}
         {allMetrics.length === 0 && (
