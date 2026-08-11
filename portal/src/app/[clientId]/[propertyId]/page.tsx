@@ -145,9 +145,23 @@ function TrendDelta({
 // src/lib/deep-links.ts (Redesign prompt Step 5) so the Intelligence tab's
 // own cross-links share the same routing instead of a fifth copy.
 
-// Standard-treatment card for priorities #2–3 — #1 gets the full-bleed hero
-// treatment inline in the page body below instead (see "Top priority — hero").
-function TopPriorityCard({ priority, clientId, propertyId }: { priority: TopPriority; clientId: string; propertyId: string }) {
+// Standard-treatment card for priorities #2–3 — #1 gets the larger,
+// heavier-accent card inline in the page body below instead (see "Top 3
+// Priorities" section), same white/cream card system as this one now
+// (Overview refinement Fix 2), not a separate full-bleed dark module.
+function TopPriorityCard({
+  priority,
+  clientId,
+  propertyId,
+  annualOpportunity,
+}: {
+  priority: TopPriority;
+  clientId: string;
+  propertyId: string;
+  // Number pairing (Fix 6) — real anchor already computed on the page
+  // (same figure the "at a glance" strip shows), not fabricated per-card.
+  annualOpportunity: number;
+}) {
   const target = PRIORITY_TAB_BY_CATEGORY[priority.category];
   return (
     <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "26px 28px" }}>
@@ -167,10 +181,17 @@ function TopPriorityCard({ priority, clientId, propertyId }: { priority: TopPrio
         )}
       </div>
       {priority.impactAnnual > 0 && (
-        <p style={{ fontFamily: SERIF, fontSize: "1.7rem", fontWeight: 400, color: GOLD, lineHeight: 1, marginBottom: 10 }}>
-          {compact(priority.impactAnnual)}
-          <span style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.35)", marginLeft: 8 }}>est. annual impact</span>
-        </p>
+        <div style={{ marginBottom: 10 }}>
+          <p style={{ fontFamily: SERIF, fontSize: "1.7rem", fontWeight: 400, color: GOLD, lineHeight: 1 }}>
+            {compact(priority.impactAnnual)}
+            <span style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.35)", marginLeft: 8 }}>est. annual impact</span>
+          </p>
+          {annualOpportunity > 0 && (
+            <p style={{ fontFamily: JOST, fontSize: 10, color: "rgba(18,18,15,0.35)", marginTop: 4 }}>
+              {Math.round((priority.impactAnnual / annualOpportunity) * 100)}% of total identified opportunity
+            </p>
+          )}
+        </div>
       )}
       {priority.nextStep && (
         <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.55)", lineHeight: 1.6, marginBottom: target ? 12 : 0 }}>
@@ -561,7 +582,7 @@ export default async function PropertyPage({
       <PropertyHeader property={property} lastUpdated={lastUpdated} />
       <PropertyTabs clientId={clientId} propertyId={propertyId} active="overview" />
 
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 0" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 80px" }}>
 
         {/* At a glance — a quiet reference strip; Current Read below is the
             page's visual anchor. Labels read as KPIs (Portfolio Status /
@@ -740,68 +761,73 @@ export default async function PropertyPage({
           )
         )}
 
-        {/* Top 3 Priorities — header sits in the constrained-width column;
-            item #1 breaks out full-bleed right below (next block), items
-            #2–3 render as standard cards once the constrained column
-            reopens, ahead of Financial Snapshot. */}
+        {/* Top 3 Priorities — one continuous container, all three items on
+            the same cream/white card system (Overview refinement Fix 2).
+            #1 used to break out full-bleed on a solid black background,
+            visually reading as an unrelated module from #2-3's white cards
+            below it; now it's the same card system, differentiated by
+            scale and a heavier gold rule instead of full color inversion. */}
         {topPriorities.length > 0 && <PrimarySectionHeader title="Top 3 Priorities" />}
-      </div>
 
-      {/* Top priority — hero, full-bleed treatment (what Biggest Opportunity used to be) */}
-      {topPriorities[0] && (
-        <section style={{ marginBottom: topPriorities.length > 1 ? HERO_CLUSTER_GAP : SECTION_GAP }}>
-          <div style={{ marginLeft: "calc(50% - 50vw)", marginRight: "calc(50% - 50vw)", background: "#12120F" }}>
-            <div style={{ maxWidth: 1100, margin: "0 auto", padding: "64px 60px" }}>
-              <div className="flex items-center flex-wrap" style={{ gap: 14, marginBottom: 18 }}>
-                <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD }}>
-                  Top Priority
+        {topPriorities.length > 0 && (
+          <section style={{ marginBottom: SECTION_GAP }} className="space-y-3">
+            {topPriorities[0] && (
+              <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderLeft: "8px solid #B8935A", padding: "48px 52px" }}>
+                <div className="flex items-center flex-wrap" style={{ gap: 14, marginBottom: 18 }}>
+                  <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD }}>
+                    Top Priority
+                  </p>
+                  {topPriorities[0].category && (
+                    <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(18,18,15,0.4)" }}>
+                      {topPriorities[0].category}
+                    </p>
+                  )}
+                </div>
+                <p style={{ fontFamily: SERIF, fontSize: "clamp(1.4rem, 2.4vw, 1.8rem)", fontWeight: 400, color: "#12120F", lineHeight: 1.4, maxWidth: 720, marginBottom: topPriorities[0].nextStep ? 10 : 22 }}>
+                  {topPriorities[0].title}
                 </p>
-                {topPriorities[0].category && (
-                  <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(242,237,228,0.4)" }}>
-                    {topPriorities[0].category}
+                {topPriorities[0].nextStep && (
+                  <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.55)", lineHeight: 1.6, maxWidth: 720, marginBottom: 22 }}>
+                    {topPriorities[0].nextStep}
                   </p>
                 )}
+                {topPriorities[0].impactAnnual > 0 && (
+                  <div style={{ marginBottom: PRIORITY_TAB_BY_CATEGORY[topPriorities[0].category] ? 22 : 0 }}>
+                    <p style={{ fontFamily: SERIF, fontSize: "clamp(2.4rem, 5vw, 3.4rem)", fontWeight: 400, color: GOLD, lineHeight: 1 }}>
+                      {compact(topPriorities[0].impactAnnual)}
+                      <span style={{ fontFamily: JOST, fontSize: "0.9rem", color: "rgba(18,18,15,0.4)", marginLeft: 14 }}>
+                        estimated annual impact
+                      </span>
+                    </p>
+                    {/* Number pairing (Fix 6) — real anchor already computed
+                        on this page (annualOpportunity, the "at a glance"
+                        strip's own figure), not fabricated for this card. */}
+                    {annualOpportunity > 0 && (
+                      <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 6 }}>
+                        {Math.round((topPriorities[0].impactAnnual / annualOpportunity) * 100)}% of total identified opportunity
+                      </p>
+                    )}
+                  </div>
+                )}
+                {PRIORITY_TAB_BY_CATEGORY[topPriorities[0].category] && (
+                  <Link
+                    href={`/${clientId}/${propertyId}${PRIORITY_TAB_BY_CATEGORY[topPriorities[0].category].segment}?category=${encodeURIComponent(topPriorities[0].category)}`}
+                    className="hover:text-[#D4AF7A]"
+                    style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: GOLD, textDecoration: "none", transition: "color 0.25s ease" }}
+                  >
+                    View in {PRIORITY_TAB_BY_CATEGORY[topPriorities[0].category].label} →
+                  </Link>
+                )}
               </div>
-              <p style={{ fontFamily: SERIF, fontSize: "clamp(1.3rem, 2vw, 1.6rem)", fontWeight: 300, color: "rgba(242,237,228,0.85)", lineHeight: 1.5, maxWidth: 640, marginBottom: topPriorities[0].nextStep ? 10 : 22 }}>
-                {topPriorities[0].title}
-              </p>
-              {topPriorities[0].nextStep && (
-                <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(242,237,228,0.45)", maxWidth: 640, marginBottom: 22 }}>
-                  {topPriorities[0].nextStep}
-                </p>
-              )}
-              {topPriorities[0].impactAnnual > 0 && (
-                <p style={{ fontFamily: SERIF, fontSize: "clamp(2.8rem, 6vw, 4.2rem)", fontWeight: 300, color: "#B8935A", lineHeight: 1, marginBottom: PRIORITY_TAB_BY_CATEGORY[topPriorities[0].category] ? 22 : 0 }}>
-                  {compact(topPriorities[0].impactAnnual)}
-                  <span style={{ fontFamily: JOST, fontSize: "0.95rem", color: "rgba(242,237,228,0.4)", marginLeft: 14 }}>
-                    estimated annual impact
-                  </span>
-                </p>
-              )}
-              {PRIORITY_TAB_BY_CATEGORY[topPriorities[0].category] && (
-                <Link
-                  href={`/${clientId}/${propertyId}${PRIORITY_TAB_BY_CATEGORY[topPriorities[0].category].segment}?category=${encodeURIComponent(topPriorities[0].category)}`}
-                  className="hover:text-[#D4AF7A]"
-                  style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: GOLD, textDecoration: "none", transition: "color 0.25s ease" }}
-                >
-                  View in {PRIORITY_TAB_BY_CATEGORY[topPriorities[0].category].label} →
-                </Link>
-              )}
-            </div>
-          </div>
-        </section>
-      )}
+            )}
 
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 60px 80px" }}>
-
-        {/* Priorities #2–3 — standard card treatment */}
-        {topPriorities.length > 1 && (
-          <section style={{ marginBottom: SECTION_GAP }}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {topPriorities.slice(1).map((priority) => (
-                <TopPriorityCard key={priority.id} priority={priority} clientId={clientId} propertyId={propertyId} />
-              ))}
-            </div>
+            {topPriorities.length > 1 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {topPriorities.slice(1).map((priority) => (
+                  <TopPriorityCard key={priority.id} priority={priority} clientId={clientId} propertyId={propertyId} annualOpportunity={annualOpportunity} />
+                ))}
+              </div>
+            )}
           </section>
         )}
 
