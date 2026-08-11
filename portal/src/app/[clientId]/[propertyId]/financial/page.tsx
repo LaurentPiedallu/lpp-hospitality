@@ -8,7 +8,6 @@ import PropertyHeader from "@/components/PropertyHeader";
 import PropertyTabs from "@/components/PropertyTabs";
 import SectionHeader from "@/components/SectionHeader";
 import KpiCard from "@/components/KpiCard";
-import BenchmarkGauge from "@/components/BenchmarkGauge";
 import EmptyState from "@/components/EmptyState";
 import FindingSection from "@/components/FindingSection";
 import ScrollToSection from "@/components/ScrollToSection";
@@ -194,14 +193,19 @@ export default async function FinancialPage({
 
   // Helper: current period metrics for a category
   const catMetrics = (cat: string) => currentMetrics.filter((m) => m.category === cat);
-  // All-period metrics for a category + unit (for trend chart)
-  const trendFor = (cat: string, unit: string, hint?: string) =>
-    allMetrics.filter(
-      (m) =>
-        m.category === cat &&
-        m.unit === unit &&
-        (hint ? m.metricName.toLowerCase().includes(hint.toLowerCase()) : true)
-    );
+  // All-period metrics for one canonical LPP Metric Key, for the trend
+  // chart (Financial Review refinement Fix 2). Previously scoped by
+  // category+unit only, which is too coarse — e.g. "Revenue" category +
+  // "$" unit pulls in avg_spend, avg_check, and ~20 unrelated per-dish/
+  // per-channel revenue line items alongside total_revenue, and "COGS"
+  // category + "%" unit pulls in a dozen individual dish-level food-cost-%
+  // records alongside the real cogs_pct series. Confirmed directly
+  // against the real KPI Records before touching this — not assumed —
+  // this was the actual cause of the malformed trend charts (x-axis
+  // repeating one period a dozen times, implausible spikes), not a Notion
+  // data-duplication issue. Matches the same canonical-key convention
+  // byKey() already uses for point-in-time lookups.
+  const trendFor = (metricKey: string) => allMetrics.filter((m) => m.lppMetricKey === metricKey);
 
   // Intelligence by category, scoped to the current period — a category with
   // no record for this period must not fall through to an older one (see
@@ -313,41 +317,6 @@ export default async function FinancialPage({
           </section>
         )}
 
-        {/* ── Performance vs Benchmarks — promoted from the bottom ───────── */}
-        {(() => {
-          const HIGHER_BETTER = new Set(["Revenue", "Profitability"]);
-          const gaugeMetrics = currentMetrics.filter(
-            (met) =>
-              met.unit === "%" &&
-              met.benchmarkLow != null &&
-              met.benchmarkHigh != null
-          );
-          if (gaugeMetrics.length === 0) return null;
-          return (
-            <section className="space-y-4">
-              <SectionHeader title="Performance vs Benchmarks" />
-              <div className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] p-6">
-                <p className="text-xs text-gray-400 mb-5">
-                  Grey zone = industry benchmark range · ★ = top quartile · dot = your value
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-6">
-                  {gaugeMetrics.map((met) => (
-                    <BenchmarkGauge
-                      key={met.id}
-                      label={met.metricName || met.category}
-                      value={met.metricValue}
-                      low={met.benchmarkLow!}
-                      high={met.benchmarkHigh!}
-                      unit={met.unit}
-                      higherIsBetter={HIGHER_BETTER.has(met.category)}
-                    />
-                  ))}
-                </div>
-              </div>
-            </section>
-          );
-        })()}
-
         {/* ── Revenue ──────────────────────────────────────────────────── */}
         <FindingSection
           id="revenue"
@@ -355,7 +324,7 @@ export default async function FinancialPage({
           connector="The shortfall referenced above starts here, with cover volume and check average."
           intelligence={intel("Financial")}
           metrics={catMetrics("Revenue")}
-          allMetrics={trendFor("Revenue", "$")}
+          allMetrics={trendFor("total_revenue")}
           primarySeverity={totalRevenue?.severity}
         >
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -385,7 +354,7 @@ export default async function FinancialPage({
           connector="Following the dinner shortfall above, labor did not scale down to match the reduced volume."
           intelligence={intel("Labor")}
           metrics={catMetrics("Labor")}
-          allMetrics={trendFor("Labor", "%")}
+          allMetrics={trendFor("labor_pct")}
           primarySeverity={laborPct?.severity}
         >
           <div className="space-y-3">
@@ -428,7 +397,7 @@ export default async function FinancialPage({
           connector="Unlike labor, food and beverage cost control held through the same volume decline."
           intelligence={intel("COGS")}
           metrics={catMetrics("COGS")}
-          allMetrics={trendFor("COGS", "%")}
+          allMetrics={trendFor("cogs_pct")}
           primarySeverity={cogsPct?.severity}
         >
           <div className="space-y-3">
@@ -472,7 +441,7 @@ export default async function FinancialPage({
           connector="The larger structural pressure sits here — the Kitchen Allocation charge below does not flex with revenue the way labor or COGS do."
           intelligence={intel("Execution")}
           metrics={catMetrics("OpEx")}
-          allMetrics={trendFor("OpEx", "%")}
+          allMetrics={trendFor("opex_pct")}
           primarySeverity={opexPct?.severity}
         >
           <div className="space-y-3">
@@ -510,7 +479,7 @@ export default async function FinancialPage({
           connector="The combined effect of the revenue shortfall, labor ratio, and OpEx allocation above nets out below."
           intelligence={intel("Profitability")}
           metrics={catMetrics("Profitability")}
-          allMetrics={trendFor("Profitability", "%")}
+          allMetrics={trendFor("net_profit_pct")}
           primarySeverity={netProfitPct?.severity}
         >
           <div style={{ background: "#12120F", padding: "36px 40px" }} className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
