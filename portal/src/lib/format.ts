@@ -124,6 +124,16 @@ export function maxIso(dates: (string | null)[]): string | null {
   return valid.length === 0 ? null : valid.reduce((max, d) => (d > max ? d : max));
 }
 
+// Real-vs-placeholder benchmark check (Financial Review refinement Fix 4,
+// now shared portal-wide) — Notion represents "no benchmark set yet" as
+// literal Benchmark Low/High = 0/0 on many records, not as a null field. A
+// naive `!= null` check treats 0/0 as a real range, rendering a fake "0-0"
+// band. Shared by FindingSection (Financial Review) and CommercialSection
+// (Commercial Review) rather than kept as two separate copies.
+export function hasRealBenchmark(low: number | null | undefined, high: number | null | undefined): boolean {
+  return low != null && high != null && !(low === 0 && high === 0);
+}
+
 // Looks up a single KPI Record by its canonical LPP Metric Key for a
 // specific period — never by category/unit/name-substring, which silently
 // picks up whichever sibling record happens to share those (e.g. matching

@@ -12,7 +12,7 @@
 // Intelligence-driven current-read callout and Executive Interpretation
 // toggle. Nothing new needed to support that case, it was already built in.
 
-import { usd, pct, buildTrendData } from "@/lib/format";
+import { usd, pct, buildTrendData, hasRealBenchmark } from "@/lib/format";
 import SectionHeader from "@/components/SectionHeader";
 import CalloutBlock from "@/components/CalloutBlock";
 import StatusBadge from "@/components/StatusBadge";
@@ -23,20 +23,6 @@ function severityVariant(s: Severity): "green" | "amber" | "red" {
   if (s === "Healthy") return "green";
   if (s === "Critical") return "red";
   return "amber";
-}
-
-// Real-vs-placeholder benchmark check (Financial Review refinement Fix 4)
-// — Notion represents "no benchmark set yet" as literal Benchmark Low/High
-// = 0/0 on many records, not as a null field. Confirmed directly against
-// Lex Yard's real data: every $-unit KPI record has this exact 0/0
-// pattern (Total Revenue, all Average Check segments, Sick Pay, Payroll
-// Taxes, Kitchen Allocation, Total Wages, Total Benefits — checked all of
-// them), while every %-unit record has a real range. A naive `!= null`
-// check treats 0/0 as a real range, rendering a fake "0-0" band in the
-// Evidence table and a fake zero reference line on the trend chart below.
-// Same convention already established for RevPASH on Commercial Review.
-function hasRealBenchmark(low: number | null | undefined, high: number | null | undefined): boolean {
-  return low != null && high != null && !(low === 0 && high === 0);
 }
 
 export default function FindingSection({
