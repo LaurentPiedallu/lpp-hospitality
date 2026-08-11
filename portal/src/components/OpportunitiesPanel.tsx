@@ -85,6 +85,15 @@ export default function OpportunitiesPanel({
               {opp.nextStep && (
                 <p className="text-xs text-gray-500 leading-relaxed mb-3">Next: {opp.nextStep}</p>
               )}
+              {/* Real "who needs to approve this" text (Portal-Wide
+                  refinement) — surfaced as-is rather than collapsed into a
+                  fabricated Operational/Ownership badge; see the
+                  clientDecisionNeeded field comment in types/portal.ts. */}
+              {opp.clientDecisionNeeded && (
+                <p className="text-xs leading-relaxed mb-3" style={{ color: "rgba(184,147,90,0.9)" }}>
+                  Decision needed: {opp.clientDecisionNeeded}
+                </p>
+              )}
               {opp.estimatedAnnualImpact != null && (
                 <p className="text-xs text-gray-400">
                   Est. impact: <span className="font-medium text-gray-700">{usd(opp.estimatedAnnualImpact)} / yr</span>

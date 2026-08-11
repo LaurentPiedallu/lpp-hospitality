@@ -127,6 +127,15 @@ export interface Opportunity {
   // Opportunities generated before this field existed (confirmed real:
   // most of Lex Yard's current Published Opportunities predate it).
   demandContext: DemandContext | null;
+  // Real, richly-populated free text naming who needs to approve this
+  // opportunity (e.g. "Executive sign-off required to initiate kitchen
+  // allocation renegotiation with hotel ownership..." vs. "Does the GM have
+  // authority to reduce hourly FTE count..."). Confirmed populated on every
+  // Published Opportunity record — surfaced as-is rather than collapsed
+  // into a fabricated Operational/Ownership binary badge, since a keyword
+  // heuristic on free text risks misrepresenting who actually needs to
+  // approve something in a client-facing portal (Portal-Wide refinement).
+  clientDecisionNeeded: string;
 }
 
 export interface Risk {

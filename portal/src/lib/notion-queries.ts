@@ -244,6 +244,7 @@ export async function getOpportunities(propertyId: string, periodIso?: string): 
     nextStep: richText(p, "Next Step"),
     sourceIntelligenceId: relationId(p, "Source Intelligence") || null,
     demandContext: (select(p, "Demand Context") || null) as import("@/types/portal").DemandContext | null,
+    clientDecisionNeeded: richText(p, "Client Decision Needed"),
   }));
 }
 
