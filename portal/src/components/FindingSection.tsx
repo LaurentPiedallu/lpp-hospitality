@@ -25,6 +25,20 @@ function severityVariant(s: Severity): "green" | "amber" | "red" {
   return "amber";
 }
 
+// Real-vs-placeholder benchmark check (Financial Review refinement Fix 4)
+// — Notion represents "no benchmark set yet" as literal Benchmark Low/High
+// = 0/0 on many records, not as a null field. Confirmed directly against
+// Lex Yard's real data: every $-unit KPI record has this exact 0/0
+// pattern (Total Revenue, all Average Check segments, Sick Pay, Payroll
+// Taxes, Kitchen Allocation, Total Wages, Total Benefits — checked all of
+// them), while every %-unit record has a real range. A naive `!= null`
+// check treats 0/0 as a real range, rendering a fake "0-0" band in the
+// Evidence table and a fake zero reference line on the trend chart below.
+// Same convention already established for RevPASH on Commercial Review.
+function hasRealBenchmark(low: number | null | undefined, high: number | null | undefined): boolean {
+  return low != null && high != null && !(low === 0 && high === 0);
+}
+
 export default function FindingSection({
   heading,
   connector,
@@ -67,22 +81,20 @@ export default function FindingSection({
         </p>
       )}
 
-      {/* Current read callout — badge first, paragraph below */}
-      {intelligence?.currentRead ? (
+      {/* Current read callout — badge first, paragraph below. Hidden
+          entirely when there's no real commentary (Financial Review
+          refinement Fix 3) — an internal pipeline state ("no commentary
+          published yet") must not leak into client-facing copy as a
+          literal placeholder string. Same "if a field is missing, don't
+          render that sub-element" rule as everywhere else in the portal. */}
+      {intelligence?.currentRead && (
         <CalloutBlock>
           <div className="space-y-3">
             <StatusBadge label={severity} variant={severityVariant(severity)} />
             <p>{intelligence.currentRead}</p>
           </div>
         </CalloutBlock>
-      ) : metrics.length > 0 ? (
-        <CalloutBlock>
-          <div className="space-y-3">
-            <StatusBadge label={severity} variant={severityVariant(severity)} />
-            <p className="text-sm opacity-70 italic">No commentary published for this period.</p>
-          </div>
-        </CalloutBlock>
-      ) : null}
+      )}
 
       {/* KPI cards / driver visuals */}
       {children}
@@ -91,8 +103,9 @@ export default function FindingSection({
       {allMetrics.length >= 2 && (() => {
         const trendData = buildTrendData(allMetrics);
         const unit = allMetrics[0]?.unit ?? "%";
-        const bLow = allMetrics[0]?.benchmarkLow;
-        const bHigh = allMetrics[0]?.benchmarkHigh;
+        const realBenchmark = hasRealBenchmark(allMetrics[0]?.benchmarkLow, allMetrics[0]?.benchmarkHigh);
+        const bLow = realBenchmark ? allMetrics[0]?.benchmarkLow : undefined;
+        const bHigh = realBenchmark ? allMetrics[0]?.benchmarkHigh : undefined;
         return (
           <div className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] p-4">
             <p className="text-xs text-gray-400 mb-3 uppercase tracking-widest">Trend</p>
@@ -107,11 +120,16 @@ export default function FindingSection({
         );
       })()}
 
-      {/* Executive Interpretation toggle */}
+      {/* LPP Perspective toggle — renamed from "Executive Interpretation"
+          (Financial Review refinement Fix 5): that label asserted a
+          single objective read rather than signaling whose read this is.
+          Overview already uses "LPP Perspective" for the same kind of
+          content; same label, same meaning, everywhere in the portal.
+          Internal structure (Why It Matters / Recommendation) unchanged. */}
       {(intelligence?.whyItMatters || intelligence?.suggestedDecision) && (
         <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden group">
           <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between select-none hover:bg-gray-50 transition">
-            <span>Executive Interpretation</span>
+            <span>LPP Perspective</span>
             <span className="text-gray-400 text-xs group-open:rotate-180 transition-transform">▼</span>
           </summary>
           <div className="px-5 pb-5 pt-2 space-y-4 border-t border-gray-50">
@@ -156,7 +174,7 @@ export default function FindingSection({
                       {m.unit === "$" ? usd(m.metricValue) : m.unit === "%" ? pct(m.metricValue) : m.metricValue}
                     </td>
                     <td className="px-5 py-2.5 text-right text-gray-400 text-xs">
-                      {m.benchmarkLow != null && m.benchmarkHigh != null
+                      {hasRealBenchmark(m.benchmarkLow, m.benchmarkHigh)
                         ? `${m.benchmarkLow}–${m.benchmarkHigh}${m.unit}`
                         : "—"}
                     </td>
