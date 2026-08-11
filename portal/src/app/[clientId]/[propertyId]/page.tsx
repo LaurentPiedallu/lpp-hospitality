@@ -619,25 +619,57 @@ export default async function PropertyPage({
             on this page; Decisions Required is a distinct field and stays. */}
         {hasNewBriefFormat && latestBrief ? (
           <section style={{ marginBottom: SECTION_GAP }} className="space-y-8">
-            {/* Zone 1 — Executive Read: the dominant visual moment. Heavier
-                left-accent (6px vs CalloutBlock's 3px) and larger padding
-                than LPP Perspective below keep this reading as the higher
-                emphasis of the two cream/gold cards, without the solid
-                black fill it used to have. */}
-            <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderLeft: "6px solid #B8935A", padding: "40px 44px" }}>
-              <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD, marginBottom: 14 }}>
-                Executive Read
+            {/* Executive Brief — merged Executive Read + LPP Perspective
+                (Overview refinement Fix 1). Deliberately unboxed: no card
+                background, no border, reads as body copy sitting on the
+                page background rather than a special callout, unlike
+                CalloutBlock/the old bordered treatment. "Situation" and
+                "Why It Matters" relabel the same two real fields Notion
+                already generates (executiveRead / lppPerspective) — full
+                text preserved, not compressed. The spec's ~100-word target
+                assumed a shorter dedicated field for each part, which
+                doesn't exist yet; hitting it would mean cutting real
+                generated analysis myself, so that's flagged back rather
+                than done here — this structure is ready for shorter copy
+                the moment it exists. */}
+            <div className="space-y-4">
+              <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD }}>
+                Executive Brief
               </p>
-              <p style={{ fontFamily: SERIF, fontSize: "clamp(1.3rem, 2vw, 1.6rem)", fontWeight: 300, color: "#12120F", lineHeight: 1.5 }}>
+              <p style={{ fontFamily: SERIF, fontSize: "1.05rem", fontWeight: 400, color: "#12120F", lineHeight: 1.75 }}>
+                <span style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, color: "rgba(18,18,15,0.4)" }}>
+                  Situation{"  "}
+                </span>
                 {latestBrief.executiveRead}
               </p>
+              {latestBrief.lppPerspective && (
+                <p style={{ fontFamily: SERIF, fontSize: "1.05rem", fontWeight: 400, color: "#12120F", lineHeight: 1.75 }}>
+                  <span style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, color: "rgba(18,18,15,0.4)" }}>
+                    Why It Matters{"  "}
+                  </span>
+                  {latestBrief.lppPerspective}
+                </p>
+              )}
+              {/* Decision needed — promoted visually (heavier weight, gold
+                  top rule) since it's the single most actionable line in
+                  the brief; previously the least visually weighted line
+                  in the section. */}
+              {latestBrief.decisionsRequired && (
+                <p style={{ fontFamily: JOST, fontSize: 15, fontWeight: 600, color: "#12120F", lineHeight: 1.6, borderTop: "1px solid rgba(184,147,90,0.3)", paddingTop: 16, marginTop: 4 }}>
+                  <span style={{ color: GOLD }}>Decision needed{"  "}</span>
+                  {latestBrief.decisionsRequired}
+                </p>
+              )}
             </div>
 
-            {/* Zone 2 — Critical Drivers: grouped Financial & Commercial vs
-                Operational, from Driver Findings (see driverBuckets above).
-                Each sub-group renders only if it has items; the whole zone
-                stays hidden if both are empty (no fallback to the old
-                criticalDrivers text, per explicit instruction). */}
+            {/* Critical Drivers — unchanged content/logic, now positioned
+                after the merged Executive Brief above rather than
+                sandwiched between its two former halves (which no longer
+                exist as separate zones). Grouped Financial & Commercial vs
+                Operational, from Driver Findings (see driverBuckets
+                above). Each sub-group renders only if it has items; the
+                whole zone stays hidden if both are empty (no fallback to
+                the old criticalDrivers text, per explicit instruction). */}
             {(driverBuckets.financial.length > 0 || driverBuckets.operational.length > 0) && (
               <div>
                 <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD, marginBottom: 14 }}>
@@ -680,29 +712,6 @@ export default async function PropertyPage({
                   )}
                 </div>
               </div>
-            )}
-
-            {/* Zone 3 — LPP Perspective: the firm's interpretation, plain prose */}
-            {latestBrief.lppPerspective && (
-              <div>
-                <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD, marginBottom: 14 }}>
-                  LPP Perspective
-                </p>
-                <CalloutBlock>
-                  <p>{latestBrief.lppPerspective}</p>
-                </CalloutBlock>
-              </div>
-            )}
-
-            {/* Zone 4 — Decisions Required: what happens next. Recommended
-                Focus used to render above this as its own numbered zone —
-                removed; Top 3 Priorities below is the ranked-priority
-                mechanism now. */}
-            {latestBrief.decisionsRequired && (
-              <p style={{ fontFamily: JOST, fontSize: 13, color: "#12120F", lineHeight: 1.6 }}>
-                <span style={{ fontWeight: 500, color: GOLD }}>Decision needed: </span>
-                {latestBrief.decisionsRequired}
-              </p>
             )}
           </section>
         ) : (
