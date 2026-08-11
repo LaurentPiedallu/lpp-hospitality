@@ -1,4 +1,5 @@
 import { redirect, notFound } from "next/navigation";
+import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastUpdated } from "@/lib/notion-queries";
 import { usd, pct, findMetricByKey, findIntelligence, extractIndividualStaffNames, mentionsIndividualStaff } from "@/lib/format";
@@ -10,6 +11,7 @@ import SectionHeader from "@/components/SectionHeader";
 import KpiCard from "@/components/KpiCard";
 import EmptyState from "@/components/EmptyState";
 import FindingSection from "@/components/FindingSection";
+import OrientationBlock from "@/components/OrientationBlock";
 import ScrollToSection from "@/components/ScrollToSection";
 import OpportunitiesPanel from "@/components/OpportunitiesPanel";
 import type { KpiMetric, Intelligence, Opportunity, Severity } from "@/types/portal";
@@ -308,6 +310,12 @@ export default async function FinancialPage({
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 80px" }} className="space-y-12">
 
+        {/* ── Orientation — for a reader landing here directly rather than
+             via Overview (Portal-Wide refinement) ──────────────────────── */}
+        <OrientationBlock>
+          Financial Review covers revenue, labor, food &amp; beverage cost, operating expenses, and profitability for the current reporting period, each measured against its own benchmark or budget where one exists.
+        </OrientationBlock>
+
         {/* ── Financial Synthesis ──────────────────────────────────────── */}
         {synthesis && (
           <section>
@@ -334,7 +342,7 @@ export default async function FinancialPage({
         <FindingSection
           id="revenue"
           heading="Revenue"
-          connector="The shortfall referenced above starts here, with cover volume and check average."
+          connector="The figures below are this property's own revenue numbers; the demand-side story behind them — daypart mix, guest volume — belongs to Commercial Review."
           intelligence={intel("Financial")}
           metrics={catMetrics("Revenue")}
           allMetrics={trendFor("total_revenue")}
@@ -357,6 +365,18 @@ export default async function FinancialPage({
               <KpiCard label="Avg Check" value={usd(avgCheck.metricValue)}
                 variant={severityVariant(avgCheck.severity)} />
             )}
+          </div>
+          {/* Deep link to Commercial Review's own ownership of the
+              demand-side story (Portal-Wide refinement — dinner-cover
+              shortfall is owned by Commercial Review, not re-derived here). */}
+          <div className="text-right">
+            <Link
+              href={`/${clientId}/${propertyId}/commercial#volume-conversion`}
+              className="hover:text-[#D4AF7A]"
+              style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: GOLD, textDecoration: "none", transition: "color 0.25s ease" }}
+            >
+              Demand-side detail in Commercial Review →
+            </Link>
           </div>
         </FindingSection>
 
