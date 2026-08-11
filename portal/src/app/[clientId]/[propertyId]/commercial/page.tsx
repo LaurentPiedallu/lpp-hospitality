@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastUpdated } from "@/lib/notion-queries";
 import {
   usd, pct, compact, buildTrendData, looksLikeIndividualStaffMetric, findMetricByKey,
-  extractIndividualStaffNames, mentionsIndividualStaff,
+  extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark,
   parseDaypartPattern, CANONICAL_DAY_ORDER, CANONICAL_DAYPART_ORDER,
 } from "@/lib/format";
 import type { DaypartCoversEntry } from "@/lib/format";
@@ -16,7 +16,6 @@ import CalloutBlock from "@/components/CalloutBlock";
 import KpiCard from "@/components/KpiCard";
 import StatusBadge from "@/components/StatusBadge";
 import TrendChart from "@/components/TrendChart";
-import BenchmarkGauge from "@/components/BenchmarkGauge";
 import EmptyState from "@/components/EmptyState";
 import ScrollToSection from "@/components/ScrollToSection";
 import OpportunitiesPanel from "@/components/OpportunitiesPanel";
@@ -60,6 +59,18 @@ function severityVariant(s: Severity): "green" | "amber" | "red" {
   return "amber";
 }
 
+// Guest Experience (Rating-unit) benchmark ranges are never shown, on top
+// of the general hasRealBenchmark() 0/0 check — confirmed directly against
+// the real Benchmarks database that the only Rating-unit benchmark defined
+// anywhere is a single 4.3-5.0-scale "Guest Rating Target — All Concepts,"
+// unrelated to these 0-100 guest survey scores. The Benchmark Low/High
+// values actually stored on these KPI Records (85-100, 80-100, 90-100,
+// 95-100 — not even uniform) have no traceable source in real benchmark
+// data, so none of them are shown as a real industry comparison here.
+function showsRealBenchmark(m: KpiMetric): boolean {
+  return hasRealBenchmark(m.benchmarkLow, m.benchmarkHigh) && !(m.category === "Guest Experience" && m.unit === "Rating");
+}
+
 function latestMetric(
   metrics: KpiMetric[],
   category: string,
@@ -89,6 +100,7 @@ function latestPeriod(metrics: KpiMetric[]): string | null {
 
 function CommercialSection({
   heading,
+  connector,
   intelligence,
   metrics,
   allMetrics,
@@ -99,6 +111,9 @@ function CommercialSection({
   children,
 }: {
   heading: string;
+  // Short line at the top of the section linking back to what came before —
+  // same convention as Financial Review's FindingSection connector prop.
+  connector?: string;
   intelligence: Intelligence | null;
   metrics: KpiMetric[];
   allMetrics: KpiMetric[];
@@ -123,25 +138,32 @@ function CommercialSection({
     <section id={id} className="space-y-4">
       <SectionHeader title={heading} />
 
-      {hideCallout ? null : intelligence?.currentRead ? (
+      {connector && (
+        <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.45)", fontStyle: "italic", marginTop: -8 }}>
+          {connector}
+        </p>
+      )}
+
+      {/* Current read callout — hidden entirely when there's no real
+          commentary (same rule as FindingSection's Fix 3: an internal
+          pipeline state must not leak into client-facing copy as a literal
+          placeholder string). */}
+      {!hideCallout && intelligence?.currentRead && (
         <CalloutBlock>
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <p>{intelligence.currentRead}</p>
             <StatusBadge label={severity} variant={severityVariant(severity)} />
           </div>
         </CalloutBlock>
-      ) : metrics.length > 0 ? (
-        <CalloutBlock>
-          <p className="text-sm opacity-60 italic">No commentary published for this period.</p>
-        </CalloutBlock>
-      ) : null}
+      )}
 
       {children}
 
       {allMetrics.length >= 2 && (() => {
         const trendData = buildTrendData(allMetrics);
-        const bLow = allMetrics[0]?.benchmarkLow;
-        const bHigh = allMetrics[0]?.benchmarkHigh;
+        const realBenchmark = allMetrics[0] != null && showsRealBenchmark(allMetrics[0]);
+        const bLow = realBenchmark ? allMetrics[0]?.benchmarkLow : undefined;
+        const bHigh = realBenchmark ? allMetrics[0]?.benchmarkHigh : undefined;
         return (
           <div className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] p-4">
             <p className="text-xs text-gray-400 mb-3 uppercase tracking-widest">Trend</p>
@@ -200,7 +222,7 @@ function CommercialSection({
                         : m.metricValue.toLocaleString()}
                     </td>
                     <td className="px-5 py-2.5 text-right text-gray-400 text-xs">
-                      {m.benchmarkLow != null && m.benchmarkHigh != null
+                      {showsRealBenchmark(m)
                         ? `${m.benchmarkLow}–${m.benchmarkHigh}${m.unit}`
                         : "—"}
                     </td>
@@ -504,13 +526,16 @@ export default async function CommercialPage({
 
   const catMetrics = (cat: string) => currentMetrics.filter((m) => m.category === cat);
 
-  const trendFor = (cat: string, unit: string, hint?: string) =>
-    allMetrics.filter(
-      (m) =>
-        m.category === cat &&
-        m.unit === unit &&
-        (hint ? m.metricName.toLowerCase().includes(hint.toLowerCase()) : true)
-    );
+  // All-period metrics for one canonical LPP Metric Key, for trend charts —
+  // same fix already applied to Financial Review's identical bug. The old
+  // category+unit(+name-hint) version was too coarse: "Guest Experience" +
+  // "Rating" + "overall" hint still pulled in day/daypart-specific records
+  // like "Monday Overall Score" alongside the real 2 guest_overall points,
+  // and "Revenue" + "Count" pulled in unrelated per-item POS figures
+  // instead of the real covers total. Confirmed directly against the real
+  // KPI Records before fixing, not assumed.
+  const trendFor = (metricKey: string, category?: string) =>
+    allMetrics.filter((m) => m.lppMetricKey === metricKey && (!category || m.category === category));
 
   const intel = (cat: string): Intelligence | null =>
     (allIntelligence as Intelligence[]).find((i) => i.category === cat) ?? null;
@@ -527,6 +552,16 @@ export default async function CommercialPage({
       !mentionsIndividualStaff(o.title, staffNames) &&
       !mentionsIndividualStaff(o.nextStep, staffNames)
   );
+  // Confidence badge (same resolution as Financial Review's Fix 7 and
+  // Overview's Top 3 Priorities — via the linked Intelligence record's own
+  // Confidence field, not a field on Opportunity itself).
+  const opportunityConfidence: Record<string, Intelligence["confidence"]> = {};
+  for (const o of commercialOpportunities) {
+    const conf = o.sourceIntelligenceId
+      ? (allIntelligence as Intelligence[]).find((i) => i.id === o.sourceIntelligenceId)?.confidence
+      : undefined;
+    if (conf) opportunityConfidence[o.id] = conf;
+  }
 
   // Guest ratings — all Rating-unit metrics under Guest Experience category,
   // excluding any record that identifies an individual staff member by name
@@ -696,7 +731,7 @@ export default async function CommercialPage({
         )}
 
         {/* ── Opportunities — promoted from the bottom ────────────────────── */}
-        <OpportunitiesPanel opportunities={commercialOpportunities} id="opportunities" />
+        <OpportunitiesPanel opportunities={commercialOpportunities} id="opportunities" confidenceById={opportunityConfidence} />
 
         {/* ── Guest Experience ─────────────────────────────────────────── */}
         <CommercialSection
@@ -704,7 +739,7 @@ export default async function CommercialPage({
           heading="Guest Experience"
           intelligence={intel("Guest")}
           metrics={guestRatings}
-          allMetrics={trendFor("Guest Experience", "Rating", "overall")}
+          allMetrics={trendFor("guest_overall")}
           trendUnit="Rating"
           hideCallout
         >
@@ -732,7 +767,14 @@ export default async function CommercialPage({
           heading="Volume & Conversion"
           intelligence={intel("Commercial")}
           metrics={catMetrics("Commercial")}
-          allMetrics={trendFor("Revenue", "Count")}
+          // Scoped correctly now (canonical "covers" key), but this won't
+          // render a 2-point trend yet even so: confirmed against real data
+          // that the only March-period record under this key is mistagged
+          // (an items-sold figure, not a real covers count) and the real
+          // June covers total is stuck Archived, never Published — an
+          // upstream data gap, not a query bug. Renders honestly empty
+          // until that's resolved rather than showing misleading points.
+          allMetrics={trendFor("covers", "Revenue")}
           trendUnit="Count"
         >
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -821,55 +863,6 @@ export default async function CommercialPage({
             {daypartPatternEntries.length > 0 && <DaypartHeatmap entries={daypartPatternEntries} />}
           </CommercialSection>
         )}
-
-        {/* ── Performance vs Benchmarks — commercial-relevant metrics only ── */}
-        {(() => {
-          // Guest Experience scores and Revenue-category demand metrics that
-          // carry a real (non-placeholder) benchmark range — e.g. the average
-          // check variants, benchmarked against $90–$160 full-service NYC
-          // comparables. Explicitly excludes Labor, COGS, OpEx, and
-          // Profitability regardless of whether a given line item happens to
-          // have a benchmark range set, per this page's commercial/guest
-          // focus — those belong on Financial Review. Also excludes the raw
-          // dollar/count totals under Revenue (Total Revenue, Food Revenue,
-          // daypart covers, etc.), which in the real data only ever carry a
-          // 0–0 placeholder range rather than a genuine industry comparable.
-          const COMMERCIAL_CATEGORIES = new Set(["Guest Experience", "Revenue"]);
-          const gaugeMetrics = currentMetrics.filter(
-            (met) =>
-              met.benchmarkLow != null &&
-              met.benchmarkHigh != null &&
-              !(met.benchmarkLow === 0 && met.benchmarkHigh === 0) &&
-              COMMERCIAL_CATEGORIES.has(met.category) &&
-              !looksLikeIndividualStaffMetric(met.metricName || met.kpiRecord) &&
-              !REDUNDANT_GUEST_METRIC_NAMES.has(met.metricName)
-          );
-          if (gaugeMetrics.length === 0) return null;
-          const HIGHER_BETTER = new Set(["Revenue", "Guest Experience"]);
-          return (
-            <section className="space-y-4">
-              <SectionHeader title="Performance vs Benchmarks" />
-              <div className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] p-6">
-                <p className="text-xs text-gray-400 mb-5">
-                  Grey zone = industry benchmark range · ★ = top quartile · dot = your value
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-6">
-                  {gaugeMetrics.map((met) => (
-                    <BenchmarkGauge
-                      key={met.id}
-                      label={met.metricName || met.category}
-                      value={met.metricValue}
-                      low={met.benchmarkLow!}
-                      high={met.benchmarkHigh!}
-                      unit={met.unit}
-                      higherIsBetter={HIGHER_BETTER.has(met.category)}
-                    />
-                  ))}
-                </div>
-              </div>
-            </section>
-          );
-        })()}
 
         {/* Empty state */}
         {allMetrics.length === 0 && commercialOpportunities.length === 0 && (
