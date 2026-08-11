@@ -15,9 +15,9 @@ import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
 import PropertyTabs from "@/components/PropertyTabs";
 import SectionHeader from "@/components/SectionHeader";
-import CalloutBlock from "@/components/CalloutBlock";
 import StatusBadge from "@/components/StatusBadge";
 import CollapsibleOnMobile from "@/components/CollapsibleOnMobile";
+import StrategicRiskBlock from "@/components/StrategicRiskBlock";
 import type { Action, Opportunity, Intelligence, KpiMetric, DataConfidence } from "@/types/portal";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
@@ -57,21 +57,32 @@ const CONFIDENCE_VARIANT: Record<DataConfidence, "green" | "amber" | "red" | "gr
   "Requires Validation": "gray",
 };
 
-// Emerging Risk — a genuine "not yet critical, but worth watching" signal,
-// not a hardcoded Guest Commentary pick. Prefers Severity=Monitor (the
-// existing field that already conceptually matches "not yet critical, but
-// could become one") across every Intelligence Category, not just Guest;
-// the highest Estimated Monthly Impact breaks a tie among multiple Monitor
-// records, most-recently-touched breaking a further tie. Falls back to the
-// lowest-impact Action Required record when no Monitor-severity record
-// exists for the period — a real, confirmed case (Lex Yard's June Published
-// Intelligence has zero Monitor-severity records) — so the section stays
-// populated with a genuine finding rather than going empty, while still
-// reading as a step down in urgency from what's already covered earlier on
-// the page (Immediate Priorities, Biggest Opportunity). Returns null if
-// nothing qualifies even under the fallback, so the section can hide
-// entirely rather than show a placeholder.
-function selectEmergingRisk(records: Intelligence[], period: string | null): Intelligence | null {
+// Strategic Risk (renamed from Emerging Risk, Overview refinement Fix 3;
+// selection logic unchanged) — a genuine "not yet critical, but worth
+// watching" signal, not a hardcoded Guest Commentary pick. Prefers
+// Severity=Monitor (the existing field that already conceptually matches
+// "not yet critical, but could become one") across every Intelligence
+// Category, not just Guest; the highest Estimated Monthly Impact breaks a
+// tie among multiple Monitor records, most-recently-touched breaking a
+// further tie. Falls back to the lowest-impact Action Required record when
+// no Monitor-severity record exists for the period — a real, confirmed
+// case (Lex Yard's June Published Intelligence has zero Monitor-severity
+// records) — so the section stays populated with a genuine finding rather
+// than going empty, while still reading as a step down in urgency from
+// what's already covered earlier on the page (Top 3 Priorities). Returns
+// null if nothing qualifies even under the fallback, so the section can
+// hide entirely rather than show a placeholder.
+//
+// Content note: checked every Published Intelligence record for Lex
+// Yard's current period directly against Notion — none match the frozen
+// spec's Strategic Risks framing (dinner demand deteriorating despite
+// rising guest scores, labor structurally outpacing revenue, growing
+// breakfast dependence). The record this function currently selects is
+// still tactical daypart-score content ("Sunday scores lowest..."). That's
+// a genuine upstream content gap, not a bug in this selection logic — the
+// visual treatment below is built and ready, the content itself needs to
+// be regenerated upstream before this section reads as intended.
+function selectStrategicRisk(records: Intelligence[], period: string | null): Intelligence | null {
   const current = records.filter((i) => i.periodStart === period);
 
   const byImpactThenRecency = (dir: 1 | -1) => (a: Intelligence, b: Intelligence) =>
@@ -265,8 +276,8 @@ export default async function PropertyPage({
   // cards.
   const topPriorities = selectTopPriorities(opportunities as Opportunity[], intelligence as Intelligence[]);
 
-  // Emerging Risk — see selectEmergingRisk above for the selection logic.
-  const emergingRisk = selectEmergingRisk(intelligence as Intelligence[], currentPeriod);
+  // Strategic Risk — see selectStrategicRisk above for the selection logic.
+  const strategicRisk = selectStrategicRisk(intelligence as Intelligence[], currentPeriod);
 
   // Admin-only signal: financial numbers are all missing even though a
   // summary exists — check whether real data is sitting unpublished in Notion.
@@ -960,28 +971,29 @@ export default async function PropertyPage({
           </section>
         )}
 
-        {/* Emerging Risk — Layer 2, collapsed by default on mobile */}
-        {emergingRisk && (
+        {/* Strategic Risks (renamed from Emerging Risk, Overview refinement
+            Fix 3) — dark/high-contrast shared treatment via
+            StrategicRiskBlock, not CollapsibleOnMobile like its neighbors
+            (see that component's own comment for why). Content unchanged;
+            the correct Strategic Risks framing (dinner demand vs. rising
+            guest scores, labor outpacing revenue, breakfast dependence)
+            doesn't exist upstream yet — confirmed against every Published
+            Intelligence record for the current period, not assumed. */}
+        {strategicRisk && (
           <section style={{ marginBottom: SECTION_GAP }}>
-          <CollapsibleOnMobile header={<SectionHeader title="Emerging Risk" />}>
-            <CalloutBlock>
-              <p>{emergingRisk.finding}</p>
-              {emergingRisk.currentRead && (
-                <p style={{ marginTop: 8, opacity: 0.8 }}>{emergingRisk.currentRead}</p>
-              )}
-            </CalloutBlock>
-            {INTEL_CATEGORY_TAB[emergingRisk.category] && (
-              <div className="text-right" style={{ marginTop: 12 }}>
-                <Link
-                  href={`/${clientId}/${propertyId}${INTEL_CATEGORY_TAB[emergingRisk.category].segment}?category=${encodeURIComponent(emergingRisk.category)}`}
-                  className="hover:text-[#D4AF7A]"
-                  style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#B8935A", textDecoration: "none", transition: "color 0.25s ease" }}
-                >
-                  View in {INTEL_CATEGORY_TAB[emergingRisk.category].label} →
-                </Link>
-              </div>
-            )}
-          </CollapsibleOnMobile>
+            <StrategicRiskBlock
+              title="Strategic Risks"
+              finding={strategicRisk.finding}
+              currentRead={strategicRisk.currentRead}
+              crossLink={
+                INTEL_CATEGORY_TAB[strategicRisk.category]
+                  ? {
+                      href: `/${clientId}/${propertyId}${INTEL_CATEGORY_TAB[strategicRisk.category].segment}?category=${encodeURIComponent(strategicRisk.category)}`,
+                      label: INTEL_CATEGORY_TAB[strategicRisk.category].label,
+                    }
+                  : null
+              }
+            />
           </section>
         )}
 
