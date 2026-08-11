@@ -539,6 +539,10 @@ export default async function PropertyPage({
     favorable: boolean;
     format: (v: number) => string;
     formatDelta: (d: number) => string;
+    // Deep-link footer (Fix 4) — reuses the exact ?metric= convention
+    // Financial Snapshot/Guest Experience cards above already use, not a
+    // new mechanism.
+    deepLink: { href: string };
   }[] = [
     {
       label: "Revenue",
@@ -546,6 +550,7 @@ export default async function PropertyPage({
       favorable: revenueDelta != null && revenueDelta.delta >= 0,
       format: (v) => compact(v),
       formatDelta: (d) => `${d >= 0 ? "+" : "−"}${compact(Math.abs(d))}`,
+      deepLink: { href: `/${clientId}/${propertyId}/financial?metric=total_revenue` },
     },
     {
       label: "Labor",
@@ -553,6 +558,7 @@ export default async function PropertyPage({
       favorable: laborDelta != null && laborDelta.delta <= 0,
       format: (v) => pct(v),
       formatDelta: (d) => `${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(1)} pts`,
+      deepLink: { href: `/${clientId}/${propertyId}/financial?metric=labor_pct` },
     },
     {
       label: "Guest",
@@ -560,31 +566,49 @@ export default async function PropertyPage({
       favorable: guestDelta != null && guestDelta.delta >= 0,
       format: (v) => v.toFixed(1),
       formatDelta: (d) => `${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(1)} pts`,
+      deepLink: { href: `/${clientId}/${propertyId}/commercial?metric=guest_overall` },
     },
   ];
 
   // One-line synthesis above the Since Last Review grid — reuses each
   // metric's own formatDelta (same source as the cards below and the
-  // compact strip up top), just stripped of its sign glyph and paired
-  // with a direction word, so the sentence and the numbers underneath it
-  // can never drift apart into two different claims.
+  // compact strip up top), so the sentence and the numbers underneath it
+  // can never drift apart into two different claims. Unlike the prior
+  // version (a flat "X is up, Y is up" restatement), this connects the
+  // deltas by whether they moved together or diverged — grounded only in
+  // each metric's own real sign/magnitude computed above, never a
+  // fabricated causal mechanism (no "outpaced"/"drove"-style claim this
+  // data alone can support). This is legitimately frontend logic, not
+  // upstream-generated content — confirmed by reading the code before
+  // assuming otherwise (Overview refinement Fix 4.2).
   const sinceLastReviewSynthesis = (() => {
     const present = sinceLastReviewMetrics.filter(
       (m): m is typeof m & { data: NonNullable<typeof m.data> } => m.data != null
     );
     if (present.length === 0) return null;
-    const clauses = present.map((m) => {
+
+    const clause = (m: (typeof present)[number]) => {
       const magnitude = m.formatDelta(m.data.delta).replace(/^[+−]/, "");
       const direction = m.data.delta >= 0 ? "up" : "down";
       return `${m.label.toLowerCase()} is ${direction} ${magnitude}`;
-    });
-    const joined =
-      clauses.length === 1
-        ? clauses[0]
-        : clauses.length === 2
-        ? `${clauses[0]} and ${clauses[1]}`
-        : `${clauses.slice(0, -1).join(", ")}, and ${clauses[clauses.length - 1]}`;
-    return `Since the last review, ${joined}`;
+    };
+    const join = (list: string[]) =>
+      list.length === 1
+        ? list[0]
+        : list.length === 2
+        ? `${list[0]} and ${list[1]}`
+        : `${list.slice(0, -1).join(", ")}, and ${list[list.length - 1]}`;
+
+    const favorable = present.filter((m) => m.favorable);
+    const unfavorable = present.filter((m) => !m.favorable);
+
+    if (unfavorable.length === 0) {
+      return `Since the last review, every tracked metric improved: ${join(present.map(clause))}`;
+    }
+    if (favorable.length === 0) {
+      return `Since the last review, every tracked metric moved the wrong direction: ${join(present.map(clause))}`;
+    }
+    return `Since the last review, ${join(unfavorable.map(clause))}, even as ${join(favorable.map(clause))}`;
   })();
 
   return (
@@ -1082,9 +1106,13 @@ export default async function PropertyPage({
               </p>
             )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {sinceLastReviewMetrics.map(({ label, data, favorable, format, formatDelta }) =>
+              {sinceLastReviewMetrics.map(({ label, data, favorable, format, formatDelta, deepLink }) =>
                 data ? (
-                  <div key={label} style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "24px 28px" }}>
+                  <Link
+                    key={label}
+                    href={deepLink.href}
+                    style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "24px 28px", display: "block", textDecoration: "none", color: "inherit" }}
+                  >
                     <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 8 }}>
                       {label}
                     </p>
@@ -1094,7 +1122,7 @@ export default async function PropertyPage({
                     <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 6 }}>
                       {format(data.prior)} → {format(data.current)}
                     </p>
-                  </div>
+                  </Link>
                 ) : null
               )}
             </div>
