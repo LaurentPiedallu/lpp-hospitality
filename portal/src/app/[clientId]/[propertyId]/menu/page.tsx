@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getProperty, getMenuBatches, getMenuItems, getIntelligence, getOpportunities, getLastUpdated } from "@/lib/notion-queries";
 import { formatPeriod, findIntelligence } from "@/lib/format";
+import { MENU_CATEGORY_ORDER, menuCategoryLabel } from "@/lib/menu";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
@@ -10,8 +11,9 @@ import PropertyTabs from "@/components/PropertyTabs";
 import SectionHeader from "@/components/SectionHeader";
 import KpiCard from "@/components/KpiCard";
 import EmptyState from "@/components/EmptyState";
-import MenuQuadrantScatter from "@/components/MenuQuadrantScatter";
-import MenuItemsTable from "@/components/MenuItemsTable";
+import OrientationBlock from "@/components/OrientationBlock";
+import MenuCategorySection from "@/components/MenuCategorySection";
+import MenuQuadrantScorecard from "@/components/MenuQuadrantScorecard";
 import FindingSection from "@/components/FindingSection";
 import ScrollToSection from "@/components/ScrollToSection";
 import OpportunitiesPanel from "@/components/OpportunitiesPanel";
@@ -159,6 +161,28 @@ async function MenuBatchView({
   // Intelligence finding for this batch's own Reporting Period.
   const menuIntel = findIntelligence(intelligence, "Menu", activeBatch.reportingPeriod);
 
+  // Daypart scope (Menu Engineering rebuild, Phase 0 item 3) — computed
+  // from the real items rather than assumed. Confirmed directly against
+  // Notion that Lex Yard's current batch is Dinner-only (all 50 Published
+  // items), but this stays honest if a future batch genuinely mixes
+  // dayparts instead of silently treating every batch as Dinner-only.
+  const daypartsPresent = [...new Set(items.map((i) => i.daypart))];
+  const daypartScopeLabel =
+    daypartsPresent.length === 1
+      ? `${daypartsPresent[0]} menu`
+      : daypartsPresent.length > 1
+      ? `${daypartsPresent.join(", ")} menus`
+      : null;
+
+  // Items grouped by category, in the fixed display order (Phase 1 item 1)
+  // — "Other" (displayed as Market Menu) always last, confirmed exclusively
+  // Market Menu items (Phase 0 item 2). Only categories with real items
+  // render a section.
+  const itemsByCategory = MENU_CATEGORY_ORDER.map((category) => ({
+    category,
+    items: items.filter((i) => i.category === category),
+  })).filter((c) => c.items.length > 0);
+
   return (
     <>
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -167,6 +191,15 @@ async function MenuBatchView({
           <PeriodSelector batches={batches} activeBatchId={activeBatchId} basePath={basePath} />
         )}
       </div>
+
+      {/* Orientation — for a reader landing here directly, and the explicit
+          daypart-scope statement Phase 0 item 3 requires (Menu Engineering
+          rebuild). */}
+      {daypartScopeLabel && (
+        <OrientationBlock>
+          Item-level performance for the {daypartScopeLabel}, organized by category to match how the menu is actually built and priced — {itemsByCategory.map((c) => menuCategoryLabel(c.category)).join(", ")}.
+        </OrientationBlock>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <KpiCard label="Items Published" value={(activeBatch.itemCount ?? items.length).toLocaleString()} />
@@ -182,18 +215,40 @@ async function MenuBatchView({
         <FindingSection id="menu-insights" heading="Menu Insights" intelligence={menuIntel} metrics={[]} allMetrics={[]} trendColor="#B8935A" />
       )}
 
-      <OpportunitiesPanel opportunities={menuOpportunities} />
-
       {items.length === 0 ? (
         <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.4)", padding: "24px 0" }}>
           This batch has no Published items yet.
         </p>
       ) : (
         <>
-          <MenuQuadrantScatter items={items} avgMarginPct={activeBatch.avgMarginPct} />
-          <MenuItemsTable items={items} />
+          {/* Category-level scorecard (Phase 2) — the number an owner wants
+              first: is a given category structurally healthy. Built from
+              the same items every scatter plot and subtotal row below
+              uses. */}
+          <section className="space-y-4">
+            <SectionHeader title="Quadrant Scorecard" />
+            <MenuQuadrantScorecard itemsByCategory={itemsByCategory} />
+          </section>
+
+          {/* Per-category sections (Phase 1) — own subtotal, own scatter
+              plot, own item table, replacing the old single flat list and
+              undifferentiated chart. */}
+          {itemsByCategory.map(({ category, items: categoryItems }) => (
+            <MenuCategorySection
+              key={category}
+              category={category}
+              items={categoryItems}
+              batchAvgMarginPct={activeBatch.avgMarginPct}
+              id={`category-${category.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+            />
+          ))}
         </>
       )}
+
+      {/* Opportunities — moved to close the tab, after the findings that
+          motivate them, matching the pattern established on Financial and
+          Commercial Review. */}
+      <OpportunitiesPanel opportunities={menuOpportunities} />
     </>
   );
 }

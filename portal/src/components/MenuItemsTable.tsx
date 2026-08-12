@@ -8,12 +8,11 @@
 import { useMemo, useState } from "react";
 import QuadrantBadge from "./QuadrantBadge";
 import { pct } from "@/lib/format";
+import { MENU_CATEGORY_ORDER, menuCategoryLabel } from "@/lib/menu";
 import type { MenuItem, MenuQuadrant } from "@/types/portal";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 
-// Fixed display order — never derived by sorting whatever happens to be present.
-const CATEGORY_ORDER = ["Starters", "Mains", "Sides", "Desserts", "Cocktails", "Wine", "Beer", "Non-Alcoholic", "Other"];
 const QUADRANT_ORDER: MenuQuadrant[] = ["Star", "Plowhorse", "Puzzle", "Dog", "Pending"];
 
 type SortKey = "itemName" | "category" | "portionsSold" | "price" | "foodCost" | "marginPct" | "quadrant";
@@ -45,14 +44,24 @@ const COLUMNS: { key: SortKey; label: string; align: "left" | "right" }[] = [
   { key: "quadrant", label: "Quadrant", align: "left" },
 ];
 
-export default function MenuItemsTable({ items }: { items: MenuItem[] }) {
+export default function MenuItemsTable({
+  items,
+  hideCategoryFilter,
+}: {
+  items: MenuItem[];
+  // Menu Engineering rebuild (Phase 1) — per-category sections already pass
+  // a category-scoped item list, so a Category dropdown offering only that
+  // one option is redundant. Optional so the flat, all-categories caller
+  // (if one exists elsewhere) is unaffected.
+  hideCategoryFilter?: boolean;
+}) {
   const [sortKey, setSortKey] = useState<SortKey>("itemName");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [categoryFilter, setCategoryFilter] = useState<string>("All");
   const [quadrantFilter, setQuadrantFilter] = useState<string>("All");
 
   const categoriesPresent = useMemo(
-    () => CATEGORY_ORDER.filter((c) => items.some((i) => i.category === c)),
+    () => MENU_CATEGORY_ORDER.filter((c) => items.some((i) => i.category === c)),
     [items]
   );
   const quadrantsPresent = useMemo(
@@ -95,15 +104,17 @@ export default function MenuItemsTable({ items }: { items: MenuItem[] }) {
   return (
     <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)" }}>
       <div className="flex flex-wrap items-center" style={{ gap: 12, padding: "16px 20px", borderBottom: "1px solid rgba(18,18,15,0.06)" }}>
-        <label style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.45)", display: "flex", alignItems: "center", gap: 8 }}>
-          Category
-          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} style={selectStyle}>
-            <option value="All">All ({items.length})</option>
-            {categoriesPresent.map((c) => (
-              <option key={c} value={c}>{c} ({items.filter((i) => i.category === c).length})</option>
-            ))}
-          </select>
-        </label>
+        {!hideCategoryFilter && (
+          <label style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.45)", display: "flex", alignItems: "center", gap: 8 }}>
+            Category
+            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} style={selectStyle}>
+              <option value="All">All ({items.length})</option>
+              {categoriesPresent.map((c) => (
+                <option key={c} value={c}>{menuCategoryLabel(c)} ({items.filter((i) => i.category === c).length})</option>
+              ))}
+            </select>
+          </label>
+        )}
         <label style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.45)", display: "flex", alignItems: "center", gap: 8 }}>
           Quadrant
           <select value={quadrantFilter} onChange={(e) => setQuadrantFilter(e.target.value)} style={selectStyle}>
@@ -155,7 +166,7 @@ export default function MenuItemsTable({ items }: { items: MenuItem[] }) {
             {sorted.map((item) => (
               <tr key={item.id} style={{ borderBottom: "1px solid rgba(18,18,15,0.04)" }}>
                 <td style={{ padding: "10px 20px", color: "#12120F" }}>{item.itemName}</td>
-                <td style={{ padding: "10px 20px", color: "rgba(18,18,15,0.6)" }}>{item.category}</td>
+                <td style={{ padding: "10px 20px", color: "rgba(18,18,15,0.6)" }}>{menuCategoryLabel(item.category)}</td>
                 <td style={{ padding: "10px 20px", textAlign: "right", color: "rgba(18,18,15,0.6)", fontVariantNumeric: "tabular-nums" }}>
                   {item.portionsSold.toLocaleString()}
                 </td>
