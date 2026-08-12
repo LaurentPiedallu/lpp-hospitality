@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { getProperty, getMenuBatches, getMenuItems, getIntelligence, getOpportunities, getLastUpdated } from "@/lib/notion-queries";
-import { formatPeriod, findIntelligence } from "@/lib/format";
-import { MENU_CATEGORY_ORDER, menuCategoryLabel } from "@/lib/menu";
+import { getProperty, getMenuBatches, getMenuItems, getIntelligence, getOpportunities, getKpiMetrics, getLastUpdated } from "@/lib/notion-queries";
+import { formatPeriod, findIntelligence, findMetricByKey } from "@/lib/format";
+import { MENU_CATEGORY_ORDER, menuCategoryLabel, computeItemPairings } from "@/lib/menu";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
@@ -14,6 +14,7 @@ import EmptyState from "@/components/EmptyState";
 import OrientationBlock from "@/components/OrientationBlock";
 import MenuCategorySection from "@/components/MenuCategorySection";
 import MenuQuadrantScorecard from "@/components/MenuQuadrantScorecard";
+import MenuCogsComparison from "@/components/MenuCogsComparison";
 import FindingSection from "@/components/FindingSection";
 import ScrollToSection from "@/components/ScrollToSection";
 import OpportunitiesPanel from "@/components/OpportunitiesPanel";
@@ -129,6 +130,7 @@ export default async function MenuPage({
 // Split out so the batch-scoped Menu Items fetch only happens once a batch
 // is resolved (needs an await, so it can't live inline in the JSX above).
 async function MenuBatchView({
+  clientId,
   propertyId,
   batches,
   activeBatchId,
@@ -141,11 +143,19 @@ async function MenuBatchView({
   basePath: string;
 }) {
   const activeBatch = batches.find((b) => b.id === activeBatchId)!;
-  const [items, intelligence, opportunities] = await Promise.all([
+  const [items, intelligence, opportunities, kpiMetrics] = await Promise.all([
     getMenuItems(activeBatchId),
     getIntelligence(propertyId, { clientVisibleOnly: true }),
     activeBatch.reportingPeriod ? getOpportunities(propertyId, activeBatch.reportingPeriod) : Promise.resolve([]),
+    getKpiMetrics(propertyId),
   ]);
+
+  // Real blended COGS figure (Phase 4 item 1) — same canonical-key lookup
+  // Financial Review itself uses, scoped to this batch's own reporting
+  // period so the comparison is apples-to-apples, not a hardcoded value.
+  const blendedCogsPct = activeBatch.reportingPeriod
+    ? findMetricByKey(kpiMetrics, "cogs_pct", activeBatch.reportingPeriod)?.metricValue ?? null
+    : null;
 
   // Opportunities panel (Redesign prompt Step 2) — same pattern as Financial
   // Review Step 1, filtered to Menu category and this batch's own period.
@@ -183,6 +193,11 @@ async function MenuBatchView({
     items: items.filter((i) => i.category === category),
   })).filter((c) => c.items.length > 0);
 
+  // À la carte <-> Market Menu cross-reference (Phase 3) — computed once
+  // for the whole batch, keyed by item id, passed down to every category's
+  // table.
+  const itemPairings = computeItemPairings(items);
+
   return (
     <>
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -197,7 +212,7 @@ async function MenuBatchView({
           rebuild). */}
       {daypartScopeLabel && (
         <OrientationBlock>
-          Item-level performance for the {daypartScopeLabel}, organized by category to match how the menu is actually built and priced — {itemsByCategory.map((c) => menuCategoryLabel(c.category)).join(", ")}.
+          Item-level performance for the {daypartScopeLabel}, organized by category to match how the menu is actually built and priced: {itemsByCategory.map((c) => menuCategoryLabel(c.category)).join(", ")}.
         </OrientationBlock>
       )}
 
@@ -230,6 +245,17 @@ async function MenuBatchView({
             <MenuQuadrantScorecard itemsByCategory={itemsByCategory} />
           </section>
 
+          {/* Category food cost vs. Financial Review's blended COGS
+              (Phase 4 item 1) — hidden entirely if the real cogs_pct
+              record doesn't exist for this period, never a fabricated
+              benchmark. */}
+          <MenuCogsComparison
+            itemsByCategory={itemsByCategory}
+            blendedCogsPct={blendedCogsPct}
+            clientId={clientId}
+            propertyId={propertyId}
+          />
+
           {/* Per-category sections (Phase 1) — own subtotal, own scatter
               plot, own item table, replacing the old single flat list and
               undifferentiated chart. */}
@@ -239,7 +265,18 @@ async function MenuBatchView({
               category={category}
               items={categoryItems}
               batchAvgMarginPct={activeBatch.avgMarginPct}
+              pairings={itemPairings}
               id={`category-${category.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+              // Cross-tab connection to Commercial Review's prix-fixe
+              // opportunity (Phase 4 item 3) — Market Menu only, since
+              // that's the category with real margin data to validate it
+              // against. Not rewriting Commercial Review's opportunity
+              // card itself in this session.
+              crossTabDeepLink={
+                category === "Other"
+                  ? { href: `/${clientId}/${propertyId}/commercial#opportunities`, label: "Commercial Review’s dinner prix-fixe opportunity" }
+                  : undefined
+              }
             />
           ))}
         </>

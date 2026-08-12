@@ -8,7 +8,7 @@
 import { useMemo, useState } from "react";
 import QuadrantBadge from "./QuadrantBadge";
 import { pct } from "@/lib/format";
-import { MENU_CATEGORY_ORDER, menuCategoryLabel } from "@/lib/menu";
+import { MENU_CATEGORY_ORDER, menuCategoryLabel, type MenuItemPairing } from "@/lib/menu";
 import type { MenuItem, MenuQuadrant } from "@/types/portal";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
@@ -47,6 +47,7 @@ const COLUMNS: { key: SortKey; label: string; align: "left" | "right" }[] = [
 export default function MenuItemsTable({
   items,
   hideCategoryFilter,
+  pairings,
 }: {
   items: MenuItem[];
   // Menu Engineering rebuild (Phase 1) — per-category sections already pass
@@ -54,6 +55,10 @@ export default function MenuItemsTable({
   // one option is redundant. Optional so the flat, all-categories caller
   // (if one exists elsewhere) is unaffected.
   hideCategoryFilter?: boolean;
+  // À la carte <-> Market Menu cross-reference (Phase 3) — keyed by item id,
+  // computed once for the whole batch (src/lib/menu.ts computeItemPairings)
+  // and passed down, not recomputed per category table.
+  pairings?: Map<string, MenuItemPairing>;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("itemName");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -163,9 +168,24 @@ export default function MenuItemsTable({
             </tr>
           </thead>
           <tbody>
-            {sorted.map((item) => (
+            {sorted.map((item) => {
+              const pairing = pairings?.get(item.id);
+              return (
               <tr key={item.id} style={{ borderBottom: "1px solid rgba(18,18,15,0.04)" }}>
-                <td style={{ padding: "10px 20px", color: "#12120F" }}>{item.itemName}</td>
+                <td style={{ padding: "10px 20px", color: "#12120F" }}>
+                  {item.itemName}
+                  {/* À la carte <-> Market Menu cross-reference (Phase 3) —
+                      a lightweight inline note, not a separate component;
+                      surfaces whether the Market Menu version of a dish is
+                      cannibalizing full-margin à la carte covers or vice
+                      versa. */}
+                  {pairing && (
+                    <p style={{ fontFamily: JOST, fontSize: 10, color: "rgba(184,147,90,0.9)", marginTop: 2 }}>
+                      {pairing.isMarketMenu ? "Also à la carte" : "Also on Market Menu"}: {money(pairing.pairedItem.price)}
+                      {pairing.pairedItem.marginPct != null ? ` · ${pct(pairing.pairedItem.marginPct)} margin` : ""}
+                    </p>
+                  )}
+                </td>
                 <td style={{ padding: "10px 20px", color: "rgba(18,18,15,0.6)" }}>{menuCategoryLabel(item.category)}</td>
                 <td style={{ padding: "10px 20px", textAlign: "right", color: "rgba(18,18,15,0.6)", fontVariantNumeric: "tabular-nums" }}>
                   {item.portionsSold.toLocaleString()}
@@ -183,7 +203,8 @@ export default function MenuItemsTable({
                   <QuadrantBadge quadrant={item.quadrant} />
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
         {sorted.length === 0 && (

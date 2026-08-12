@@ -88,3 +88,40 @@ export function computeQuadrantScorecard(items: MenuItem[]): QuadrantScorecardCe
     };
   });
 }
+
+// Strips the "LY " / "LY MK " naming convention down to the dish itself —
+// confirmed directly against the real item names that this convention is
+// consistent (e.g. "LY Arctic Char" / "LY MK Arctic Char"), not guessed.
+// MK is stripped first since "LY MK X".replace(/^LY /) alone would wrongly
+// leave "MK X".
+function baseDishName(itemName: string): string {
+  return itemName.replace(/^LY MK\s+/i, "").replace(/^LY\s+/i, "").trim();
+}
+
+export interface MenuItemPairing {
+  pairedItem: MenuItem;
+  isMarketMenu: boolean; // true if the item this pairing is attached to is the Market Menu ("Other") version
+}
+
+// À la carte <-> Market Menu pairing (Phase 3) — confirmed directly against
+// real data that only 7 of the 11 Market Menu items have a same-named à la
+// carte counterpart (Arctic Char, Ricotta Cavatelli, Ribeye, Strawberry
+// Shortcake, Red Velvet Souffle Tart, Farmland Cheeses, Lobster Salad); the
+// other 4 (Swordfish, Carrots, Royal Red Shrimp, and "Market Menu" itself,
+// which reads as the whole prix-fixe package sold as one line) are
+// Market-Menu-exclusive with no real twin — this does not assume every
+// item pairs. Matched by base dish name within the same batch only.
+export function computeItemPairings(items: MenuItem[]): Map<string, MenuItemPairing> {
+  const map = new Map<string, MenuItemPairing>();
+  const marketMenuItems = items.filter((i) => i.category === "Other");
+  const alaCarteItems = items.filter((i) => i.category !== "Other");
+  for (const mk of marketMenuItems) {
+    const base = baseDishName(mk.itemName);
+    const match = alaCarteItems.find((a) => baseDishName(a.itemName) === base);
+    if (match) {
+      map.set(mk.id, { pairedItem: match, isMarketMenu: true });
+      map.set(match.id, { pairedItem: mk, isMarketMenu: false });
+    }
+  }
+  return map;
+}
