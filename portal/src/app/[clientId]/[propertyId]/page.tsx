@@ -18,6 +18,7 @@ import SectionHeader from "@/components/SectionHeader";
 import StatusBadge from "@/components/StatusBadge";
 import CollapsibleOnMobile from "@/components/CollapsibleOnMobile";
 import StrategicRiskBlock from "@/components/StrategicRiskBlock";
+import Sparkline from "@/components/Sparkline";
 import type { Action, Opportunity, Intelligence, KpiMetric, DataConfidence } from "@/types/portal";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
@@ -324,6 +325,17 @@ export default async function PropertyPage({
       ?.targetValue ?? null;
   }
 
+  // Prior-period value for a canonical metric key, for the inline
+  // Sparkline (Portal-Wide refinement, cross-cutting) — real data only
+  // ever has 2 Published periods per metric (confirmed directly against
+  // Notion before building this), so this renders a single line segment,
+  // not a fabricated multi-point trend. Null (sparkline hidden) whenever
+  // there's no prior *reviewed* period or no record for it, same gating
+  // Since Last Review already uses.
+  function metricPrior(key: string): number | null {
+    return priorPeriod ? findMetricByKey(allMetrics as KpiMetric[], key, priorPeriod)?.metricValue ?? null : null;
+  }
+
   // Financial Snapshot — one consistent template for all four cards
   // (metric name -> value -> variance vs budget -> one-line driver
   // sentence), replacing four separately hand-coded card bodies.
@@ -338,6 +350,9 @@ export default async function PropertyPage({
     subLine: string | null;
     interpretation: string;
     variance: { text: string; favorable: boolean } | null;
+    // Inline trajectory (Portal-Wide refinement, cross-cutting) — [prior,
+    // current], null when there's no prior period or record to pair it with.
+    sparkline: [number, number] | null;
   }
   const financialCards: FinancialCard[] = kpi
     ? [
@@ -354,6 +369,7 @@ export default async function PropertyPage({
             const diff = kpi.revenue - target;
             return { text: `${diff >= 0 ? "+" : "−"}${compact(Math.abs(diff))} vs budget`, favorable: diff >= 0 };
           })(),
+          sparkline: kpi.revenue != null && metricPrior("total_revenue") != null ? [metricPrior("total_revenue")!, kpi.revenue] : null,
         },
         {
           label: "Labor",
@@ -368,6 +384,7 @@ export default async function PropertyPage({
             const diff = kpi.laborPct - target;
             return { text: `${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)} pts vs budget`, favorable: diff <= 0 };
           })(),
+          sparkline: kpi.laborPct != null && metricPrior("labor_pct") != null ? [metricPrior("labor_pct")!, kpi.laborPct] : null,
         },
         {
           label: "Food COGS",
@@ -382,6 +399,7 @@ export default async function PropertyPage({
             const diff = kpi.cogsPct - target;
             return { text: `${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)} pts vs budget`, favorable: diff <= 0 };
           })(),
+          sparkline: kpi.cogsPct != null && metricPrior("cogs_pct") != null ? [metricPrior("cogs_pct")!, kpi.cogsPct] : null,
         },
         {
           label: "Net Profit",
@@ -396,6 +414,7 @@ export default async function PropertyPage({
             const diff = kpi.netProfitPct - target;
             return { text: `${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)} pts vs budget`, favorable: diff >= 0 };
           })(),
+          sparkline: kpi.netProfitPct != null && metricPrior("net_profit_pct") != null ? [metricPrior("net_profit_pct")!, kpi.netProfitPct] : null,
         },
       ]
     : [];
@@ -445,13 +464,19 @@ export default async function PropertyPage({
     { label: "Service",  key: "guest_service",  fallback: kpi?.guestService ?? null },
     { label: "Ambiance", key: "guest_ambiance", fallback: kpi?.guestAmbiance ?? null },
   ]
-    .map(({ label, key, fallback }) => ({
-      label,
-      metricKey: key,
-      metric: guestMetric(key, fallback),
-      interpretation: metricInterpretation(key),
-      delta: priorPeriod ? periodDelta(key) : null,
-    }))
+    .map(({ label, key, fallback }) => {
+      const delta = priorPeriod ? periodDelta(key) : null;
+      return {
+        label,
+        metricKey: key,
+        metric: guestMetric(key, fallback),
+        interpretation: metricInterpretation(key),
+        delta,
+        // Inline trajectory (Portal-Wide refinement) — same [prior, current]
+        // source as the delta above, not a second computation.
+        sparkline: delta ? ([delta.prior, delta.current] as [number, number]) : null,
+      };
+    })
     .filter(
       (c): c is {
         label: string;
@@ -459,6 +484,7 @@ export default async function PropertyPage({
         metric: { display: string; isRange: boolean };
         interpretation: string;
         delta: { current: number; prior: number; delta: number } | null;
+        sparkline: [number, number] | null;
       } => c.metric != null
     );
 
@@ -891,9 +917,12 @@ export default async function PropertyPage({
                   href={`/${clientId}/${propertyId}/financial?metric=${card.metricKey}`}
                   style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "24px 28px", display: "block", textDecoration: "none", color: "inherit" }}
                 >
-                  <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 8 }}>
-                    {card.label}
-                  </p>
+                  <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
+                    <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)" }}>
+                      {card.label}
+                    </p>
+                    {card.sparkline && <Sparkline values={card.sparkline} />}
+                  </div>
                   <p style={{ fontFamily: SERIF, fontSize: "2.2rem", fontWeight: 400, color: card.valueColor, lineHeight: 1 }}>
                     {card.value}
                   </p>
@@ -931,7 +960,7 @@ export default async function PropertyPage({
           <section style={{ marginBottom: SECTION_GAP }}>
           <CollapsibleOnMobile header={<SectionHeader title="Guest Experience" />}>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {guestCards.map(({ label, metricKey, metric, interpretation, delta }) => (
+              {guestCards.map(({ label, metricKey, metric, interpretation, delta, sparkline }) => (
                 <Link
                   key={label}
                   href={`/${clientId}/${propertyId}/commercial?metric=${metricKey}`}
@@ -946,9 +975,12 @@ export default async function PropertyPage({
                     color: "inherit",
                   }}
                 >
-                  <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 8 }}>
-                    {label}
-                  </p>
+                  <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
+                    <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)" }}>
+                      {label}
+                    </p>
+                    {sparkline && <Sparkline values={sparkline} />}
+                  </div>
                   <p style={{ fontFamily: SERIF, fontSize: metric.isRange ? "1.8rem" : "2.2rem", fontWeight: 400, lineHeight: 1, color: "#12120F" }}>
                     {metric.display}
                     {!metric.isRange && <span style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.3)", fontWeight: 300 }}> / 100</span>}
