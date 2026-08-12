@@ -165,6 +165,16 @@ export default function MenuQuadrantScatter({
           <XAxis
             type="number" dataKey="x" name="Popularity Index" unit="%"
             domain={[0, xMax]}
+            // Rounded tick labels (Menu Engineering rebuild, Phase 0 item 1) —
+            // Recharts' default tick generation places a tick at the exact
+            // domain bound (xMax/yMax, computed as a real item's value * a
+            // multiplier) and renders it with full float precision unless
+            // formatted. Confirmed directly against the live chart this was
+            // the entire source of the "corrupted" 500.4460303300624% /
+            // 110.0461538461542% axis labels — not a data bug, every real
+            // Popularity Index value is legitimate (see MenuQuadrantScatter
+            // callers). tickFormatter rounds for display only.
+            tickFormatter={(v: number) => `${Math.round(v)}`}
             tick={{ fontSize: 11, fill: "rgba(18,18,15,0.4)", fontFamily: JOST }}
             axisLine={{ stroke: "rgba(18,18,15,0.12)" }} tickLine={false}
             label={{ value: "Popularity Index →", position: "insideBottom", offset: -5, fontSize: 11, fill: "rgba(18,18,15,0.4)", fontFamily: JOST }}
@@ -172,6 +182,7 @@ export default function MenuQuadrantScatter({
           <YAxis
             type="number" dataKey="y" name="Margin Pct" unit="%"
             domain={[yMin, yMax]}
+            tickFormatter={(v: number) => `${Math.round(v)}`}
             tick={{ fontSize: 11, fill: "rgba(18,18,15,0.4)", fontFamily: JOST }}
             axisLine={{ stroke: "rgba(18,18,15,0.12)" }} tickLine={false}
             label={{ value: "Margin % →", angle: -90, position: "insideLeft", fontSize: 11, fill: "rgba(18,18,15,0.4)", fontFamily: JOST }}
