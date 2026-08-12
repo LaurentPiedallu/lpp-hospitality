@@ -42,12 +42,17 @@ export default function OpportunitiesPanel({
   opportunities,
   id,
   heading = "Value Creation Opportunities",
+  connector,
   confidenceById,
 }: {
   opportunities: Opportunity[];
   // Deep-link anchor (Cross-tab audit Part 4 convention) — optional.
   id?: string;
   heading?: string;
+  // Short connector line above the heading, same convention as
+  // FindingSection/CommercialSection — optional (Financial Review doesn't
+  // use one here; Commercial Review's Portal-Wide restructure does).
+  connector?: string;
   // Confidence badge (Financial Review refinement Fix 7) — Opportunity
   // itself has no confidence field; the real signal lives on the linked
   // Intelligence record via sourceIntelligenceId, same resolution
@@ -65,6 +70,11 @@ export default function OpportunitiesPanel({
   return (
     <section id={id} className="space-y-4">
       <SectionHeader title={heading} />
+      {connector && (
+        <p style={{ fontFamily: "'Jost', 'Inter', system-ui, sans-serif", fontSize: 12, color: "rgba(18,18,15,0.45)", fontStyle: "italic", marginTop: -8 }}>
+          {connector}
+        </p>
+      )}
       <div className="grid gap-3 md:grid-cols-2">
         {sorted.map((opp) => {
           const demandTag = opp.demandContext ? DEMAND_CONTEXT_TAG[opp.demandContext] : null;

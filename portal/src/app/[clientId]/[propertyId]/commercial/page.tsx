@@ -17,6 +17,7 @@ import KpiCard from "@/components/KpiCard";
 import StatusBadge from "@/components/StatusBadge";
 import TrendChart from "@/components/TrendChart";
 import EmptyState from "@/components/EmptyState";
+import OrientationBlock from "@/components/OrientationBlock";
 import ScrollToSection from "@/components/ScrollToSection";
 import OpportunitiesPanel from "@/components/OpportunitiesPanel";
 import type { KpiMetric, Intelligence, Opportunity, Severity } from "@/types/portal";
@@ -34,6 +35,37 @@ const GOLD = "#B8935A";
 // the canonical "Atmosphere Score"/guest_ambiance) — kept out of every
 // guest-experience display on this page (cards, table, benchmark gauges).
 const REDUNDANT_GUEST_METRIC_NAMES = new Set(["Atmosphere Sub-Score", "Food Taste Score"]);
+
+// Guest Experience three-tier grouping (Portal-Wide refinement, Phase 3) —
+// what each score actually measures, not an arbitrary split: the tangible
+// product/service dimensions guests directly rate ("pillars"), the
+// staff-execution signals that produce that experience ("operational
+// drivers"), and the forward-looking referral/sentiment signals that
+// predict retention rather than describe the current visit ("advocacy").
+// Matched by the real Metric Name strings confirmed across live Guest
+// Experience KPI Records — this is a fixed survey-question taxonomy
+// reused across properties, not per-property freeform text. Anything that
+// doesn't match falls into its own "Additional Signals" group below rather
+// than being silently dropped, so an unrecognized future metric name still
+// shows up somewhere.
+type GuestTier = "pillars" | "operational" | "advocacy";
+const GUEST_TIER_BY_NAME: Record<string, GuestTier> = {
+  "Food Score": "pillars",
+  "Service Score": "pillars",
+  "Atmosphere Score": "pillars",
+  "Restaurant Cleanliness Score": "pillars",
+  "Restroom Cleanliness Score": "pillars",
+  "Host Rating Score": "operational",
+  "Hospitality and Friendliness Score": "operational",
+  "Server Confidence Score": "operational",
+  "Guest Sentiment Score": "advocacy",
+  "Likelihood to Recommend Score": "advocacy",
+};
+const GUEST_TIER_LABEL: Record<GuestTier, string> = {
+  pillars: "Core Experience",
+  operational: "Operational Drivers",
+  advocacy: "Advocacy & Loyalty",
+};
 
 // Opportunity Category values that belong on this tab — pulled from the
 // real "Category Mapping (LPP internal)" Notion database, not guessed.
@@ -300,6 +332,39 @@ function ThemeCard({ label, value, max }: { label: string; value: number; max: n
       >
         {sentiment}
       </span>
+    </div>
+  );
+}
+
+// Guest Experience tier group (Portal-Wide refinement, Phase 3) — a labeled
+// sub-grid of ThemeCards for one of the three tiers (see GUEST_TIER_BY_NAME
+// above). "emphasize" gives the Core Experience tier a heavier gold rule
+// and larger card padding than the other two — the same
+// scale-not-color-inversion differentiation Overview's Top Priority card
+// already uses, so the strongest, most load-bearing tier reads with real
+// visual weight instead of every tier looking equally minor.
+function GuestTierGroup({
+  label,
+  metrics,
+  emphasize,
+}: {
+  label: string;
+  metrics: KpiMetric[];
+  emphasize?: boolean;
+}) {
+  if (metrics.length === 0) return null;
+  return (
+    <div>
+      <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: emphasize ? GOLD : "rgba(18,18,15,0.35)", marginBottom: 12 }}>
+        {label}
+      </p>
+      <div className={`grid grid-cols-1 sm:grid-cols-3 gap-3`}>
+        {metrics.map((g) => (
+          <div key={g.id} style={emphasize ? { borderLeft: `3px solid ${GOLD}` } : undefined}>
+            <ThemeCard label={g.metricName || g.kpiRecord} value={g.metricValue} max={g.benchmarkHigh ?? 100} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -708,6 +773,12 @@ export default async function CommercialPage({
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 80px" }} className="space-y-12">
 
+        {/* ── Orientation — for a reader landing here directly rather than
+             via Overview (Portal-Wide refinement) ──────────────────────── */}
+        <OrientationBlock>
+          Commercial Review covers guest experience, demand volume and conversion, and seat-efficiency (RevPASH) for the current reporting period, closing with the opportunities that follow from them.
+        </OrientationBlock>
+
         {/* ── Commercial Synthesis ─────────────────────────────────────── */}
         {synthesis && (
           <section>
@@ -730,10 +801,16 @@ export default async function CommercialPage({
           </section>
         )}
 
-        {/* ── Opportunities — promoted from the bottom ────────────────────── */}
-        <OpportunitiesPanel opportunities={commercialOpportunities} id="opportunities" confidenceById={opportunityConfidence} />
-
-        {/* ── Guest Experience ─────────────────────────────────────────── */}
+        {/* ── Guest Experience — first (Portal-Wide refinement Phase 3
+             reorder): the strongest, most load-bearing result on this tab
+             leads, rather than following after Opportunities. Ten flat
+             cards regrouped into three tiers (see GUEST_TIER_BY_NAME) —
+             what each score actually measures, not an arbitrary split.
+             No qualitative/open-text guest-comment data exists anywhere in
+             the KPI Records pipeline (Source Notes is pipeline provenance
+             metadata, never guest-authored text — confirmed directly, not
+             assumed) — flagged as a real content gap rather than built as
+             an empty shell. ──────────────────────────────────────────── */}
         <CommercialSection
           id="guest-experience"
           heading="Guest Experience"
@@ -745,26 +822,26 @@ export default async function CommercialPage({
         >
           <GuestSentimentBlock overallRating={overallRating} summary={intel("Guest")?.currentRead ?? null} />
 
-          {guestRatings.filter((g) => !g.metricName.toLowerCase().includes("overall")).length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {guestRatings
-                .filter((g) => !g.metricName.toLowerCase().includes("overall"))
-                .map((g) => (
-                  <ThemeCard
-                    key={g.id}
-                    label={g.metricName || g.kpiRecord}
-                    value={g.metricValue}
-                    max={g.benchmarkHigh ?? 100}
-                  />
-                ))}
-            </div>
-          )}
+          {(() => {
+            const nonOverall = guestRatings.filter((g) => !g.metricName.toLowerCase().includes("overall"));
+            const byTier = (tier: GuestTier) => nonOverall.filter((g) => GUEST_TIER_BY_NAME[g.metricName] === tier);
+            const unclassified = nonOverall.filter((g) => !GUEST_TIER_BY_NAME[g.metricName]);
+            return (
+              <div className="space-y-6">
+                <GuestTierGroup label={GUEST_TIER_LABEL.pillars} metrics={byTier("pillars")} emphasize />
+                <GuestTierGroup label={GUEST_TIER_LABEL.operational} metrics={byTier("operational")} />
+                <GuestTierGroup label={GUEST_TIER_LABEL.advocacy} metrics={byTier("advocacy")} />
+                <GuestTierGroup label="Additional Signals" metrics={unclassified} />
+              </div>
+            );
+          })()}
         </CommercialSection>
 
         {/* ── Volume & Conversion ──────────────────────────────────────── */}
         <CommercialSection
           id="volume-conversion"
           heading="Volume & Conversion"
+          connector="That guest-experience strength doesn't yet fully convert into dinner volume — the breakdown below shows where."
           intelligence={intel("Commercial")}
           metrics={catMetrics("Commercial")}
           // Scoped correctly now (canonical "covers" key), but this won't
@@ -822,20 +899,27 @@ export default async function CommercialPage({
         {/* ── Seat Efficiency (RevPASH) — capacity-efficiency, kept distinct
              from the P&L-style panels elsewhere on this page. Hidden
              entirely for properties with no RevPASH/Daypart Pattern data
-             yet (Peacock Alley and Yoshoku, as of this writing). Now uses
-             CommercialSection like every other section (Redesign prompt
-             Step 3) — intelligence=null since no Intelligence category
-             maps to Reservations, so it renders the honest "No commentary
-             published" callout plus a real Evidence table from revpashMetrics,
-             not a fabricated narrative. allMetrics=[] deliberately, so
-             CommercialSection's own single blended trend chart doesn't
-             duplicate the per-segment trend grid already in children below —
-             a single trend line wouldn't mean anything across 5 distinct
-             operating configurations anyway. ────────── */}
+             yet (Peacock Alley and Yoshoku, as of this writing). Uses
+             CommercialSection like every other section — intelligence=null
+             since no Intelligence category maps to Reservations, so it
+             renders a real Evidence table from revpashMetrics with no
+             narrative callout, rather than a fabricated one. allMetrics=[]
+             deliberately, so CommercialSection's own single blended trend
+             chart doesn't duplicate the per-segment trend grid already in
+             children below — a single trend line wouldn't mean anything
+             across 5 distinct operating configurations anyway.
+             The real Dinner Both Floors ($7.25) vs. Dinner Bar Only
+             ($12.80) gap below is a genuine, verified finding, but
+             connecting it causally to the broader demand story is
+             analysis, not display — flagged as a content gap rather than
+             authored here, same discipline as everywhere else in this
+             portal that doesn't invent commentary the data doesn't
+             support. ────────── */}
         {hasCapacitySection && (
           <CommercialSection
             id="seat-efficiency"
             heading="Seat Efficiency — RevPASH"
+            connector="The dinner shortfall above is also a capacity-efficiency question: which configuration converts seats into revenue best."
             intelligence={null}
             metrics={revpashMetrics}
             allMetrics={[]}
@@ -863,6 +947,16 @@ export default async function CommercialPage({
             {daypartPatternEntries.length > 0 && <DaypartHeatmap entries={daypartPatternEntries} />}
           </CommercialSection>
         )}
+
+        {/* ── Opportunities — moved to close the tab (Portal-Wide
+             refinement Phase 3 reorder), after the findings that motivate
+             them rather than before. ───────────────────────────────────── */}
+        <OpportunitiesPanel
+          opportunities={commercialOpportunities}
+          id="opportunities"
+          confidenceById={opportunityConfidence}
+          connector="Translated into specific, costed initiatives:"
+        />
 
         {/* Empty state */}
         {allMetrics.length === 0 && commercialOpportunities.length === 0 && (
