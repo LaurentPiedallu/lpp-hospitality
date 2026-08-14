@@ -685,6 +685,19 @@ export default async function CommercialPage({
   // Average check — canonical key, the same blended figure Financial Review
   // uses (not the "Revenue Drivers" section's old name-hint match, which
   // picked up "Dinner Average Check" instead).
+  //
+  // Commercial Synthesis bug investigation (confirmed against real Notion
+  // data, not assumed): this can legitimately resolve to null for a real
+  // property/period even though the correct record exists. Lex Yard's real
+  // June 2026 Total avg_check record ($78.12, $90 benchmark floor) is
+  // sitting Archived, never Published — the same systemic "generated but
+  // never promoted to Published" gap already found on COGS, Labor, OpEx,
+  // and the Covers total this engagement. The Published record that DOES
+  // exist for this key/segment/period ($110.41) belongs to a different
+  // property entirely, so it correctly never matches here. This is an
+  // upstream publishing gap, not a frontend join bug — do not "fix" this
+  // by relaxing the Published-only filter or falling back to another
+  // property's data.
   const avgCheckMetric = byKey("avg_check", "Revenue");
 
   // Average check by daypart — comparative bars, not a stacked/summed split
@@ -757,7 +770,12 @@ export default async function CommercialPage({
   // Page-level synthesis — built from the same verified figures the sections
   // below display, connecting guest-experience strength to the specific
   // revenue-capture gap and the quantified opportunities that follow. Only
-  // renders when the figures it depends on actually exist.
+  // renders when the figures it depends on actually exist — this is a real,
+  // confirmed gap for Lex Yard's current period (see avgCheckMetric above),
+  // not a bug: the section correctly and silently stays absent rather than
+  // rendering a literal placeholder or partial/undefined sentence. Resolves
+  // on its own once the real avg_check benchmark record gets Published
+  // upstream — no frontend change needed when that happens.
   const totalOpportunityValue = commercialOpportunities.reduce((s, o) => s + o.estimatedAnnualImpact, 0);
   const synthesis =
     overallRating && avgCheckMetric?.benchmarkLow != null && totalOpportunityValue > 0
