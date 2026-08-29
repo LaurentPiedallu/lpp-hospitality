@@ -14,11 +14,10 @@ R2_BUCKET               = "lpp-portal-uploads"
 R2_PUBLIC_URL           = "https://uploads.lpphospitality.com"
 MAKE_WEBHOOK_URL_PDF    = "https://hook.us2.make.com/6njuyc3vcs78eqro495b7ygo3ic6hjmm"
 MAKE_WEBHOOK_URL_EXCEL  = "https://hook.us2.make.com/b04fax4qxwb7mv6kvklseoxxx5w1eb5f"
-MAKE_WEBHOOK_URL_EXTRACTION = "https://hook.us2.make.com/t9bdzyqfcjaqt534za62ufls4mvqs2ve"
+MAKE_WEBHOOK_URL_EXTRACTION = "https://hook.us2.make.com/vzh17uueiewwg75b9g3xpmpf1wnxrgwa"
 MAKE_WEBHOOK_URL_MENU_ENGINEERING = "https://hook.us2.make.com/vdujmvug8fkrira3ye775fpp6uixq88c"
-# Secrets (JWT_SECRET, NOTION_API_KEY, RESEND_API_KEY, MAKE_WEBHOOK_URL)
+# Secrets (JWT_SECRET, NOTION_API_KEY, RESEND_API_KEY)
 # → set via dashboard or: wrangler secret put <NAME>
-# MAKE_WEBHOOK_URL = https://hook.us2.make.com/vzh17uueiewwg75b9g3xpmpf1wnxrgwa  (CSV uploads)
 
 [[r2_buckets]]
 binding = "R2"
