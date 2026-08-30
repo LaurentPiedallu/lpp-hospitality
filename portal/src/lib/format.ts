@@ -161,6 +161,28 @@ export const CANONICAL_METRIC_NAME: Record<string, string> = {
   opex_pct: "Total Other Operating Expenses Percentage",
   net_profit: "Departmental Profit/(Loss)",
   net_profit_pct: "Departmental Profit/(Loss) Percentage",
+  // Covers: the revenue-generating cover count ("Total Revenue Covers" =
+  // 7,040 for Lex Yard June — reconciles with Total Revenue ÷ avg check:
+  // 608,445 / 7,040 ≈ 86.43). Siblings tagged Segment "Total": "Total
+  // Covers Period" (7,453, includes comped covers) and the Breakfast /
+  // Lunch / Dinner daypart counts the pipeline also mistags as "Total".
+  total_covers_period: "Total Revenue Covers",
+  // Average check: the standard revenue ÷ covers figure, comps excluded
+  // ("Total Food and Beverage Average Check Excluding Comps" = $86.43).
+  // Siblings: "Food and Beverage Average Check Including Comps" ($78.12) and
+  // "Food Average Check Including Comps" ($57.50) — kept as breakdown
+  // lines, never the headline.
+  avg_check: "Total Food and Beverage Average Check Excluding Comps",
+};
+
+// Legacy LPP Metric Key values that call sites still pass but no live KPI
+// Record uses any more — the underlying records were re-tagged. Confirmed
+// against every property/period: zero records carry "covers" today, they
+// are all "total_covers_period". Aliased here so the old key keeps
+// resolving instead of silently returning null (which is what dropped the
+// covers total off Overview and Commercial Review).
+export const KEY_ALIAS: Record<string, string> = {
+  covers: "total_covers_period",
 };
 
 // From a set of KPI Records that already share LPP Metric Key + Segment
@@ -208,14 +230,75 @@ export function findMetricByKey(
   category?: string,
   segment: string = "Total"
 ): KpiMetric | null {
+  const resolvedKey = KEY_ALIAS[key] ?? key;
   const candidates = metrics.filter(
     (m) =>
-      m.lppMetricKey === key &&
+      m.lppMetricKey === resolvedKey &&
       m.periodStart === periodStart &&
       (!category || m.category === category) &&
       (m.segment ?? "Total") === segment
   );
-  return resolveCanonicalRollup(candidates, key);
+  return resolveCanonicalRollup(candidates, resolvedKey);
+}
+
+// All-period series for one LPP Metric Key, for trend charts. Applies the
+// same key alias + Segment "Total" filter + canonical-name disambiguation
+// as findMetricByKey, once per period — so a key that carries a roll-up
+// plus sub-component siblings in the same period (total_revenue,
+// total_covers_period, avg_check) contributes ONE point per period, not one
+// per sibling. Passing the raw filtered list to a trend chart instead gives
+// it several points sharing an x value and a malformed axis (the same
+// symptom the earlier category+unit trend fix chased, still reachable this
+// way).
+export function metricSeriesForKey(
+  metrics: KpiMetric[],
+  key: string,
+  category?: string
+): KpiMetric[] {
+  const resolvedKey = KEY_ALIAS[key] ?? key;
+  const periods = [
+    ...new Set(
+      metrics
+        .filter((m) => m.lppMetricKey === resolvedKey && (!category || m.category === category))
+        .map((m) => m.periodStart)
+    ),
+  ];
+  return periods
+    .map((p) => {
+      const candidates = metrics.filter(
+        (m) =>
+          m.lppMetricKey === resolvedKey &&
+          m.periodStart === p &&
+          (!category || m.category === category) &&
+          (m.segment ?? "Total") === "Total"
+      );
+      return resolveCanonicalRollup(candidates, resolvedKey);
+    })
+    .filter((m): m is KpiMetric => m != null);
+}
+
+// Exact Metric Name lookup within a period (+ optional category). For the
+// sub-component sibling records that share an LPP Metric Key with their
+// roll-up and so can't be told apart by key + segment — Food vs Beverage
+// revenue, Food vs Beverage cost of sales, Total Wages vs Taxes and
+// Benefits, the comps-included average checks. Case-insensitive, trimmed.
+// Returns the first match; these names are unique within a property/period
+// in the live data.
+export function findMetricByName(
+  metrics: KpiMetric[],
+  name: string,
+  periodStart: string | null,
+  category?: string
+): KpiMetric | null {
+  const target = name.trim().toLowerCase();
+  return (
+    metrics.find(
+      (m) =>
+        (m.metricName || "").trim().toLowerCase() === target &&
+        m.periodStart === periodStart &&
+        (!category || m.category === category)
+    ) ?? null
+  );
 }
 
 // Looks up the Intelligence record for a category, scoped to a specific

@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastUpdated } from "@/lib/notion-queries";
-import { usd, pct, findMetricByKey, findIntelligence, extractIndividualStaffNames, mentionsIndividualStaff } from "@/lib/format";
+import { usd, pct, findMetricByKey, findMetricByName, metricSeriesForKey, findIntelligence, extractIndividualStaffNames, mentionsIndividualStaff } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
@@ -220,7 +220,11 @@ export default async function FinancialPage({
   // repeating one period a dozen times, implausible spikes), not a Notion
   // data-duplication issue. Matches the same canonical-key convention
   // byKey() already uses for point-in-time lookups.
-  const trendFor = (metricKey: string) => allMetrics.filter((m) => m.lppMetricKey === metricKey);
+  // metricSeriesForKey collapses roll-up + sub-component siblings to one
+  // point per period (total_revenue carries Total / Food / Beverage revenue
+  // in the same period) — passing the raw filter gave the chart three
+  // points sharing an x value.
+  const trendFor = (metricKey: string) => metricSeriesForKey(allMetrics, metricKey);
 
   // Intelligence by category, scoped to the current period — a category with
   // no record for this period must not fall through to an older one (see
@@ -354,7 +358,8 @@ export default async function FinancialPage({
                 variant={severityVariant(totalRevenue.severity)} />
             )}
             {covers && (
-              <KpiCard label="Covers" value={covers.metricValue.toLocaleString()}
+              <KpiCard label={covers.metricName || "Total Revenue Covers"}
+                value={covers.metricValue.toLocaleString()}
                 variant="neutral" />
             )}
             {avgSpend && (
@@ -362,7 +367,12 @@ export default async function FinancialPage({
                 variant={severityVariant(avgSpend.severity)} />
             )}
             {avgCheck && (
-              <KpiCard label="Avg Check" value={usd(avgCheck.metricValue)}
+              // Light formatting pass over the record's own name ("Total
+              // Food and Beverage Average Check Excluding Comps") — keeps
+              // the qualifying "excl. comps" dimension, drops only the
+              // redundant "Total Food and Beverage" the Revenue section
+              // already implies.
+              <KpiCard label="Average Check (excl. comps)" value={usd(avgCheck.metricValue)}
                 variant={severityVariant(avgCheck.severity)} />
             )}
           </div>

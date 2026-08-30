@@ -361,7 +361,9 @@ export default async function PropertyPage({
           metricKey: "total_revenue",
           value: kpi.revenue != null ? compact(kpi.revenue) : "—",
           valueColor: "#12120F",
-          subLine: kpi.covers != null ? `${kpi.covers.toLocaleString()} covers` : null,
+          // "revenue covers" — kpi.covers resolves to "Total Revenue
+          // Covers" (comps excluded), not the larger "Total Covers Period".
+          subLine: kpi.covers != null ? `${kpi.covers.toLocaleString()} revenue covers` : null,
           interpretation: revenueInterpretation,
           variance: (() => {
             const target = metricTarget("total_revenue");

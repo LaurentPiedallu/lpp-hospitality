@@ -8,7 +8,7 @@ import {
   updateSelectProperty, getPage,
 } from "./notion-fetch";
 import { NOTION_DBS } from "./notion-ids";
-import { maxIso, resolveCanonicalRollup } from "./format";
+import { maxIso, resolveCanonicalRollup, KEY_ALIAS } from "./format";
 import type {
   Client, Property, KpiMetric, KpiSummary, Action, Opportunity,
   Risk, Intelligence, Initiative, Brief, Benchmark, Upload,
@@ -137,13 +137,18 @@ export function buildKpiSummary(metrics: KpiMetric[]): KpiSummary | null {
   // the same disambiguation findMetricByKey uses. Without it the Overview
   // Financial Snapshot showed $154K Beverage revenue as "Revenue" and
   // $152,723 Taxes-and-Benefits as the Labor dollar figure.
-  const byKey = (key: string, category?: string) =>
-    resolveCanonicalRollup(
+  const byKey = (key: string, category?: string) => {
+    const resolvedKey = KEY_ALIAS[key] ?? key;
+    return resolveCanonicalRollup(
       current.filter(
-        (m) => m.lppMetricKey === key && (!category || m.category === category) && (m.segment ?? "Total") === "Total"
+        (m) =>
+          m.lppMetricKey === resolvedKey &&
+          (!category || m.category === category) &&
+          (m.segment ?? "Total") === "Total"
       ),
-      key
+      resolvedKey
     )?.metricValue ?? null;
+  };
 
   // Derive worst financial severity
   const severityRank: Record<Severity, number> = {

@@ -2,8 +2,8 @@ import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastUpdated } from "@/lib/notion-queries";
 import {
-  usd, pct, compact, buildTrendData, looksLikeIndividualStaffMetric, findMetricByKey,
-  extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark,
+  usd, pct, compact, buildTrendData, looksLikeIndividualStaffMetric, findMetricByKey, findMetricByName,
+  metricSeriesForKey, extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark,
   parseDaypartPattern, CANONICAL_DAY_ORDER, CANONICAL_DAYPART_ORDER,
 } from "@/lib/format";
 import type { DaypartCoversEntry } from "@/lib/format";
@@ -591,16 +591,15 @@ export default async function CommercialPage({
 
   const catMetrics = (cat: string) => currentMetrics.filter((m) => m.category === cat);
 
-  // All-period metrics for one canonical LPP Metric Key, for trend charts —
-  // same fix already applied to Financial Review's identical bug. The old
-  // category+unit(+name-hint) version was too coarse: "Guest Experience" +
-  // "Rating" + "overall" hint still pulled in day/daypart-specific records
-  // like "Monday Overall Score" alongside the real 2 guest_overall points,
-  // and "Revenue" + "Count" pulled in unrelated per-item POS figures
-  // instead of the real covers total. Confirmed directly against the real
-  // KPI Records before fixing, not assumed.
+  // All-period series for one canonical LPP Metric Key, for trend charts.
+  // metricSeriesForKey applies the key alias + Segment-"Total" filter +
+  // canonical-name disambiguation once per period, so total_covers_period /
+  // avg_check contribute one point per period rather than one per
+  // roll-up/sub-component sibling. The old raw filter pulled in
+  // daypart-specific records ("Monday Overall Score", "Dinner Covers")
+  // alongside the real series.
   const trendFor = (metricKey: string, category?: string) =>
-    allMetrics.filter((m) => m.lppMetricKey === metricKey && (!category || m.category === category));
+    metricSeriesForKey(allMetrics, metricKey, category);
 
   const intel = (cat: string): Intelligence | null =>
     (allIntelligence as Intelligence[]).find((i) => i.category === cat) ?? null;
@@ -649,12 +648,18 @@ export default async function CommercialPage({
   const byKey = (key: string, category?: string, segment?: string) =>
     findMetricByKey(allMetrics, key, latest, category, segment);
 
-  // Covers — canonical key, scoped to Revenue (the real property-wide total),
-  // not a bare category+unit match, which was silently returning whichever
-  // Count-unit Revenue record Notion happened to return first (Dinner Covers,
-  // 2,400) instead of the actual total (Total Covers / Revenue Customers,
-  // 7,040) — same class of bug already fixed on Financial Review.
+  // Covers — "covers" aliases to LPP Metric Key total_covers_period (no
+  // record uses the bare "covers" key any more), scoped to Revenue, and
+  // resolveCanonicalRollup pins the "Total Revenue Covers" record (7,040 for
+  // Lex Yard June — comps excluded, reconciles with Total Revenue ÷ avg
+  // check) over its Segment-"Total"-mistagged siblings: "Total Covers
+  // Period" (7,453, comps included) and the Breakfast/Lunch/Dinner daypart
+  // counts. The bare .find() here previously returned whichever the API
+  // sorted first (Dinner Covers, 2,400).
   const coversMetric = byKey("covers", "Revenue");
+  // Comps-included cover count — shown as a secondary line under the
+  // revenue-covers headline, not in place of it.
+  const coversInclComps = findMetricByName(allMetrics, "Total Covers Period", latest, "Revenue");
   const conversionMetric = latestMetric(allMetrics, "Commercial", "%", "conversion");
   const channelMetrics = catMetrics("Commercial").filter((g) =>
     g.metricName.toLowerCase().includes("channel") ||
@@ -682,23 +687,19 @@ export default async function CommercialPage({
     .filter((e): e is { label: string; metric: KpiMetric } => e.metric != null);
   const daypartCovers = daypartCoverEntries.length >= 2 ? daypartCoverEntries : null;
 
-  // Average check — canonical key, the same blended figure Financial Review
-  // uses (not the "Revenue Drivers" section's old name-hint match, which
-  // picked up "Dinner Average Check" instead).
-  //
-  // Commercial Synthesis bug investigation (confirmed against real Notion
-  // data, not assumed): this can legitimately resolve to null for a real
-  // property/period even though the correct record exists. Lex Yard's real
-  // June 2026 Total avg_check record ($78.12, $90 benchmark floor) is
-  // sitting Archived, never Published — the same systemic "generated but
-  // never promoted to Published" gap already found on COGS, Labor, OpEx,
-  // and the Covers total this engagement. The Published record that DOES
-  // exist for this key/segment/period ($110.41) belongs to a different
-  // property entirely, so it correctly never matches here. This is an
-  // upstream publishing gap, not a frontend join bug — do not "fix" this
-  // by relaxing the Published-only filter or falling back to another
-  // property's data.
+  // Average check — canonical key resolves to "Total Food and Beverage
+  // Average Check Excluding Comps" ($86.43 for Lex Yard June, $90 benchmark
+  // floor), the standard revenue ÷ covers figure. Its Segment-"Total"
+  // siblings — "Food and Beverage Average Check Including Comps" ($78.12)
+  // and "Food Average Check Including Comps" ($57.50) — are shown as
+  // breakdown lines below, never as the headline. (All three are Published
+  // as of this engagement; an earlier note here about the $78.12 record
+  // being stuck Archived is no longer true.)
   const avgCheckMetric = byKey("avg_check", "Revenue");
+  const avgCheckBreakdown = [
+    { m: findMetricByName(allMetrics, "Food and Beverage Average Check Including Comps", latest, "Revenue"), tag: "F&B incl. comps" },
+    { m: findMetricByName(allMetrics, "Food Average Check Including Comps", latest, "Revenue"), tag: "food incl. comps" },
+  ].filter((x): x is { m: KpiMetric; tag: string } => x.m != null);
 
   // Average check by daypart — comparative bars, not a stacked/summed split
   // like covers-by-daypart: an average check isn't a part of a whole, so it
@@ -876,9 +877,27 @@ export default async function CommercialPage({
             {coversMetric && (
               <KpiCard
                 key="covers"
-                label="Covers / Guests"
+                label={coversMetric.metricName || "Total Revenue Covers"}
                 value={coversMetric.metricValue.toLocaleString()}
+                sub={
+                  coversInclComps
+                    ? `${coversInclComps.metricValue.toLocaleString()} incl. comped covers`
+                    : undefined
+                }
                 variant={severityVariant(coversMetric.severity)}
+              />
+            )}
+            {avgCheckMetric && (
+              <KpiCard
+                key="avgcheck"
+                label="Average Check (excl. comps)"
+                value={usd(avgCheckMetric.metricValue)}
+                sub={
+                  avgCheckBreakdown.length > 0
+                    ? avgCheckBreakdown.map(({ m, tag }) => `${usd(m.metricValue)} ${tag}`).join(" · ")
+                    : undefined
+                }
+                variant={severityVariant(avgCheckMetric.severity)}
               />
             )}
             {conversionMetric && (
