@@ -251,6 +251,8 @@ export default async function FinancialPage({
   // lines. Food + Beverage don't always sum to Total (comps / other
   // revenue), so DriverBreakdown against the real total with a residual,
   // not a StackedSplit that would imply they do.
+  // NOTE: the strings below are exact Notion Metric Name literals — they
+  // must move in lockstep with any upstream rename of those records.
   const foodRevenue = findMetricByName(allMetrics, "Total Food Revenue", latest, "Revenue");
   const beverageRevenue = findMetricByName(allMetrics, "Total Beverage Revenue", latest, "Revenue");
   const revenueDrivers = [foodRevenue, beverageRevenue].filter((x): x is KpiMetric => x != null);
@@ -263,6 +265,8 @@ export default async function FinancialPage({
   // ("Wages Total" / "Payroll Taxes" / "Benefits") are kept as fallbacks
   // for any property/period that used them. Each keeps its own Metric Name
   // as the label — no re-blending into generic buckets.
+  // NOTE: the strings below are exact Notion Metric Name literals — keep
+  // them in lockstep with any upstream rename of those records.
   const wages = findMetricByName(allMetrics, "Total Wages", latest, "Labor") ?? byKey("total_payroll", "Labor", "Wages Total");
   const taxesAndBenefits = findMetricByName(allMetrics, "Taxes and Benefits", latest, "Labor");
   const payrollTaxes = byKey("total_payroll", "Labor", "Payroll Taxes");
@@ -275,6 +279,8 @@ export default async function FinancialPage({
   // total_cogs + Segment "Total" with the roll-up. These do sum exactly to
   // Total Cost of Sales in the live data, so a StackedSplit is honest here.
   // Beverage is one blended figure (beer/wine/liquor not split further).
+  // NOTE: the strings below are exact Notion Metric Name literals — keep
+  // them in lockstep with any upstream rename of those records.
   const foodCost = findMetricByName(allMetrics, "Food Cost of Sales", latest, "COGS") ?? byKey("total_cogs", "COGS", "Food");
   const beverageCost = findMetricByName(allMetrics, "Beverage Cost of Sales", latest, "COGS") ?? byKey("total_cogs", "COGS", "Beverage");
 
@@ -365,7 +371,7 @@ export default async function FinancialPage({
         >
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {totalRevenue && (
-              <KpiCard label="Total Revenue" value={usd(totalRevenue.metricValue)}
+              <KpiCard label={totalRevenue.metricName} value={usd(totalRevenue.metricValue)}
                 variant={severityVariant(totalRevenue.severity)} />
             )}
             {covers && (

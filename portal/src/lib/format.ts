@@ -191,6 +191,14 @@ export const KEY_ALIAS: Record<string, string> = {
 // (case-insensitive, trimmed), that record wins; otherwise the first
 // candidate is returned unchanged — so single-candidate keys and keys with
 // no known collision are completely unaffected.
+//
+// The fall-through (>1 candidate, no unique canonical match) is the exact
+// failure mode this function exists to prevent — a bare first-match on a
+// collision. It stays reachable (a new roll-up key, an upstream Metric Name
+// rename, or two records sharing the canonical name), so it logs loudly
+// rather than picking silently. The warning is un-gated: a silently-wrong
+// KPI in production is worse than a log line, and it only fires on a
+// genuine unresolved ambiguity, which is rare.
 export function resolveCanonicalRollup(candidates: KpiMetric[], key: string): KpiMetric | null {
   if (candidates.length <= 1) return candidates[0] ?? null;
   const canonicalName = CANONICAL_METRIC_NAME[key];
@@ -199,6 +207,12 @@ export function resolveCanonicalRollup(candidates: KpiMetric[], key: string): Kp
     const exact = candidates.filter((m) => (m.metricName || "").trim().toLowerCase() === target);
     if (exact.length === 1) return exact[0];
   }
+  console.warn(
+    `[resolveCanonicalRollup] ${candidates.length} records share key "${key}" + segment; ` +
+      `no unique CANONICAL_METRIC_NAME match — using "${candidates[0].metricName}". ` +
+      `Candidates: ${candidates.map((c) => `${c.metricName}=${c.metricValue}`).join(" | ")}. ` +
+      `Add "${key}" to CANONICAL_METRIC_NAME in lib/format.ts.`
+  );
   return candidates[0];
 }
 

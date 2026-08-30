@@ -8,7 +8,8 @@
     "start": "next start",
     "pages:build": "node -e \"['.next','.open-next'].forEach(d=>{try{require('fs').rmSync(d,{recursive:true,force:true})}catch(e){}})\" && opennextjs-cloudflare build",
     "preview": "opennextjs-cloudflare preview",
-    "deploy": "opennextjs-cloudflare deploy"
+    "deploy": "opennextjs-cloudflare deploy",
+    "test": "node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@notionhq/client": "^2.2.15",

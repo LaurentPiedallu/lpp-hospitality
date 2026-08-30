@@ -658,7 +658,9 @@ export default async function CommercialPage({
   // sorted first (Dinner Covers, 2,400).
   const coversMetric = byKey("covers", "Revenue");
   // Comps-included cover count — shown as a secondary line under the
-  // revenue-covers headline, not in place of it.
+  // revenue-covers headline, not in place of it. NOTE: "Total Covers
+  // Period" is an exact Notion Metric Name literal — keep it in lockstep
+  // with any upstream rename of that record.
   const coversInclComps = findMetricByName(allMetrics, "Total Covers Period", latest, "Revenue");
   const conversionMetric = latestMetric(allMetrics, "Commercial", "%", "conversion");
   const channelMetrics = catMetrics("Commercial").filter((g) =>
@@ -696,6 +698,8 @@ export default async function CommercialPage({
   // as of this engagement; an earlier note here about the $78.12 record
   // being stuck Archived is no longer true.)
   const avgCheckMetric = byKey("avg_check", "Revenue");
+  // NOTE: the Metric Name strings below are exact Notion literals — keep
+  // them in lockstep with any upstream rename of those records.
   const avgCheckBreakdown = [
     { m: findMetricByName(allMetrics, "Food and Beverage Average Check Including Comps", latest, "Revenue"), tag: "F&B incl. comps" },
     { m: findMetricByName(allMetrics, "Food Average Check Including Comps", latest, "Revenue"), tag: "food incl. comps" },

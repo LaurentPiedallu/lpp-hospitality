@@ -332,6 +332,9 @@ export default async function PropertyPage({
   // resolveCanonicalRollup steps past for the headline. Each line keeps its
   // own Metric Name; money shown compact. Empty list -> tile shows no
   // breakdown, exactly as before.
+  // NOTE: `names` passed by callers below are exact Notion Metric Name
+  // literals — they must move in lockstep with any upstream rename of the
+  // corresponding records.
   function metricBreakdown(names: string[], category: string): { label: string; value: string }[] {
     return names
       .map((n) => findMetricByName(allMetrics as KpiMetric[], n, latestPeriod, category))
