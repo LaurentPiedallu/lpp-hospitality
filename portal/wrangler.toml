@@ -12,13 +12,12 @@ NEXT_PUBLIC_SITE_URL    = "https://portal.lpphospitality.com"
 SITE_URL                = "https://portal.lpphospitality.com"
 R2_BUCKET               = "lpp-portal-uploads"
 R2_PUBLIC_URL           = "https://uploads.lpphospitality.com"
-MAKE_WEBHOOK_URL_PDF    = "https://hook.us2.make.com/giuugemos7petqmnjeog62wjtxbt7r6s"
-MAKE_WEBHOOK_URL_CSV    = "https://hook.us2.make.com/nj8dqdgkfknofsa4aelbj4gadyv7m3f3"
-MAKE_WEBHOOK_URL_EXCEL  = "https://hook.us2.make.com/b04fax4qxwb7mv6kvklseoxxx5w1eb5f"
-# Old combined CSV+PDF scenario — kept as rollback, retired in a later step
-MAKE_WEBHOOK_URL_EXTRACTION = "https://hook.us2.make.com/vzh17uueiewwg75b9g3xpmpf1wnxrgwa"
-MAKE_WEBHOOK_URL_MENU_ENGINEERING = "https://hook.us2.make.com/vdujmvug8fkrira3ye775fpp6uixq88c"
-# Secrets (JWT_SECRET, NOTION_API_KEY, RESEND_API_KEY)
+# MAKE_WEBHOOK_URL_* moved to encrypted Cloudflare secrets — plaintext [vars] are
+# committed to git and were being scraped from commits. Names now set as secrets:
+# MAKE_WEBHOOK_URL_CSV, _PDF, _EXTRACTION, _MENU_ENGINEERING, _EXCEL
+# Verify with: wrangler secret list
+# Secrets (JWT_SECRET, NOTION_API_KEY, RESEND_API_KEY, INTERNAL_API_SECRET,
+#          MAKE_WEBHOOK_URL, MAKE_WEBHOOK_URL_*)
 # → set via dashboard or: wrangler secret put <NAME>
 
 [[r2_buckets]]
