@@ -151,6 +151,15 @@ export function hasRealBenchmark(low: number | null | undefined, high: number | 
 // $358,980 / $144,103 roll-ups that exist in the same period. The *_pct
 // twins below are single-record and unambiguous today; they're pinned here
 // too so a future sub-component %-record can't reintroduce the collision.
+//
+// opex and net_profit are a second collision shape: not a total plus its
+// components, but two legitimate headline figures both tagged Segment
+// "Total". Confirmed live on Yoshoku's first P&L upload (2026-08) — opex
+// carried "Total Other Operating Expenses" $143,256 vs "Total Expenses"
+// $250,277; net_profit carried "Departmental Profit/(Loss)" -$112,669 vs
+// "Gross Profit" +$137,607. Both already resolve to the right record via
+// the entries below; the guard test also pins these two keys explicitly
+// since they don't match the total_* / *_pct shape it keys off.
 export const CANONICAL_METRIC_NAME: Record<string, string> = {
   total_revenue: "Total Revenue",
   total_cogs: "Total Cost of Sales",

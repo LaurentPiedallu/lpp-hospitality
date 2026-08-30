@@ -21,9 +21,19 @@ function lppMetricKeys(): string[] {
   return [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
 }
 
-test("every total_* / *_pct metric key has a CANONICAL_METRIC_NAME entry", () => {
-  const rollupKeys = lppMetricKeys().filter((k) => k.startsWith("total_") || k.endsWith("_pct"));
-  assert.ok(rollupKeys.length >= 6, `expected the roll-up/percentage keys, got: ${rollupKeys.join(", ")}`);
+// opex and net_profit are roll-up keys too — the pipeline tags two distinct
+// Segment "Total" records under each (opex: "Total Other Operating Expenses"
+// vs "Total Expenses"; net_profit: "Departmental Profit/(Loss)" vs "Gross
+// Profit", both seen live on Yoshoku's first P&L) — but they don't fit the
+// total_* / *_pct shape, so name them explicitly or the guard misses exactly
+// the keys most prone to a silent collision.
+const EXTRA_ROLLUP_KEYS = ["opex", "net_profit"];
+
+test("every roll-up / *_pct metric key has a CANONICAL_METRIC_NAME entry", () => {
+  const rollupKeys = lppMetricKeys().filter(
+    (k) => k.startsWith("total_") || k.endsWith("_pct") || EXTRA_ROLLUP_KEYS.includes(k)
+  );
+  assert.ok(rollupKeys.length >= 8, `expected the roll-up/percentage keys, got: ${rollupKeys.join(", ")}`);
   const missing = rollupKeys.filter((k) => !(k in CANONICAL_METRIC_NAME));
   assert.deepEqual(
     missing,
@@ -41,6 +51,21 @@ test("resolveCanonicalRollup picks the canonical record on a key+segment collisi
     row("Total Revenue", 608445),
   ];
   assert.equal(resolveCanonicalRollup(candidates, "total_revenue")?.metricValue, 608445);
+});
+
+test("resolveCanonicalRollup resolves the opex / net_profit two-headline collisions", () => {
+  const row = (metricName: string, metricValue: number) =>
+    ({ metricName, metricValue } as Parameters<typeof resolveCanonicalRollup>[0][number]);
+
+  // Yoshoku's first P&L: two records each legitimately tagged Segment
+  // "Total" under one key — distinct headline concepts, not a roll-up plus
+  // its parts. Canonical name is second in each array, so a first-match
+  // fallback would fail these.
+  const opex = [row("Total Expenses", 250277), row("Total Other Operating Expenses", 143256)];
+  assert.equal(resolveCanonicalRollup(opex, "opex")?.metricValue, 143256);
+
+  const netProfit = [row("Gross Profit", 137607), row("Departmental Profit/(Loss)", -112669)];
+  assert.equal(resolveCanonicalRollup(netProfit, "net_profit")?.metricValue, -112669);
 });
 
 test("resolveCanonicalRollup passes a single candidate straight through", () => {
