@@ -245,27 +245,38 @@ export default async function FinancialPage({
   const covers = byKey("covers", "Revenue");
   const avgSpend = byKey("avg_spend");
   const avgCheck = byKey("avg_check");
+  // Revenue by type — the same sub-component records the roll-up resolver
+  // now steps past for the headline (they share LPP Metric Key
+  // total_revenue + Segment "Total"), surfaced here as their own labelled
+  // lines. Food + Beverage don't always sum to Total (comps / other
+  // revenue), so DriverBreakdown against the real total with a residual,
+  // not a StackedSplit that would imply they do.
+  const foodRevenue = findMetricByName(allMetrics, "Total Food Revenue", latest, "Revenue");
+  const beverageRevenue = findMetricByName(allMetrics, "Total Beverage Revenue", latest, "Revenue");
+  const revenueDrivers = [foodRevenue, beverageRevenue].filter((x): x is KpiMetric => x != null);
 
   const laborCost = byKey("total_payroll");
   const laborPct = byKey("labor_pct");
-  // Driver line items — canonical key + Segment lookup (see the Segment
-  // field on KpiMetric / findMetricByKey in lib/format.ts). Previously
-  // matched by exact metric name since none of these had a canonical key at
-  // all; now that a prior pass tagged them with real key+segment pairs,
-  // this is resilient to title variants Notion has both used for the same
-  // figure (e.g. "Total Wages" vs "Total Payroll Only" — both Segment
-  // "Wages Total"). Only shown if genuinely present for this property/period.
-  const wages = byKey("total_payroll", "Labor", "Wages Total");
+  // Payroll drivers — the sub-component records that share LPP Metric Key
+  // total_payroll + Segment "Total" with the roll-up. Live data splits it
+  // "Total Wages" + "Taxes and Benefits"; older Segment-tagged variants
+  // ("Wages Total" / "Payroll Taxes" / "Benefits") are kept as fallbacks
+  // for any property/period that used them. Each keeps its own Metric Name
+  // as the label — no re-blending into generic buckets.
+  const wages = findMetricByName(allMetrics, "Total Wages", latest, "Labor") ?? byKey("total_payroll", "Labor", "Wages Total");
+  const taxesAndBenefits = findMetricByName(allMetrics, "Taxes and Benefits", latest, "Labor");
   const payrollTaxes = byKey("total_payroll", "Labor", "Payroll Taxes");
   const benefits = byKey("total_payroll", "Labor", "Benefits");
-  const laborDrivers = [wages, payrollTaxes, benefits].filter((x): x is KpiMetric => x != null);
+  const laborDrivers = [wages, taxesAndBenefits, payrollTaxes, benefits].filter((x): x is KpiMetric => x != null);
 
   const cogsDollars = byKey("total_cogs");
   const cogsPct = byKey("cogs_pct");
-  // Beverage COGS is one blended figure (beer/wine/liquor not split further
-  // in the source P&Ls) — don't build UI implying a finer breakdown exists.
-  const foodCost = byKey("total_cogs", "COGS", "Food");
-  const beverageCost = byKey("total_cogs", "COGS", "Beverage");
+  // Food vs Beverage cost of sales — sibling records sharing LPP Metric Key
+  // total_cogs + Segment "Total" with the roll-up. These do sum exactly to
+  // Total Cost of Sales in the live data, so a StackedSplit is honest here.
+  // Beverage is one blended figure (beer/wine/liquor not split further).
+  const foodCost = findMetricByName(allMetrics, "Food Cost of Sales", latest, "COGS") ?? byKey("total_cogs", "COGS", "Food");
+  const beverageCost = findMetricByName(allMetrics, "Beverage Cost of Sales", latest, "COGS") ?? byKey("total_cogs", "COGS", "Beverage");
 
   const opexDollars = byKey("opex");
   const opexPct = byKey("opex_pct");
@@ -376,6 +387,14 @@ export default async function FinancialPage({
                 variant={severityVariant(avgCheck.severity)} />
             )}
           </div>
+          {revenueDrivers.length >= 2 && totalRevenue && (
+            <DriverBreakdown
+              title="Revenue by Type"
+              total={totalRevenue.metricValue}
+              items={revenueDrivers.map((d) => ({ label: d.metricName, value: d.metricValue }))}
+              residualLabel="other revenue (comps, non-F&B)"
+            />
+          )}
           {/* Deep link to Commercial Review's own ownership of the
               demand-side story (Portal-Wide refinement — dinner-cover
               shortfall is owned by Commercial Review, not re-derived here). */}
@@ -467,10 +486,10 @@ export default async function FinancialPage({
             </div>
             {foodCost && beverageCost && (
               <StackedSplit
-                title="Food vs. Beverage Split"
+                title="Cost of Sales by Type"
                 segments={[
-                  { label: "Food", value: foodCost.metricValue, color: "#B8935A" },
-                  { label: "Beverage", value: beverageCost.metricValue, color: "#12120F" },
+                  { label: foodCost.metricName, value: foodCost.metricValue, color: "#B8935A" },
+                  { label: beverageCost.metricName, value: beverageCost.metricValue, color: "#12120F" },
                 ]}
               />
             )}

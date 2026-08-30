@@ -7,7 +7,7 @@ import {
   getPublishedBriefs,
 } from "@/lib/notion-queries";
 import { deriveHealth } from "@/lib/health";
-import { usd, pct, compact, formatPeriod, splitIntoParagraphs, parseTextLines, maxIso, findMetricByKey } from "@/lib/format";
+import { usd, pct, compact, formatPeriod, splitIntoParagraphs, parseTextLines, maxIso, findMetricByKey, findMetricByName } from "@/lib/format";
 import { selectTopPriorities, type TopPriority } from "@/lib/priorities";
 import { PRIORITY_TAB_BY_CATEGORY, INTEL_CATEGORY_TAB } from "@/lib/deep-links";
 import NavBar from "@/components/NavBar";
@@ -325,6 +325,27 @@ export default async function PropertyPage({
     return findMetricByKey(allMetrics as KpiMetric[], key, latestPeriod)?.targetValue ?? null;
   }
 
+  // Compact sub-component breakdown for a Financial Snapshot tile — the
+  // granular sibling records that share the tile's LPP Metric Key + Segment
+  // "Total" with the roll-up (Food vs Beverage revenue, Food vs Beverage
+  // cost of sales, Wages vs Taxes & Benefits), the same records
+  // resolveCanonicalRollup steps past for the headline. Each line keeps its
+  // own Metric Name; money shown compact. Empty list -> tile shows no
+  // breakdown, exactly as before.
+  function metricBreakdown(names: string[], category: string): { label: string; value: string }[] {
+    return names
+      .map((n) => findMetricByName(allMetrics as KpiMetric[], n, latestPeriod, category))
+      .filter((m): m is KpiMetric => m != null)
+      .map((m) => ({
+        // Drop only a leading "Total " on this compact tile (the tile
+        // header already carries the category) — the qualifying dimension
+        // ("Food Revenue", "Beverage Cost of Sales") is always kept. Full
+        // Metric Name is used verbatim on Financial Review.
+        label: m.metricName.replace(/^Total\s+/i, ""),
+        value: compact(m.metricValue),
+      }));
+  }
+
   // Prior-period value for a canonical metric key, for the inline
   // Sparkline (Portal-Wide refinement, cross-cutting) — real data only
   // ever has 2 Published periods per metric (confirmed directly against
@@ -353,6 +374,10 @@ export default async function PropertyPage({
     // Inline trajectory (Portal-Wide refinement, cross-cutting) — [prior,
     // current], null when there's no prior period or record to pair it with.
     sparkline: [number, number] | null;
+    // Granular sub-component lines (e.g. Total Food Revenue / Total
+    // Beverage Revenue) shown small under the tile's own figure — empty
+    // when the property/period has no sub-components for this metric.
+    breakdown: { label: string; value: string }[];
   }
   const financialCards: FinancialCard[] = kpi
     ? [
@@ -372,6 +397,7 @@ export default async function PropertyPage({
             return { text: `${diff >= 0 ? "+" : "−"}${compact(Math.abs(diff))} vs budget`, favorable: diff >= 0 };
           })(),
           sparkline: kpi.revenue != null && metricPrior("total_revenue") != null ? [metricPrior("total_revenue")!, kpi.revenue] : null,
+          breakdown: metricBreakdown(["Total Food Revenue", "Total Beverage Revenue"], "Revenue"),
         },
         {
           label: "Labor",
@@ -387,6 +413,7 @@ export default async function PropertyPage({
             return { text: `${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)} pts vs budget`, favorable: diff <= 0 };
           })(),
           sparkline: kpi.laborPct != null && metricPrior("labor_pct") != null ? [metricPrior("labor_pct")!, kpi.laborPct] : null,
+          breakdown: metricBreakdown(["Total Wages", "Taxes and Benefits"], "Labor"),
         },
         {
           // "COGS", not "Food COGS" — cogs_pct / total_cogs are the blended
@@ -406,6 +433,7 @@ export default async function PropertyPage({
             return { text: `${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)} pts vs budget`, favorable: diff <= 0 };
           })(),
           sparkline: kpi.cogsPct != null && metricPrior("cogs_pct") != null ? [metricPrior("cogs_pct")!, kpi.cogsPct] : null,
+          breakdown: metricBreakdown(["Food Cost of Sales", "Beverage Cost of Sales"], "COGS"),
         },
         {
           label: "Net Profit",
@@ -421,6 +449,9 @@ export default async function PropertyPage({
             return { text: `${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)} pts vs budget`, favorable: diff >= 0 };
           })(),
           sparkline: kpi.netProfitPct != null && metricPrior("net_profit_pct") != null ? [metricPrior("net_profit_pct")!, kpi.netProfitPct] : null,
+          // Departmental vs Gross profit aren't components of one total —
+          // no sub-component breakdown for this tile.
+          breakdown: [],
         },
       ]
     : [];
@@ -933,6 +964,18 @@ export default async function PropertyPage({
                     {card.value}
                   </p>
                   {card.subLine && <p style={{ fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 6 }}>{card.subLine}</p>}
+                  {card.breakdown.length > 0 && (
+                    <div style={{ marginTop: 8 }}>
+                      {card.breakdown.map((b) => (
+                        <p
+                          key={b.label}
+                          style={{ fontFamily: JOST, fontSize: 10, color: "rgba(18,18,15,0.45)", lineHeight: 1.5, marginTop: 2 }}
+                        >
+                          {b.label} <span style={{ color: "rgba(18,18,15,0.7)", fontWeight: 500 }}>{b.value}</span>
+                        </p>
+                      ))}
+                    </div>
+                  )}
                   {/* Variance vs budget — only renders once Target Value is
                       populated in Notion (see financialCards above); the
                       template is ready for it, nothing fakes it in the
