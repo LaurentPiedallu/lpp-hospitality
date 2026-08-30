@@ -270,20 +270,32 @@ export async function POST(req: NextRequest) {
 
   const notionPage = await notionRes.json() as { id: string };
 
-  // 4. Trigger the extraction pipeline for this Upload record. Menu
-  // Engineering routes to its own separate Make automation — different
-  // output shape (many item-level records with relational rollups, not
-  // simple scalar metrics) — everything else keeps going through the
-  // standard extraction webhook, unchanged. Same payload shape either way;
-  // only the destination URL differs.
+  // 4. Trigger the extraction pipeline for this Upload record. Routing, in
+  // priority order:
+  //   - Menu Engineering → its own Make automation (different output shape:
+  //     many item-level records with relational rollups, not scalar metrics)
+  //   - PDF uploads       → the PDF extraction scenario
+  //   - CSV / Excel       → the CSV extraction scenario (Excel is converted
+  //     to CSV upstream, so it goes through the same pipeline)
+  //   - anything else     → the old combined extraction scenario as a
+  //     fallback, so an unexpected format still triggers rather than
+  //     silently resolving to undefined (upstream validation should keep
+  //     fileFormat to CSV/PDF/Excel, so this is a safety net only)
+  // Same payload shape for every destination; only the URL differs.
   // Processing Status in Notion is just a label — this webhook is the only
   // thing that actually kicks off extraction, so a failure here means the
   // upload is stored correctly but sits inert until someone retries it.
   let extractionTriggered = false;
-  const extractionWebhook =
-    uploadType?.trim() === "Menu Engineering"
-      ? process.env.MAKE_WEBHOOK_URL_MENU_ENGINEERING
-      : process.env.MAKE_WEBHOOK_URL_EXTRACTION;
+  let extractionWebhook: string | undefined;
+  if (uploadType?.trim() === "Menu Engineering") {
+    extractionWebhook = process.env.MAKE_WEBHOOK_URL_MENU_ENGINEERING;
+  } else if (fmt === "PDF") {
+    extractionWebhook = process.env.MAKE_WEBHOOK_URL_PDF;
+  } else if (fmt === "CSV" || fmt === "Excel") {
+    extractionWebhook = process.env.MAKE_WEBHOOK_URL_CSV;
+  } else {
+    extractionWebhook = process.env.MAKE_WEBHOOK_URL_EXTRACTION;
+  }
   if (extractionWebhook) {
     try {
       const webhookRes = await fetch(extractionWebhook, {
@@ -299,7 +311,11 @@ export async function POST(req: NextRequest) {
       console.error("Extraction webhook request failed:", err);
     }
   } else {
-    const missingVar = uploadType?.trim() === "Menu Engineering" ? "MAKE_WEBHOOK_URL_MENU_ENGINEERING" : "MAKE_WEBHOOK_URL_EXTRACTION";
+    const missingVar =
+      uploadType?.trim() === "Menu Engineering" ? "MAKE_WEBHOOK_URL_MENU_ENGINEERING"
+      : fmt === "PDF"                           ? "MAKE_WEBHOOK_URL_PDF"
+      : fmt === "CSV" || fmt === "Excel"        ? "MAKE_WEBHOOK_URL_CSV"
+      :                                          "MAKE_WEBHOOK_URL_EXTRACTION";
     console.error(`${missingVar} is not configured — upload recorded but extraction was not triggered`);
   }
 
