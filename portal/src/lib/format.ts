@@ -134,6 +134,52 @@ export function hasRealBenchmark(low: number | null | undefined, high: number | 
   return low != null && high != null && !(low === 0 && high === 0);
 }
 
+// The exact Metric Name of the one true roll-up record for each financial
+// roll-up LPP Metric Key. The upstream pipeline tags several Published KPI
+// Records with the SAME key + Segment ("Total") + KPI Category — the roll-up
+// plus its sub-components:
+//   total_revenue  → "Total Revenue" | "Total Food Revenue" | "Total Beverage Revenue"
+//   total_cogs     → "Total Cost of Sales" | "Food Cost of Sales" | "Beverage Cost of Sales"
+//   total_payroll  → "Total Payroll, Taxes and Benefits" | "Total Wages" | "Taxes and Benefits"
+//   opex           → "Total Other Operating Expenses" | "Total Expenses" | "Kitchen Allocation Expense"
+//   net_profit     → "Departmental Profit/(Loss)" | "Gross Profit"
+// so key + Segment alone no longer identifies one record, and a bare
+// .find() returns whichever Notion stored first. Confirmed live-wrong on
+// Lex Yard, June 2026: Overview's Revenue card showed $154K (the Beverage
+// revenue line), Labor $ showed $152,723 (Taxes and Benefits), Food COGS $
+// showed $25,782 (Beverage Cost of Sales) — instead of the $608,445 /
+// $358,980 / $144,103 roll-ups that exist in the same period. The *_pct
+// twins below are single-record and unambiguous today; they're pinned here
+// too so a future sub-component %-record can't reintroduce the collision.
+export const CANONICAL_METRIC_NAME: Record<string, string> = {
+  total_revenue: "Total Revenue",
+  total_cogs: "Total Cost of Sales",
+  cogs_pct: "Total Cost of Sales Percentage",
+  total_payroll: "Total Payroll, Taxes and Benefits",
+  labor_pct: "Total Payroll, Taxes and Benefits Percentage",
+  opex: "Total Other Operating Expenses",
+  opex_pct: "Total Other Operating Expenses Percentage",
+  net_profit: "Departmental Profit/(Loss)",
+  net_profit_pct: "Departmental Profit/(Loss) Percentage",
+};
+
+// From a set of KPI Records that already share LPP Metric Key + Segment
+// (+ period, + optional category), return the one true roll-up. When the
+// key has a known canonical total name and exactly one candidate matches it
+// (case-insensitive, trimmed), that record wins; otherwise the first
+// candidate is returned unchanged — so single-candidate keys and keys with
+// no known collision are completely unaffected.
+export function resolveCanonicalRollup(candidates: KpiMetric[], key: string): KpiMetric | null {
+  if (candidates.length <= 1) return candidates[0] ?? null;
+  const canonicalName = CANONICAL_METRIC_NAME[key];
+  if (canonicalName) {
+    const target = canonicalName.toLowerCase();
+    const exact = candidates.filter((m) => (m.metricName || "").trim().toLowerCase() === target);
+    if (exact.length === 1) return exact[0];
+  }
+  return candidates[0];
+}
+
 // Looks up a single KPI Record by its canonical LPP Metric Key for a
 // specific period — never by category/unit/name-substring, which silently
 // picks up whichever sibling record happens to share those (e.g. matching
@@ -150,6 +196,11 @@ export function hasRealBenchmark(low: number | null | undefined, high: number | 
 // Total was a deliberate backward-compatibility choice so nothing already
 // Published needed to change. Pass an explicit segment (e.g. "Breakfast",
 // "Food", "Wages Total") to get a specific slice instead.
+//
+// When several records still share key + period + category + segment (the
+// roll-up plus its sub-components, all tagged Segment "Total" upstream),
+// resolveCanonicalRollup picks the real total by Metric Name rather than
+// letting Notion's storage order decide.
 export function findMetricByKey(
   metrics: KpiMetric[],
   key: string,
@@ -157,15 +208,14 @@ export function findMetricByKey(
   category?: string,
   segment: string = "Total"
 ): KpiMetric | null {
-  return (
-    metrics.find(
-      (m) =>
-        m.lppMetricKey === key &&
-        m.periodStart === periodStart &&
-        (!category || m.category === category) &&
-        (m.segment ?? "Total") === segment
-    ) ?? null
+  const candidates = metrics.filter(
+    (m) =>
+      m.lppMetricKey === key &&
+      m.periodStart === periodStart &&
+      (!category || m.category === category) &&
+      (m.segment ?? "Total") === segment
   );
+  return resolveCanonicalRollup(candidates, key);
 }
 
 // Looks up the Intelligence record for a category, scoped to a specific

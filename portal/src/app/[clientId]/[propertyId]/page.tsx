@@ -299,9 +299,11 @@ export default async function PropertyPage({
   // field. Left blank (not a placeholder) when the record or its
   // interpretation doesn't exist yet for this property/period.
   function metricInterpretation(key: string): string {
-    return (allMetrics as KpiMetric[])
-      .find((m) => m.lppMetricKey === key && m.periodStart === latestPeriod)
-      ?.interpretation?.trim() ?? "";
+    // findMetricByKey (not a bare .find) so the roll-up keys resolve to
+    // their canonical total record — otherwise the caption is pulled from
+    // whichever sub-component Notion stored first (e.g. the "Beverage
+    // revenue of $154K…" line under the Revenue card).
+    return findMetricByKey(allMetrics as KpiMetric[], key, latestPeriod)?.interpretation?.trim() ?? "";
   }
   const revenueInterpretation    = metricInterpretation("total_revenue");
   const laborInterpretation      = metricInterpretation("labor_pct");
@@ -320,9 +322,7 @@ export default async function PropertyPage({
   // wired to the real field so the variance badge activates the moment
   // Target Value gets populated, per Phase 5's "leave room for it."
   function metricTarget(key: string): number | null {
-    return (allMetrics as KpiMetric[])
-      .find((m) => m.lppMetricKey === key && m.periodStart === latestPeriod)
-      ?.targetValue ?? null;
+    return findMetricByKey(allMetrics as KpiMetric[], key, latestPeriod)?.targetValue ?? null;
   }
 
   // Prior-period value for a canonical metric key, for the inline
@@ -387,7 +387,11 @@ export default async function PropertyPage({
           sparkline: kpi.laborPct != null && metricPrior("labor_pct") != null ? [metricPrior("labor_pct")!, kpi.laborPct] : null,
         },
         {
-          label: "Food COGS",
+          // "COGS", not "Food COGS" — cogs_pct / total_cogs are the blended
+          // food + beverage roll-up ("Total Cost of Sales" / "…Percentage"),
+          // not a food-only figure. The food-only line ($118,321 for Lex
+          // Yard June) is a separate Segment "Food" record.
+          label: "COGS",
           metricKey: "cogs_pct",
           value: kpi.cogsPct != null ? pct(kpi.cogsPct) : "—",
           valueColor: kpi.cogsPct == null ? "#12120F" : kpi.cogsPct <= 34 ? "#12120F" : "#C0392B",

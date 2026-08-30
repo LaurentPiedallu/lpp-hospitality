@@ -8,7 +8,7 @@ import {
   updateSelectProperty, getPage,
 } from "./notion-fetch";
 import { NOTION_DBS } from "./notion-ids";
-import { maxIso } from "./format";
+import { maxIso, resolveCanonicalRollup } from "./format";
 import type {
   Client, Property, KpiMetric, KpiSummary, Action, Opportunity,
   Risk, Intelligence, Initiative, Brief, Benchmark, Upload,
@@ -129,9 +129,20 @@ export function buildKpiSummary(metrics: KpiMetric[]): KpiSummary | null {
   // segment record happened to come first — confirmed live-wrong on the
   // Dashboard property cards (Lex Yard showing "2,400 covers" / "$26K COGS"
   // instead of the real 7,040 / $144K) before this fix.
+  //
+  // Even after the segment filter, the financial roll-up keys still carry
+  // several Segment "Total" records apiece (the true total plus Food /
+  // Beverage / Wages / Taxes sub-components the pipeline mistags as
+  // "Total") — resolveCanonicalRollup picks the real total by Metric Name,
+  // the same disambiguation findMetricByKey uses. Without it the Overview
+  // Financial Snapshot showed $154K Beverage revenue as "Revenue" and
+  // $152,723 Taxes-and-Benefits as the Labor dollar figure.
   const byKey = (key: string, category?: string) =>
-    current.find(
-      (m) => m.lppMetricKey === key && (!category || m.category === category) && (m.segment ?? "Total") === "Total"
+    resolveCanonicalRollup(
+      current.filter(
+        (m) => m.lppMetricKey === key && (!category || m.category === category) && (m.segment ?? "Total") === "Total"
+      ),
+      key
     )?.metricValue ?? null;
 
   // Derive worst financial severity
