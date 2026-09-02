@@ -1,4 +1,4 @@
-import type { KpiMetric, Intelligence, InitiativeColumn } from "@/types/portal";
+import type { KpiMetric, Intelligence, Action } from "@/types/portal";
 
 // Detects KPI Records whose Metric Name identifies an individual staff
 // member (e.g. "Will Service Server Score", "Hector T Server Overall
@@ -89,37 +89,50 @@ export function formatPeriod(isoDate: string | null): string {
   return d.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 }
 
-// How many whole calendar quarters `target` sits ahead of the quarter
-// containing `ref` (default now): negative = a past quarter, 0 = the
-// current quarter, 1 = the next one, and so on. Null / unparseable target
-// returns null. Used to bucket Initiatives into Now / Next / Later.
-export function quartersAhead(target: string | null, ref: Date = new Date()): number | null {
-  if (!target) return null;
-  const t = new Date(target.slice(0, 10) + "T12:00:00Z"); // noon UTC, same as formatPeriod
-  if (Number.isNaN(t.getTime())) return null;
-  const q = (y: number, m: number) => y * 4 + Math.floor(m / 3);
-  return (
-    q(t.getUTCFullYear(), t.getUTCMonth()) -
-    q(ref.getUTCFullYear(), ref.getUTCMonth())
-  );
+// Short "Mon D" date, e.g. "Sep 14". Empty string for null / unparseable.
+// Noon UTC keeps the day stable across timezones, same as formatPeriod.
+export function formatShortDate(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso.slice(0, 10) + "T12:00:00Z");
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
-// Now / Next / Later placement for an Initiative. Target Completion in the
-// current quarter or already past -> Now; the following quarter -> Next;
-// anything further out or unset -> Later. An Initiative that is actively In
-// Progress and has at least one dated Action is pulled forward to Now
-// regardless of its Target Completion.
-export function initiativeColumn(
-  targetCompletion: string | null,
-  inProgressWithDueDate: boolean,
-  ref: Date = new Date(),
-): InitiativeColumn {
-  if (inProgressWithDueDate) return "Now";
-  const q = quartersAhead(targetCompletion, ref);
-  if (q === null) return "Later";
-  if (q <= 0) return "Now";
-  if (q === 1) return "Next";
-  return "Later";
+// Whole days from `fromIso` to `toIso` (both yyyy-mm-dd or ISO). Positive
+// when `toIso` is later. 0 if either is unparseable.
+export function daysBetweenIso(fromIso: string | null, toIso: string | null): number {
+  if (!fromIso || !toIso) return 0;
+  const a = Date.parse(fromIso.slice(0, 10));
+  const b = Date.parse(toIso.slice(0, 10));
+  if (Number.isNaN(a) || Number.isNaN(b)) return 0;
+  return Math.round((b - a) / 86_400_000);
+}
+
+const ACTION_PRIORITY_RANK: Record<Action["priority"], number> = {
+  Critical: 0,
+  High: 1,
+  Medium: 2,
+  Low: 3,
+};
+
+// Incomplete Actions first, completed ones sink to the bottom. Within each
+// group: by priority Critical to Low, then by due date with undated last.
+// Shared by the Initiatives tab card and its nested Action list so the
+// "highest-priority open Action" is the same in both.
+export function sortActions(actions: Action[]): Action[] {
+  return [...actions].sort((a, b) => {
+    const aDone = a.status === "Complete" ? 1 : 0;
+    const bDone = b.status === "Complete" ? 1 : 0;
+    if (aDone !== bDone) return aDone - bDone;
+
+    const byPriority = ACTION_PRIORITY_RANK[a.priority] - ACTION_PRIORITY_RANK[b.priority];
+    if (byPriority !== 0) return byPriority;
+
+    if (!a.dueDateIso && !b.dueDateIso) return 0;
+    if (!a.dueDateIso) return 1;
+    if (!b.dueDateIso) return -1;
+    return a.dueDateIso.localeCompare(b.dueDateIso);
+  });
 }
 
 export function compact(value: number): string {

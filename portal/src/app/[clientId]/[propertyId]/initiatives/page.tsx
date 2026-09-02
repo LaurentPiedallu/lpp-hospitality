@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getProperty, getInitiatives, getActions, getLastUpdated } from "@/lib/notion-queries";
-import { initiativeColumn } from "@/lib/format";
+import { daysBetweenIso, sortActions } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
@@ -9,25 +9,16 @@ import PropertyTabs from "@/components/PropertyTabs";
 import StatusBadge from "@/components/StatusBadge";
 import EmptyState from "@/components/EmptyState";
 import InitiativeProgress from "@/components/InitiativeProgress";
-import type { Initiative, InitiativeColumn, Action } from "@/types/portal";
+import type { Initiative, Action } from "@/types/portal";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 const SERIF = "'Cormorant Garamond', Georgia, serif";
 
-// Status green. The four portal tokens (dark / cream / gold / action-red)
-// carry no success hue, so this reuses the "healthy" status color already
-// defined in tailwind.config.ts rather than inventing a new one.
-const GREEN = "#16A34A";
-
-// ─── Derived Initiative state ─────────────────────────────────────────────────
-// The Initiative's own Notion Status does not roll up from its Actions, so
-// completion state is derived from the client-visible Actions instead.
-
+// Reused from the a22627d KPI fix: completion state is derived from an
+// Initiative's client-visible Actions, since its own Notion Status never
+// rolls up. Not changed here.
 type InitiativeState = "not-started" | "in-progress" | "complete";
 
-// Client-visible Actions linked to this Initiative. Same per-Action Client
-// Visible filter the rest of the tab uses, kept identical so every count on
-// the page agrees.
 function visibleActionsFor(initiative: Initiative, actions: Action[]): Action[] {
   return actions.filter((a) => initiative.actionIds.includes(a.id) && a.clientVisible);
 }
@@ -40,184 +31,217 @@ function deriveState(visibleActions: Action[]): InitiativeState {
   return "in-progress";
 }
 
-const STATE_DOT: Record<InitiativeState, string> = {
-  "not-started": "rgba(18,18,15,0.25)",
-  "in-progress": "#B8935A",
-  "complete":    GREEN,
-};
+// ─── Per-Initiative view model ────────────────────────────────────────────────
+
+interface InitiativeView {
+  initiative: Initiative;
+  visibleActions: Action[];
+  state: InitiativeState;
+  isBlocked: boolean;
+  isBehind: boolean;
+  behindReason: "target" | "actions" | null;
+  daysPastTarget: number;
+  overdueActionCount: number;
+  topOpenAction: Action | null;
+  completed: number;
+  total: number;
+  pct: number;
+}
+
+function buildView(initiative: Initiative, actions: Action[], todayIso: string): InitiativeView {
+  const visible = visibleActionsFor(initiative, actions);
+  const state = deriveState(visible);
+  const isBlocked = initiative.status === "Blocked";
+
+  const openActions = visible.filter((a) => a.status !== "Complete");
+  const overdueActions = openActions.filter((a) => a.dueDateIso != null && a.dueDateIso < todayIso);
+  const targetOverdue =
+    initiative.targetCompletion != null &&
+    initiative.targetCompletion < todayIso &&
+    state !== "complete";
+
+  const isBehind = !isBlocked && state !== "complete" && (targetOverdue || overdueActions.length > 0);
+  const behindReason: "target" | "actions" | null = !isBehind
+    ? null
+    : targetOverdue
+      ? "target"
+      : "actions";
+
+  const completed = visible.filter((a) => a.status === "Complete").length;
+  const total = visible.length;
+
+  return {
+    initiative,
+    visibleActions: visible,
+    state,
+    isBlocked,
+    isBehind,
+    behindReason,
+    daysPastTarget: targetOverdue ? daysBetweenIso(initiative.targetCompletion, todayIso) : 0,
+    overdueActionCount: overdueActions.length,
+    topOpenAction: sortActions(openActions)[0] ?? null,
+    completed,
+    total,
+    pct: total > 0 ? Math.round((completed / total) * 100) : 0,
+  };
+}
+
+// Behind-schedule first, then in progress, not yet underway, complete last.
+// Blocked sits at the very top as the most urgent situation.
+function urgencyRank(v: InitiativeView): number {
+  if (v.isBlocked) return 0;
+  if (v.isBehind) return 1;
+  if (v.state === "in-progress") return 2;
+  if (v.state === "not-started") return 3;
+  return 4;
+}
+
+function orderByUrgency(views: InitiativeView[]): InitiativeView[] {
+  return [...views].sort(
+    (a, b) =>
+      urgencyRank(a) - urgencyRank(b) ||
+      b.pct - a.pct ||
+      a.initiative.title.localeCompare(b.initiative.title),
+  );
+}
+
+// ─── Headline ────────────────────────────────────────────────────────────────
+
+function buildHeadline(views: InitiativeView[]): { line: string; subline: string } {
+  const y = views.length;
+  const onTrack = views.filter((v) => !v.isBlocked && !v.isBehind).length;
+  const line = `${onTrack} of ${y} initiative${y === 1 ? "" : "s"} on track`;
+
+  const problems = views
+    .filter((v) => v.isBlocked || v.isBehind)
+    .sort(
+      (a, b) =>
+        urgencyRank(a) - urgencyRank(b) ||
+        b.daysPastTarget - a.daysPastTarget ||
+        b.overdueActionCount - a.overdueActionCount,
+    );
+
+  let subline: string;
+  if (problems.length > 0) {
+    const p = problems[0];
+    const others = problems.length - 1;
+    const tail = others > 0 ? `, ${others} more need attention` : "";
+    if (p.isBlocked) {
+      subline = `${p.initiative.title} is blocked${tail}`;
+    } else if (p.behindReason === "target") {
+      const d = p.daysPastTarget;
+      subline = `${p.initiative.title} is ${d} day${d === 1 ? "" : "s"} past target${tail}`;
+    } else {
+      const n = p.overdueActionCount;
+      subline = `${p.initiative.title} has ${n} overdue action${n === 1 ? "" : "s"}${tail}`;
+    }
+  } else if (y > 0 && views.every((v) => v.state === "complete")) {
+    subline = "Every initiative is complete this cycle";
+  } else {
+    const active = views.filter((v) => v.state === "in-progress");
+    if (active.length > 0) {
+      const trailing = [...active].sort((a, b) => a.pct - b.pct)[0];
+      subline = `${trailing.initiative.title} has the most ground to cover at ${trailing.pct}%`;
+    } else {
+      subline = "No initiative has started yet";
+    }
+  }
+
+  return { line, subline };
+}
+
+function Headline({ line, subline }: { line: string; subline: string }) {
+  return (
+    <div>
+      <p style={{ fontFamily: SERIF, fontSize: "2rem", fontWeight: 400, color: "#12120F", lineHeight: 1.15 }}>
+        {line}
+      </p>
+      <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.55)", marginTop: 6, lineHeight: 1.5 }}>
+        {subline}
+      </p>
+    </div>
+  );
+}
+
+// ─── Status indicator ────────────────────────────────────────────────────────
+// Square, zero-radius, four states only. Blocked and behind schedule are
+// different concepts sharing the one available attention color: Blocked is
+// a filled red square, behind schedule is a red outline. Blocked wins when
+// an Initiative is both.
+
+function StatusDot({ view }: { view: InitiativeView }) {
+  const base = { width: 9, height: 9, flexShrink: 0, marginTop: 5 } as const;
+  if (view.isBlocked) return <span style={{ ...base, background: "#C0392B" }} />;
+  if (view.isBehind) return <span style={{ ...base, border: "1.5px solid #C0392B" }} />;
+  const bg =
+    view.state === "complete"
+      ? "#16A34A"
+      : view.state === "in-progress"
+        ? "#B8935A"
+        : "rgba(18,18,15,0.25)";
+  return <span style={{ ...base, background: bg }} />;
+}
 
 const STATE_LABEL: Record<InitiativeState, string> = {
-  "not-started": "Not Started",
-  "in-progress": "In Progress",
-  "complete":    "Complete",
+  "not-started": "Not yet underway",
+  "in-progress": "In progress",
+  "complete": "Complete",
 };
 
-const STATE_BADGE: Record<InitiativeState, "gray" | "amber" | "green"> = {
-  "not-started": "gray",
-  "in-progress": "amber",
-  "complete":    "green",
-};
+function statusLabel(view: InitiativeView): string {
+  if (view.isBlocked) return "Blocked";
+  if (view.isBehind) return "Behind schedule";
+  return STATE_LABEL[view.state];
+}
 
-// Fixed hue per Initiative Category, rendered as a left-edge bar on the
-// card so the category badge text can go away without losing the signal.
-const CATEGORY_HUE: Record<string, string> = {
-  Commercial: "#B8935A",
-  Finance:    "#3E5C76",
-  Execution:  "#A6572F",
-  Guest:      "#5C7355",
-  Labor:      "#7A6C8A",
-};
-const CATEGORY_HUE_FALLBACK = "rgba(18,18,15,0.25)";
+function statusVariant(view: InitiativeView): "gray" | "amber" | "green" | "red" {
+  if (view.isBlocked || view.isBehind) return "red";
+  if (view.state === "complete") return "green";
+  if (view.state === "in-progress") return "amber";
+  return "gray";
+}
 
-// ─── Column config ────────────────────────────────────────────────────────────
+// ─── Initiative card ─────────────────────────────────────────────────────────
 
-const COLUMNS: { id: InitiativeColumn; label: string; description: string }[] = [
-  { id: "Now",   label: "Now",   description: "This quarter or overdue" },
-  { id: "Next",  label: "Next",  description: "Next quarter" },
-  { id: "Later", label: "Later", description: "Beyond next quarter" },
-];
-
-// ─── Initiative card ──────────────────────────────────────────────────────────
-
-function InitiativeCard({
-  initiative: i,
-  actions,
-  clientId,
-  propertyId,
-  todayIso,
-}: {
-  initiative: Initiative;
-  actions: Action[];
-  clientId: string;
-  propertyId: string;
-  todayIso: string;
-}) {
-  const linkedActions = visibleActionsFor(i, actions);
-  const isBlocked = i.status === "Blocked";
-  const state = deriveState(linkedActions);
-  const dotColor = isBlocked ? "#C0392B" : STATE_DOT[state];
-  const badgeLabel = isBlocked ? "Blocked" : STATE_LABEL[state];
-  const badgeVariant: "gray" | "amber" | "green" | "red" = isBlocked ? "red" : STATE_BADGE[state];
-  const hue = CATEGORY_HUE[i.category] ?? CATEGORY_HUE_FALLBACK;
+function InitiativeCard({ view, todayIso }: { view: InitiativeView; todayIso: string }) {
+  const i = view.initiative;
 
   return (
     <div
       style={{
         background: "#FFFFFF",
         border: "1px solid rgba(18,18,15,0.08)",
-        borderLeft: `3px solid ${hue}`,
         borderRadius: 0,
-        padding: "16px 16px 16px 18px",
+        padding: 20,
       }}
       className="space-y-3"
     >
-      <div className="flex items-start justify-between gap-2">
-        <p style={{ fontFamily: SERIF, fontSize: 17, fontWeight: 400, color: "#12120F", lineHeight: 1.3 }} className="flex-1">
+      <div className="flex items-start justify-between gap-3">
+        <p style={{ fontFamily: SERIF, fontSize: 19, fontWeight: 400, color: "#12120F", lineHeight: 1.25 }} className="flex-1">
           {i.title}
         </p>
-        <span
-          title={badgeLabel}
-          className="mt-1 w-2 h-2 rounded-full shrink-0"
-          style={{ background: dotColor }}
-        />
+        <StatusDot view={view} />
       </div>
 
-      {i.category && <span className="sr-only">Category: {i.category}</span>}
+      <div>
+        <StatusBadge label={statusLabel(view)} variant={statusVariant(view)} />
+      </div>
 
-      {i.nextMilestone && (
-        <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.5)", lineHeight: 1.5, borderLeft: "2px solid rgba(18,18,15,0.08)", paddingLeft: 8 }}>
-          {i.nextMilestone}
+      {view.topOpenAction && (
+        <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.6)", lineHeight: 1.5 }}>
+          <span style={{ fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginRight: 8 }}>
+            Focus
+          </span>
+          {view.topOpenAction.title}
         </p>
       )}
 
-      <div className="pt-1">
-        <StatusBadge label={badgeLabel} variant={badgeVariant} />
-      </div>
-
-      <InitiativeProgress
-        clientId={clientId}
-        propertyId={propertyId}
-        actions={linkedActions}
-        todayIso={todayIso}
-      />
+      <InitiativeProgress actions={view.visibleActions} todayIso={todayIso} />
     </div>
   );
 }
 
-// ─── Kanban column ────────────────────────────────────────────────────────────
-
-function KanbanColumn({
-  column,
-  initiatives,
-  actions,
-  clientId,
-  propertyId,
-  todayIso,
-}: {
-  column: typeof COLUMNS[number];
-  initiatives: Initiative[];
-  actions: Action[];
-  clientId: string;
-  propertyId: string;
-  todayIso: string;
-}) {
-  const active = initiatives.filter((i) => i.status !== "Archived");
-
-  return (
-    <div style={{ background: "rgba(18,18,15,0.02)", border: "1px solid rgba(18,18,15,0.08)", borderTop: "3px solid #B8935A", borderRadius: 0, minHeight: "20rem" }} className="flex flex-col">
-      <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid rgba(18,18,15,0.08)" }}>
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 style={{ fontFamily: SERIF, fontSize: "1.1rem", fontWeight: 400, color: "#12120F" }}>{column.label}</h3>
-            <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.4)", marginTop: 2 }}>{column.description}</p>
-          </div>
-          <span style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.5)", background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "2px 8px" }}>
-            {active.length}
-          </span>
-        </div>
-      </div>
-
-      <div className="p-3 flex flex-col gap-3 flex-1">
-        {active.length === 0 ? (
-          <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.3)", textAlign: "center", marginTop: 32, fontStyle: "italic" }}>No initiatives</p>
-        ) : (
-          active.map((i) => (
-            <InitiativeCard key={i.id} initiative={i} actions={actions} clientId={clientId} propertyId={propertyId} todayIso={todayIso} />
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Summary strip ────────────────────────────────────────────────────────────
-
-function SummaryStrip({ initiatives, actions }: { initiatives: Initiative[]; actions: Action[] }) {
-  const live = initiatives.filter((i) => i.status !== "Archived");
-  const states = live.map((i) => deriveState(visibleActionsFor(i, actions)));
-
-  const total      = live.length;
-  const inProgress = states.filter((s) => s === "in-progress").length;
-  const complete   = states.filter((s) => s === "complete").length;
-
-  return (
-    <div className="grid grid-cols-3 gap-3">
-      {[
-        { label: "Total",       value: String(total),      sub: "initiatives" },
-        { label: "In Progress", value: String(inProgress), sub: "underway" },
-        { label: "Complete",    value: String(complete),   sub: "this cycle" },
-      ].map(({ label, value, sub }) => (
-        <div key={label} style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: "20px 24px" }}>
-          <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 8 }}>{label}</p>
-          <p style={{ fontFamily: SERIF, fontSize: "1.9rem", fontWeight: 400, color: "#12120F", lineHeight: 1 }}>{value}</p>
-          <p style={{ fontSize: 10, color: "rgba(18,18,15,0.35)", marginTop: 4 }}>{sub}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Page ────────────────────────────────────────────────────────────────────
 
 export default async function InitiativesPage({
   params,
@@ -241,19 +265,14 @@ export default async function InitiativesPage({
 
   const todayIso = new Date().toISOString().slice(0, 10);
 
-  // Recompute the Now / Next / Later bucket with the full rule now that
-  // Actions are loaded: an In Progress Initiative with at least one dated
-  // Action is pulled forward to Now regardless of its Target Completion.
-  const columnOf = (i: Initiative): InitiativeColumn => {
-    const visible = visibleActionsFor(i, actions);
-    const inProgressWithDueDate =
-      deriveState(visible) === "in-progress" && visible.some((a) => a.dueDateIso);
-    return initiativeColumn(i.targetCompletion, inProgressWithDueDate);
-  };
+  const liveViews = orderByUrgency(
+    initiatives.filter((i) => i.status !== "Archived").map((i) => buildView(i, actions, todayIso)),
+  );
+  const archivedViews = initiatives
+    .filter((i) => i.status === "Archived")
+    .map((i) => buildView(i, actions, todayIso));
 
-  const byColumn = (col: InitiativeColumn) =>
-    initiatives.filter((i) => i.status !== "Archived" && columnOf(i) === col);
-  const archived = initiatives.filter((i) => i.status === "Archived");
+  const headline = buildHeadline(liveViews);
 
   return (
     <PageWrapper noTopPadding>
@@ -261,22 +280,14 @@ export default async function InitiativesPage({
       <PropertyHeader property={property} lastUpdated={lastUpdated} />
       <PropertyTabs clientId={clientId} propertyId={propertyId} active="initiatives" />
 
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 80px" }} className="space-y-8">
+      <div style={{ maxWidth: 780, margin: "0 auto", padding: "48px 60px 80px" }} className="space-y-8">
 
-        {initiatives.length > 0 && <SummaryStrip initiatives={initiatives} actions={actions} />}
+        {liveViews.length > 0 && <Headline line={headline.line} subline={headline.subline} />}
 
         {initiatives.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {COLUMNS.map((col) => (
-              <KanbanColumn
-                key={col.id}
-                column={col}
-                initiatives={byColumn(col.id)}
-                actions={actions}
-                clientId={clientId}
-                propertyId={propertyId}
-                todayIso={todayIso}
-              />
+          <div className="space-y-4">
+            {liveViews.map((v) => (
+              <InitiativeCard key={v.initiative.id} view={v} todayIso={todayIso} />
             ))}
           </div>
         ) : (
@@ -286,10 +297,10 @@ export default async function InitiativesPage({
           />
         )}
 
-        {archived.length > 0 && (
+        {archivedViews.length > 0 && (
           <details className="group bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden">
             <summary className="list-none [&::-webkit-details-marker]:hidden px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-500 flex items-center justify-between select-none hover:bg-gray-50 transition">
-              <span>Archived ({archived.length})</span>
+              <span>Archived ({archivedViews.length})</span>
               <svg
                 width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"
                 className="text-gray-400 transition-transform duration-200 group-open:rotate-90"
@@ -297,9 +308,9 @@ export default async function InitiativesPage({
                 <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </summary>
-            <div className="p-4 border-t border-gray-50 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-              {archived.map((i) => (
-                <InitiativeCard key={i.id} initiative={i} actions={actions} clientId={clientId} propertyId={propertyId} todayIso={todayIso} />
+            <div className="p-4 border-t border-gray-50 space-y-4">
+              {archivedViews.map((v) => (
+                <InitiativeCard key={v.initiative.id} view={v} todayIso={todayIso} />
               ))}
             </div>
           </details>

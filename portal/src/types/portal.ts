@@ -8,7 +8,6 @@ export type DataConfidence = "High" | "Medium" | "Low" | "Requires Validation";
 export type OverallHealth = "Strong" | "Stable" | "At Risk" | "Critical";
 export type RiskStatus = "Open" | "Mitigating" | "Escalated" | "Closed" | "Archived";
 export type InitiativeStatus = "Not Started" | "In Progress" | "Blocked" | "Complete" | "Measured" | "Archived";
-export type InitiativeColumn = "Now" | "Next" | "Later";
 
 export interface Client {
   id: string;
@@ -180,10 +179,9 @@ export interface Initiative {
   financialOwner: string;
   status: InitiativeStatus;
   priority: string;
-  // ISO date (yyyy-mm-dd) from Notion's "Target Completion" — drives the
-  // Now / Next / Later column on the Initiatives tab. Null when unset.
+  // ISO date (yyyy-mm-dd) from Notion's "Target Completion". Null when
+  // unset. Used to flag an Initiative as behind schedule.
   targetCompletion: string | null;
-  column: InitiativeColumn; // calendar-quarter bucket of targetCompletion
   expectedImpact: number;
   nextMilestone: string;
   actionIds: string[];        // linked Actions relation

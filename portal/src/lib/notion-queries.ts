@@ -5,10 +5,10 @@ import {
   queryDatabase, publishedAnd, relationFilter, dateEqualsFilter,
   title, richText, select, num, email, url, checkbox,
   relationId, relationIds, rollupNumber, formulaNumber, formulaString,
-  updateSelectProperty, getPage,
+  getPage,
 } from "./notion-fetch";
 import { NOTION_DBS } from "./notion-ids";
-import { maxIso, resolveCanonicalRollup, KEY_ALIAS, initiativeColumn } from "./format";
+import { maxIso, resolveCanonicalRollup, KEY_ALIAS } from "./format";
 import type {
   Client, Property, KpiMetric, KpiSummary, Action, Opportunity,
   Risk, Intelligence, Initiative, Brief, Benchmark, Upload,
@@ -353,28 +353,16 @@ export async function getInitiatives(propertyId: string): Promise<Initiative[]> 
       financialOwner: richText(p, "Financial Owner"),
       status: (select(p, "Status") || "Not Started") as InitiativeStatus,
       priority,
+      // Notion "Target Completion" date. The Initiatives tab uses it to
+      // flag an Initiative as behind schedule when it is in the past and
+      // the Initiative is not complete.
       targetCompletion,
-      // Date-only bucket. The Initiatives page recomputes this with the
-      // "In Progress + has a dated Action" rule once Actions are loaded —
-      // that signal isn't available here.
-      column: initiativeColumn(targetCompletion, false),
       expectedImpact: num(p, "Expected Impact"),
       nextMilestone: richText(p, "Next Milestone"),
       actionIds: relationIds(p, "Actions"),
       completionPct: completionFraction != null ? Math.round(completionFraction * 100) : null,
     };
   });
-}
-
-// Update an Action's Status in Notion and return the confirmed value from
-// Notion's response — the caller should trust this over whatever it optimistically
-// assumed, since it's read back from the actual write result.
-export async function updateActionStatus(
-  actionId: string,
-  status: Action["status"]
-): Promise<Action["status"]> {
-  const page = await updateSelectProperty(actionId, "Status", status);
-  return (select(page, "Status") || status) as Action["status"];
 }
 
 // ─── Briefs ───────────────────────────────────────────────────────────────────
