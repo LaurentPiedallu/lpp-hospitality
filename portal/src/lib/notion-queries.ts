@@ -8,12 +8,12 @@ import {
   updateSelectProperty, getPage,
 } from "./notion-fetch";
 import { NOTION_DBS } from "./notion-ids";
-import { maxIso, resolveCanonicalRollup, KEY_ALIAS } from "./format";
+import { maxIso, resolveCanonicalRollup, KEY_ALIAS, initiativeColumn } from "./format";
 import type {
   Client, Property, KpiMetric, KpiSummary, Action, Opportunity,
   Risk, Intelligence, Initiative, Brief, Benchmark, Upload,
   MenuBatch, MenuItem, MenuQuadrant,
-  DataConfidence, Severity, RiskStatus, InitiativeStatus, InitiativeColumn,
+  DataConfidence, Severity, RiskStatus, InitiativeStatus,
   OverallHealth, ClientStatus, PropertyStatus, PublishGateStatus, PublishStatus,
 } from "@/types/portal";
 
@@ -335,12 +335,6 @@ export async function getIntelligence(
 
 // ─── Initiatives ──────────────────────────────────────────────────────────────
 
-function priorityToColumn(priority: string): InitiativeColumn {
-  if (priority === "Critical" || priority === "High") return "Now";
-  if (priority === "Medium") return "Next";
-  return "Later";
-}
-
 export async function getInitiatives(propertyId: string): Promise<Initiative[]> {
   const pages = await queryDatabase({
     databaseId: NOTION_DBS.INITIATIVES,
@@ -349,6 +343,7 @@ export async function getInitiatives(propertyId: string): Promise<Initiative[]> 
   return pages.map((p) => {
     const priority = select(p, "Priority") || "Medium";
     const completionFraction = rollupNumber(p, "Completion %");
+    const targetCompletion = p.properties?.["Target Completion"]?.date?.start ?? null;
     return {
       id: p.id,
       propertyId,
@@ -358,7 +353,11 @@ export async function getInitiatives(propertyId: string): Promise<Initiative[]> 
       financialOwner: richText(p, "Financial Owner"),
       status: (select(p, "Status") || "Not Started") as InitiativeStatus,
       priority,
-      column: priorityToColumn(priority),
+      targetCompletion,
+      // Date-only bucket. The Initiatives page recomputes this with the
+      // "In Progress + has a dated Action" rule once Actions are loaded —
+      // that signal isn't available here.
+      column: initiativeColumn(targetCompletion, false),
       expectedImpact: num(p, "Expected Impact"),
       nextMilestone: richText(p, "Next Milestone"),
       actionIds: relationIds(p, "Actions"),

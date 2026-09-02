@@ -180,7 +180,10 @@ export interface Initiative {
   financialOwner: string;
   status: InitiativeStatus;
   priority: string;
-  column: InitiativeColumn; // derived from priority
+  // ISO date (yyyy-mm-dd) from Notion's "Target Completion" — drives the
+  // Now / Next / Later column on the Initiatives tab. Null when unset.
+  targetCompletion: string | null;
+  column: InitiativeColumn; // calendar-quarter bucket of targetCompletion
   expectedImpact: number;
   nextMilestone: string;
   actionIds: string[];        // linked Actions relation

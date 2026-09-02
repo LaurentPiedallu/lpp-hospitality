@@ -1,4 +1,4 @@
-import type { KpiMetric, Intelligence } from "@/types/portal";
+import type { KpiMetric, Intelligence, InitiativeColumn } from "@/types/portal";
 
 // Detects KPI Records whose Metric Name identifies an individual staff
 // member (e.g. "Will Service Server Score", "Hector T Server Overall
@@ -87,6 +87,39 @@ export function formatPeriod(isoDate: string | null): string {
   if (!isoDate) return "—";
   const d = new Date(isoDate + "T12:00:00Z"); // noon UTC avoids timezone edge cases
   return d.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+}
+
+// How many whole calendar quarters `target` sits ahead of the quarter
+// containing `ref` (default now): negative = a past quarter, 0 = the
+// current quarter, 1 = the next one, and so on. Null / unparseable target
+// returns null. Used to bucket Initiatives into Now / Next / Later.
+export function quartersAhead(target: string | null, ref: Date = new Date()): number | null {
+  if (!target) return null;
+  const t = new Date(target.slice(0, 10) + "T12:00:00Z"); // noon UTC, same as formatPeriod
+  if (Number.isNaN(t.getTime())) return null;
+  const q = (y: number, m: number) => y * 4 + Math.floor(m / 3);
+  return (
+    q(t.getUTCFullYear(), t.getUTCMonth()) -
+    q(ref.getUTCFullYear(), ref.getUTCMonth())
+  );
+}
+
+// Now / Next / Later placement for an Initiative. Target Completion in the
+// current quarter or already past -> Now; the following quarter -> Next;
+// anything further out or unset -> Later. An Initiative that is actively In
+// Progress and has at least one dated Action is pulled forward to Now
+// regardless of its Target Completion.
+export function initiativeColumn(
+  targetCompletion: string | null,
+  inProgressWithDueDate: boolean,
+  ref: Date = new Date(),
+): InitiativeColumn {
+  if (inProgressWithDueDate) return "Now";
+  const q = quartersAhead(targetCompletion, ref);
+  if (q === null) return "Later";
+  if (q <= 0) return "Now";
+  if (q === 1) return "Next";
+  return "Later";
 }
 
 export function compact(value: number): string {
