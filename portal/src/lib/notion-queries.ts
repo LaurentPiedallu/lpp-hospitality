@@ -5,7 +5,7 @@ import {
   queryDatabase, publishedAnd, relationFilter, dateEqualsFilter,
   title, richText, select, num, email, url, checkbox,
   relationId, relationIds, rollupNumber, formulaNumber, formulaString,
-  getPage,
+  updateSelectProperty, getPage,
 } from "./notion-fetch";
 import { NOTION_DBS } from "./notion-ids";
 import { maxIso, resolveCanonicalRollup, KEY_ALIAS } from "./format";
@@ -363,6 +363,17 @@ export async function getInitiatives(propertyId: string): Promise<Initiative[]> 
       completionPct: completionFraction != null ? Math.round(completionFraction * 100) : null,
     };
   });
+}
+
+// Update an Action's Status in Notion and return the confirmed value from
+// Notion's response. The caller should trust this over whatever it
+// optimistically assumed, since it is read back from the actual write result.
+export async function updateActionStatus(
+  actionId: string,
+  status: Action["status"]
+): Promise<Action["status"]> {
+  const page = await updateSelectProperty(actionId, "Status", status);
+  return (select(page, "Status") || status) as Action["status"];
 }
 
 // ─── Briefs ───────────────────────────────────────────────────────────────────

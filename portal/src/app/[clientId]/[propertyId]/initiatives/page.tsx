@@ -203,7 +203,17 @@ function statusVariant(view: InitiativeView): "gray" | "amber" | "green" | "red"
 
 // ─── Initiative card ─────────────────────────────────────────────────────────
 
-function InitiativeCard({ view, todayIso }: { view: InitiativeView; todayIso: string }) {
+function InitiativeCard({
+  view,
+  todayIso,
+  clientId,
+  propertyId,
+}: {
+  view: InitiativeView;
+  todayIso: string;
+  clientId: string;
+  propertyId: string;
+}) {
   const i = view.initiative;
 
   return (
@@ -236,7 +246,12 @@ function InitiativeCard({ view, todayIso }: { view: InitiativeView; todayIso: st
         </p>
       )}
 
-      <InitiativeProgress actions={view.visibleActions} todayIso={todayIso} />
+      <InitiativeProgress
+        actions={view.visibleActions}
+        todayIso={todayIso}
+        clientId={clientId}
+        propertyId={propertyId}
+      />
     </div>
   );
 }
@@ -280,14 +295,18 @@ export default async function InitiativesPage({
       <PropertyHeader property={property} lastUpdated={lastUpdated} />
       <PropertyTabs clientId={clientId} propertyId={propertyId} active="initiatives" />
 
-      <div style={{ maxWidth: 780, margin: "0 auto", padding: "48px 60px 80px" }} className="space-y-8">
+      {/* Outer area is full tab width; the reading column is capped so card
+          text lines stay short and the strict urgency stack scans as one
+          vertical column. Not a two-column layout on purpose. */}
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 80px" }}>
+       <div style={{ maxWidth: 760, margin: "0 auto" }} className="space-y-8">
 
         {liveViews.length > 0 && <Headline line={headline.line} subline={headline.subline} />}
 
         {initiatives.length > 0 ? (
           <div className="space-y-4">
             {liveViews.map((v) => (
-              <InitiativeCard key={v.initiative.id} view={v} todayIso={todayIso} />
+              <InitiativeCard key={v.initiative.id} view={v} todayIso={todayIso} clientId={clientId} propertyId={propertyId} />
             ))}
           </div>
         ) : (
@@ -310,12 +329,13 @@ export default async function InitiativesPage({
             </summary>
             <div className="p-4 border-t border-gray-50 space-y-4">
               {archivedViews.map((v) => (
-                <InitiativeCard key={v.initiative.id} view={v} todayIso={todayIso} />
+                <InitiativeCard key={v.initiative.id} view={v} todayIso={todayIso} clientId={clientId} propertyId={propertyId} />
               ))}
             </div>
           </details>
         )}
 
+       </div>
       </div>
     </PageWrapper>
   );

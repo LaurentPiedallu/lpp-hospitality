@@ -29,52 +29,90 @@ export const PRIORITY_VARIANT: Record<Action["priority"], "green" | "amber" | "r
   Low: "gray",
 };
 
-// Non-interactive status marker. These rows report progress, they are not
-// client to-dos, so there is nothing to toggle.
-function ActionGlyph({ status }: { status: Action["status"] }) {
-  if (status === "Complete") {
-    return (
-      <span style={{ display: "inline-flex", width: 14, height: 14, marginTop: 2, flexShrink: 0, alignItems: "center", justifyContent: "center" }}>
+function glyphColor(status: Action["status"]): string {
+  if (status === "Blocked" || status === "Waiting on Client") return OVERDUE_RED;
+  if (status === "In Progress") return GOLD;
+  return "rgba(18,18,15,0.25)";
+}
+
+// Clickable status marker. Toggles the Action between Complete and Not
+// Started (the only two the write route accepts), same as the pre-redesign
+// checkbox. Zero-radius squares kept from the redesign: a green check when
+// complete, a small filled square coloured by status otherwise.
+function ActionToggle({
+  action,
+  pending,
+  onToggle,
+}: {
+  action: Action;
+  pending: boolean;
+  onToggle: () => void;
+}) {
+  const isComplete = action.status === "Complete";
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={pending}
+      aria-pressed={isComplete}
+      aria-label={isComplete ? "Mark not started" : "Mark complete"}
+      className="hover:bg-[rgba(18,18,15,0.06)]"
+      style={{
+        display: "inline-flex",
+        width: 14,
+        height: 14,
+        marginTop: 2,
+        flexShrink: 0,
+        alignItems: "center",
+        justifyContent: "center",
+        background: "none",
+        border: 0,
+        padding: 0,
+        borderRadius: 0,
+        cursor: pending ? "wait" : "pointer",
+        opacity: pending ? 0.45 : 1,
+        transition: "background 0.15s ease",
+      }}
+    >
+      {isComplete ? (
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
           <path d="M2 6l3 3 5-6" stroke={GREEN} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-      </span>
-    );
-  }
-  const color =
-    status === "Blocked" || status === "Waiting on Client"
-      ? OVERDUE_RED
-      : status === "In Progress"
-        ? GOLD
-        : "rgba(18,18,15,0.25)";
-  return (
-    <span style={{ display: "inline-flex", width: 14, height: 14, marginTop: 2, flexShrink: 0, alignItems: "center", justifyContent: "center" }}>
-      <span style={{ width: 7, height: 7, background: color }} />
-    </span>
+      ) : (
+        <span style={{ width: 7, height: 7, background: glyphColor(action.status) }} />
+      )}
+    </button>
   );
 }
 
 export default function InitiativeProgress({
+  clientId,
+  propertyId,
   actions,
   todayIso,
 }: {
+  clientId: string;
+  propertyId: string;
   actions: Action[];
   todayIso: string;
 }) {
+  const [actionsState, setActionsState] = useState(actions);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [errorId, setErrorId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [showAll, setShowAll] = useState(false);
 
-  if (actions.length === 0) return null;
+  if (actionsState.length === 0) return null;
 
-  const total = actions.length;
-  const completed = actions.filter((a) => a.status === "Complete").length;
+  const total = actionsState.length;
+  const completed = actionsState.filter((a) => a.status === "Complete").length;
   const pct = Math.round((completed / total) * 100);
-  const sorted = sortActions(actions);
+  const sorted = sortActions(actionsState);
 
   // Red progress segment: share of the whole Action set that is unchecked
   // and past its due date. Only shown when some Actions carry a due date.
-  const datedCount = actions.filter((a) => a.dueDateIso).length;
-  const overdueOpen = actions.filter(
+  const datedCount = actionsState.filter((a) => a.dueDateIso).length;
+  const overdueOpen = actionsState.filter(
     (a) => a.status !== "Complete" && a.dueDateIso != null && a.dueDateIso < todayIso,
   ).length;
   const goldPct = pct;
@@ -82,6 +120,36 @@ export default function InitiativeProgress({
 
   const truncating = sorted.length > COLLAPSED_COUNT && !showAll;
   const visibleRows = truncating ? sorted.slice(0, COLLAPSED_COUNT) : sorted;
+
+  async function toggle(action: Action) {
+    const nextStatus: Action["status"] = action.status === "Complete" ? "Not Started" : "Complete";
+    const prevStatus = action.status;
+
+    setErrorId(null);
+    setActionsState((prev) => prev.map((a) => (a.id === action.id ? { ...a, status: nextStatus } : a)));
+    setPendingIds((prev) => new Set(prev).add(action.id));
+
+    try {
+      const res = await fetch("/api/actions/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId, propertyId, actionId: action.id, status: nextStatus }),
+      });
+      if (!res.ok) throw new Error("Update failed");
+      const data = (await res.json()) as { status: Action["status"] };
+      // Trust the confirmed value read back from Notion over the optimistic one
+      setActionsState((prev) => prev.map((a) => (a.id === action.id ? { ...a, status: data.status } : a)));
+    } catch {
+      setActionsState((prev) => prev.map((a) => (a.id === action.id ? { ...a, status: prevStatus } : a)));
+      setErrorId(action.id);
+    } finally {
+      setPendingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(action.id);
+        return next;
+      });
+    }
+  }
 
   return (
     <div style={{ marginTop: 12 }}>
@@ -148,7 +216,11 @@ export default function InitiativeProgress({
                     borderBottom: "1px solid rgba(18,18,15,0.06)",
                   }}
                 >
-                  <ActionGlyph status={action.status} />
+                  <ActionToggle
+                    action={action}
+                    pending={pendingIds.has(action.id)}
+                    onToggle={() => toggle(action)}
+                  />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p
                       style={{
@@ -163,6 +235,11 @@ export default function InitiativeProgress({
                       <StatusBadge label={action.status} variant={STATUS_VARIANT[action.status]} />
                       <StatusBadge label={action.priority} variant={PRIORITY_VARIANT[action.priority]} />
                     </div>
+                    {errorId === action.id && (
+                      <p style={{ fontFamily: JOST, fontSize: 11, color: OVERDUE_RED, marginTop: 4 }}>
+                        Couldn&apos;t save · try again
+                      </p>
+                    )}
                   </div>
                   {action.dueDateIso && (
                     <span
