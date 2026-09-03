@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireClient } from "@/lib/api-helpers";
 import { getProperty, getActions, updateActionStatus } from "@/lib/notion-queries";
+import { authorizeActionWrite } from "@/lib/action-authz";
 import type { Action } from "@/types/portal";
 
 const ALLOWED_STATUSES: Action["status"][] = ["Not Started", "Complete"];
@@ -31,9 +32,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Property not found" }, { status: 404 });
   }
 
+  // getActions returns the property's Published Actions with the current
+  // Client Visible flag straight from Notion. Gate the write on it: a
+  // forged request naming a real-but-hidden Action must not succeed even
+  // though the propertyId check above passed.
   const actions = await getActions(propertyId);
-  if (!actions.some((a) => a.id === actionId)) {
-    return NextResponse.json({ error: "Action not found on this property" }, { status: 404 });
+  const authz = authorizeActionWrite(actions, actionId);
+  if (!authz.ok) {
+    return NextResponse.json({ error: authz.error }, { status: authz.status });
   }
 
   try {
