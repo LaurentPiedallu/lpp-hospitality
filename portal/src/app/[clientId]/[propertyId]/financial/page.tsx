@@ -507,7 +507,14 @@ export default async function FinancialPage({
           id="opex"
           heading="Operating Expenses"
           connector="The larger structural pressure sits here — the Kitchen Allocation charge below does not flex with revenue the way labor or COGS do."
-          intelligence={intel("Execution")}
+          // OpEx findings are filed under Intelligence Category "Financial"
+          // (alongside Revenue and Profitability) — the schema has no
+          // dedicated OpEx value. Previously read "Execution", which
+          // surfaced an unrelated operational-coverage record here.
+          // Known follow-up: this now resolves the same "Financial" record
+          // the Revenue section shows (findIntelligence has no field to
+          // split one category across two sections) — separate issue.
+          intelligence={intel("Financial")}
           metrics={catMetrics("OpEx")}
           allMetrics={trendFor("opex_pct")}
           primarySeverity={opexPct?.severity}
