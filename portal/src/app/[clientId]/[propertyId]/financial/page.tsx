@@ -587,7 +587,7 @@ export default async function FinancialPage({
         </FindingSection>
 
         {/* ── Opportunities — Labor/OpEx/Purchasing, Redesign prompt Step 1 ── */}
-        <OpportunitiesPanel opportunities={financialOpportunities} id="opportunities" confidenceById={opportunityConfidence} />
+        <OpportunitiesPanel opportunities={financialOpportunities} id="opportunities" confidenceById={opportunityConfidence} showTotalValue={true} />
 
         {/* Empty state */}
         {allMetrics.length === 0 && (
