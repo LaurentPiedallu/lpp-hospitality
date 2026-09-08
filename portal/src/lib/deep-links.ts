@@ -59,6 +59,12 @@ export const FINANCIAL_CATEGORY_SECTION: Record<string, string> = {
   Labor: "labor",
   COGS: "cogs",
   Purchasing: "cogs",
+  // NOTE: "Execution" here carries the same wrong assumption that was just
+  // fixed in financial/page.tsx — OpEx findings are filed under Intelligence
+  // Category "Financial", not "Execution" (the schema has no OpEx value).
+  // Left as-is on purpose: this map drives inbound deep-link scroll routing,
+  // "Financial" already routes to "revenue", and re-pointing it is a broader
+  // change with its own trade-off — not part of that bug fix.
   Execution: "opex",
   OpEx: "opex",
   Profitability: "profitability",
