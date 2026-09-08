@@ -85,7 +85,10 @@ export default function OpportunitiesPanel({
       {/* Total-value summary — same serif body treatment as Financial
           Review's Financial Synthesis block; the figure carries the weight
           bump the Profitability net line uses. Section's own space-y-4
-          handles the gap to the grid below. */}
+          handles the gap to the grid below. Sum is over Math.round(...) of
+          each impact, not the raw values, so this total always equals a
+          hand-sum of the per-card figures below (each shown via usd(), which
+          rounds to whole dollars) rather than a round of the raw sum. */}
       {showTotalValue && (
         <p
           style={{
@@ -98,7 +101,7 @@ export default function OpportunitiesPanel({
         >
           Total identified opportunity value:{" "}
           <span style={{ fontWeight: 600 }}>
-            {usd(sorted.reduce((sum, o) => sum + o.estimatedAnnualImpact, 0))} / yr
+            {usd(sorted.reduce((sum, o) => sum + Math.round(o.estimatedAnnualImpact), 0))} / yr
           </span>{" "}
           across {opportunities.length} opportunities
         </p>
