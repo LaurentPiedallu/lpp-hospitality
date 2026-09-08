@@ -12,11 +12,12 @@
 // Intelligence-driven current-read callout and Executive Interpretation
 // toggle. Nothing new needed to support that case, it was already built in.
 
-import { usd, pct, buildTrendData, hasRealBenchmark } from "@/lib/format";
+import { buildTrendData, hasRealBenchmark } from "@/lib/format";
 import SectionHeader from "@/components/SectionHeader";
 import CalloutBlock from "@/components/CalloutBlock";
 import StatusBadge from "@/components/StatusBadge";
 import TrendChart from "@/components/TrendChart";
+import EvidenceTable from "@/components/EvidenceTable";
 import type { KpiMetric, Intelligence, Severity } from "@/types/portal";
 
 function severityVariant(s: Severity): "green" | "amber" | "red" {
@@ -135,43 +136,16 @@ export default function FindingSection({
         </details>
       )}
 
-      {/* Evidence toggle — raw metrics */}
+      {/* Evidence toggle — raw metrics. This <details> is disclosure level 1
+          ("show me raw metrics at all"); the notable-rows-only vs. show-all
+          toggle inside EvidenceTable is level 2 and stays independent of it. */}
       {metrics.length > 0 && (
         <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden">
           <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between select-none hover:bg-gray-50 transition">
             <span>Evidence</span>
             <span className="text-gray-400 text-xs">▼</span>
           </summary>
-          <div className="border-t border-gray-50 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-50">
-                  <th className="text-left px-5 py-2.5 text-xs text-gray-400 font-medium">Metric</th>
-                  <th className="text-right px-5 py-2.5 text-xs text-gray-400 font-medium">Value</th>
-                  <th className="text-right px-5 py-2.5 text-xs text-gray-400 font-medium">Benchmark</th>
-                  <th className="text-right px-5 py-2.5 text-xs text-gray-400 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {metrics.map((m) => (
-                  <tr key={m.id} className="border-b border-gray-50 last:border-0">
-                    <td className="px-5 py-2.5 text-gray-700">{m.metricName || m.kpiRecord}</td>
-                    <td className="px-5 py-2.5 text-right font-medium text-gray-900">
-                      {m.unit === "$" ? usd(m.metricValue) : m.unit === "%" ? pct(m.metricValue) : m.metricValue}
-                    </td>
-                    <td className="px-5 py-2.5 text-right text-gray-400 text-xs">
-                      {hasRealBenchmark(m.benchmarkLow, m.benchmarkHigh)
-                        ? `${m.benchmarkLow}–${m.benchmarkHigh}${m.unit}`
-                        : "—"}
-                    </td>
-                    <td className="px-5 py-2.5 text-right">
-                      <StatusBadge label={m.severity} variant={severityVariant(m.severity)} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <EvidenceTable metrics={metrics} sectionSeverity={severity} />
         </details>
       )}
     </section>
