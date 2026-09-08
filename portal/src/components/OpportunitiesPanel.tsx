@@ -44,6 +44,7 @@ export default function OpportunitiesPanel({
   heading = "Value Creation Opportunities",
   connector,
   confidenceById,
+  showTotalValue = false,
 }: {
   opportunities: Opportunity[];
   // Deep-link anchor (Cross-tab audit Part 4 convention) — optional.
@@ -61,6 +62,12 @@ export default function OpportunitiesPanel({
   // Opportunity type, so callers that don't have an Intelligence array on
   // hand (Commercial Review, Menu Engineering) are unaffected.
   confidenceById?: Record<string, DataConfidence>;
+  // When true, render a one-line total above the card grid summing
+  // estimatedAnnualImpact across all opportunities (computed from the same
+  // `sorted` array as the card list). Financial Review only — defaults to
+  // false so Commercial Review and Menu Engineering's call sites, which
+  // don't pass it, render exactly as before.
+  showTotalValue?: boolean;
 }) {
   if (opportunities.length === 0) return null;
   // Sorted by impact descending (Fix 7) — matches the sort Overview's Top
@@ -73,6 +80,27 @@ export default function OpportunitiesPanel({
       {connector && (
         <p style={{ fontFamily: "'Jost', 'Inter', system-ui, sans-serif", fontSize: 12, color: "rgba(18,18,15,0.45)", fontStyle: "italic", marginTop: -8 }}>
           {connector}
+        </p>
+      )}
+      {/* Total-value summary — same serif body treatment as Financial
+          Review's Financial Synthesis block; the figure carries the weight
+          bump the Profitability net line uses. Section's own space-y-4
+          handles the gap to the grid below. */}
+      {showTotalValue && (
+        <p
+          style={{
+            fontFamily: "'Cormorant Garamond', Georgia, serif",
+            fontSize: "clamp(0.95rem, 1.3vw, 1.05rem)",
+            fontWeight: 400,
+            lineHeight: 1.7,
+            color: "#12120F",
+          }}
+        >
+          Total identified opportunity value:{" "}
+          <span style={{ fontWeight: 600 }}>
+            {usd(sorted.reduce((sum, o) => sum + o.estimatedAnnualImpact, 0))} / yr
+          </span>{" "}
+          across {opportunities.length} opportunities
         </p>
       )}
       <div className="grid gap-3 md:grid-cols-2">
