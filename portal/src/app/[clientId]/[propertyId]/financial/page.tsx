@@ -2,13 +2,14 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastUpdated } from "@/lib/notion-queries";
-import { usd, pct, findMetricByKey, findMetricByName, metricSeriesForKey, findIntelligence, extractIndividualStaffNames, mentionsIndividualStaff } from "@/lib/format";
+import { usd, pct, findMetricByKey, findMetricByName, metricSeriesForKey, findIntelligence, extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
 import PropertyTabs from "@/components/PropertyTabs";
 import SectionHeader from "@/components/SectionHeader";
 import KpiCard from "@/components/KpiCard";
+import BenchmarkRangeBar from "@/components/BenchmarkRangeBar";
 import EmptyState from "@/components/EmptyState";
 import FindingSection from "@/components/FindingSection";
 import OrientationBlock from "@/components/OrientationBlock";
@@ -426,27 +427,46 @@ export default async function FinancialPage({
           primarySeverity={laborPct?.severity}
         >
           <div className="space-y-3">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {laborCost && (
-                <KpiCard label="Labor Cost" value={usd(laborCost.metricValue)}
-                  variant={severityVariant(laborCost.severity)} />
-              )}
-              {laborPct && (
-                <KpiCard label="Labor %" value={pct(laborPct.metricValue)}
-                  sub="of revenue"
-                  variant={severityVariant(laborPct.severity)} />
-              )}
-              {laborPct?.benchmarkLow != null && (
-                <KpiCard label="Benchmark Range"
-                  value={`${laborPct.benchmarkLow}–${laborPct.benchmarkHigh}%`}
-                  variant="neutral" />
-              )}
-              {laborPct?.targetValue != null && (
-                <KpiCard label="Target"
-                  value={pct(laborPct.targetValue)}
-                  variant="neutral" />
-              )}
-            </div>
+            {laborPct &&
+            laborPct.benchmarkLow != null &&
+            laborPct.benchmarkHigh != null &&
+            hasRealBenchmark(laborPct.benchmarkLow, laborPct.benchmarkHigh) ? (
+              // Range-position indicator in place of the Labor Cost / Labor %
+              // / Benchmark Range card trio. laborCost / laborPct bindings are
+              // untouched above — Financial Synthesis still reads them.
+              <BenchmarkRangeBar
+                label="Labor"
+                value={laborPct.metricValue}
+                low={laborPct.benchmarkLow}
+                high={laborPct.benchmarkHigh}
+                unit={laborPct.unit}
+                target={laborPct.targetValue}
+                caption={laborCost ? `total labor cost ${usd(laborCost.metricValue)}` : undefined}
+              />
+            ) : (
+              // No real benchmark on this property/period — keep the cards.
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {laborCost && (
+                  <KpiCard label="Labor Cost" value={usd(laborCost.metricValue)}
+                    variant={severityVariant(laborCost.severity)} />
+                )}
+                {laborPct && (
+                  <KpiCard label="Labor %" value={pct(laborPct.metricValue)}
+                    sub="of revenue"
+                    variant={severityVariant(laborPct.severity)} />
+                )}
+                {laborPct?.benchmarkLow != null && (
+                  <KpiCard label="Benchmark Range"
+                    value={`${laborPct.benchmarkLow}–${laborPct.benchmarkHigh}%`}
+                    variant="neutral" />
+                )}
+                {laborPct?.targetValue != null && (
+                  <KpiCard label="Target"
+                    value={pct(laborPct.targetValue)}
+                    variant="neutral" />
+                )}
+              </div>
+            )}
             {laborDrivers.length >= 2 && laborCost && (
               <DriverBreakdown
                 title="Labor Cost Drivers"
