@@ -92,6 +92,11 @@ export default function EvidenceTable({
                 </td>
                 <td className="px-5 py-2.5 text-right align-top">
                   <StatusBadge label={m.severity} variant={severityVariant(m.severity)} />
+                  {m.severity === "Validate" && (
+                    <p className="text-xs text-gray-500 leading-relaxed">
+                      Data confidence needs confirmation before acting on this.
+                    </p>
+                  )}
                 </td>
               </tr>
             ))}
