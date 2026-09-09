@@ -60,16 +60,20 @@ export default function BenchmarkRangeBar({
   unit: string;
   caption?: string;
   target?: number | null;
-  // false (default): a lower-is-better ratio (Labor, OpEx, COGS) — under the
-  // low bound is the favorable direction, so it reads neutral. true: a
-  // higher-is-better metric — under the low bound is a shortfall and reads
-  // action-red. Over the high bound is action-red either way; only the
-  // under-low side responds to this flag.
+  // false (default): a lower-is-better ratio (Labor, OpEx, COGS) — over the
+  // high bound (a cost ceiling exceeded) reads action-red; under the low
+  // bound is the favorable direction and reads neutral. true: a
+  // higher-is-better metric (net-profit margin) — under the low bound is a
+  // shortfall and reads action-red; over the high bound is exceptional and
+  // reads neutral.
   higherIsBetter?: boolean;
 }) {
   // ── Track scale ──────────────────────────────────────────────────────────
-  // Data-driven with 15% headroom, then snapped to round endpoints; clamped
-  // at 0 (a % or $ metric here can't go negative).
+  // Data-driven with 15% headroom, then snapped to round endpoints. The
+  // lower end is floored at 0 only when the data itself stays non-negative
+  // (Labor / COGS / OpEx are percentage-of-revenue cost ratios). A metric
+  // that genuinely goes negative — net-profit margin — keeps its real
+  // snapped minimum so the marker isn't pinned to the left edge.
   const pts = [value, low, high, target].filter(
     (n): n is number => typeof n === "number" && Number.isFinite(n)
   );
@@ -77,16 +81,19 @@ export default function BenchmarkRangeBar({
   const rawMax = Math.max(...pts);
   const pad = Math.max((rawMax - rawMin) * 0.15, rawMax * 0.08, unit === "%" ? 4 : 1);
   const step = unit === "%" ? 5 : niceStep(rawMax - rawMin + 2 * pad);
-  const axisMin = Math.max(0, Math.floor((rawMin - pad) / step) * step);
+  const flooredMin = Math.floor((rawMin - pad) / step) * step;
+  const axisMin = rawMin < 0 ? flooredMin : Math.max(0, flooredMin);
   const axisMax = Math.ceil((rawMax + pad) / step) * step;
   const span = axisMax - axisMin || 1;
   const pos = (v: number) => Math.max(0, Math.min(100, ((v - axisMin) / span) * 100));
 
   const within = value >= low && value <= high;
-  // Over the high bound is bad for every metric this renders. Under the low
-  // bound is bad only when higherIsBetter — for a lower-is-better ratio it
-  // is the favorable direction and stays neutral.
-  const alarm = value > high || (value < low && higherIsBetter);
+  // Alarm on a bound breached in the unfavorable direction only: over the
+  // high bound for a lower-is-better ratio (a cost ceiling exceeded), or
+  // under the low bound for a higher-is-better metric (a shortfall). An
+  // exceptional higher-is-better value above its band is not an alarm.
+  const alarm =
+    (value > high && !higherIsBetter) || (value < low && higherIsBetter);
   const markerColor = alarm ? "#C0392B" : "#12120F";
   const gapText = within
     ? "within range"
