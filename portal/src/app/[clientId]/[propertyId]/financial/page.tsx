@@ -441,6 +441,7 @@ export default async function FinancialPage({
                 high={laborPct.benchmarkHigh}
                 unit={laborPct.unit}
                 target={laborPct.targetValue}
+                higherIsBetter={false}
                 caption={laborCost ? `total labor cost ${usd(laborCost.metricValue)}` : undefined}
               />
             ) : (
