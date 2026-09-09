@@ -27,6 +27,22 @@ function isNotable(m: KpiMetric, sectionSeverity: Severity): boolean {
   return m.severity !== sectionSeverity || hasRealBenchmark(m.benchmarkLow, m.benchmarkHigh);
 }
 
+// An elevated Status ("Action Required" / "Critical") on a row that shows no
+// Benchmark is a concern asserted without a visible standard behind it. For
+// those rows, surface the KPI Record's own LPP Interpretation as a muted
+// second line under the metric name, so the reader can see what the status
+// is measured against (for these records the comparison — typically a
+// budget — lives only in that prose, not in the Benchmark fields). Applies
+// to any such row in any of the five Financial Review sections; nothing
+// metric-specific here.
+function showsRationale(m: KpiMetric): boolean {
+  return (
+    !hasRealBenchmark(m.benchmarkLow, m.benchmarkHigh) &&
+    (m.severity === "Action Required" || m.severity === "Critical") &&
+    m.interpretation.trim().length > 0
+  );
+}
+
 export default function EvidenceTable({
   metrics,
   sectionSeverity,
@@ -60,16 +76,21 @@ export default function EvidenceTable({
           <tbody>
             {rows.map((m) => (
               <tr key={m.id} className="border-b border-gray-50 last:border-0">
-                <td className="px-5 py-2.5 text-gray-700">{m.metricName || m.kpiRecord}</td>
-                <td className="px-5 py-2.5 text-right font-medium text-gray-900">
+                <td className="px-5 py-2.5 text-gray-700 align-top">
+                  {m.metricName || m.kpiRecord}
+                  {showsRationale(m) && (
+                    <p className="text-xs text-gray-500 leading-relaxed">{m.interpretation}</p>
+                  )}
+                </td>
+                <td className="px-5 py-2.5 text-right font-medium text-gray-900 align-top">
                   {m.unit === "$" ? usd(m.metricValue) : m.unit === "%" ? pct(m.metricValue) : m.metricValue}
                 </td>
-                <td className="px-5 py-2.5 text-right text-gray-400 text-xs">
+                <td className="px-5 py-2.5 text-right text-gray-400 text-xs align-top">
                   {hasRealBenchmark(m.benchmarkLow, m.benchmarkHigh)
                     ? `${m.benchmarkLow}–${m.benchmarkHigh}${m.unit}`
                     : "—"}
                 </td>
-                <td className="px-5 py-2.5 text-right">
+                <td className="px-5 py-2.5 text-right align-top">
                   <StatusBadge label={m.severity} variant={severityVariant(m.severity)} />
                 </td>
               </tr>
