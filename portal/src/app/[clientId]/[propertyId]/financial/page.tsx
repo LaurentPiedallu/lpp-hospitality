@@ -441,6 +441,7 @@ export default async function FinancialPage({
                 high={laborPct.benchmarkHigh}
                 unit={laborPct.unit}
                 target={laborPct.targetValue}
+                higherIsBetter={false}
                 caption={laborCost ? `total labor cost ${usd(laborCost.metricValue)}` : undefined}
               />
             ) : (
@@ -489,27 +490,46 @@ export default async function FinancialPage({
           primarySeverity={cogsPct?.severity}
         >
           <div className="space-y-3">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {cogsDollars && (
-                <KpiCard label="COGS" value={usd(cogsDollars.metricValue)}
-                  variant={severityVariant(cogsDollars.severity)} />
-              )}
-              {cogsPct && (
-                <KpiCard label="COGS %" value={pct(cogsPct.metricValue)}
-                  sub="of revenue"
-                  variant={severityVariant(cogsPct.severity)} />
-              )}
-              {cogsPct?.benchmarkLow != null && (
-                <KpiCard label="Benchmark Range"
-                  value={`${cogsPct.benchmarkLow}–${cogsPct.benchmarkHigh}%`}
-                  variant="neutral" />
-              )}
-              {cogsPct?.targetValue != null && (
-                <KpiCard label="Target"
-                  value={pct(cogsPct.targetValue)}
-                  variant="neutral" />
-              )}
-            </div>
+            {cogsPct &&
+            cogsPct.benchmarkLow != null &&
+            cogsPct.benchmarkHigh != null &&
+            hasRealBenchmark(cogsPct.benchmarkLow, cogsPct.benchmarkHigh) ? (
+              // COGS is a lower-is-better ratio: under the floor is the
+              // favorable direction, so higherIsBetter={false} keeps an
+              // under-low marker neutral rather than action-red.
+              <BenchmarkRangeBar
+                label="COGS"
+                value={cogsPct.metricValue}
+                low={cogsPct.benchmarkLow}
+                high={cogsPct.benchmarkHigh}
+                unit={cogsPct.unit}
+                target={cogsPct.targetValue}
+                higherIsBetter={false}
+                caption={cogsDollars ? `total cost of sales ${usd(cogsDollars.metricValue)}` : undefined}
+              />
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {cogsDollars && (
+                  <KpiCard label="COGS" value={usd(cogsDollars.metricValue)}
+                    variant={severityVariant(cogsDollars.severity)} />
+                )}
+                {cogsPct && (
+                  <KpiCard label="COGS %" value={pct(cogsPct.metricValue)}
+                    sub="of revenue"
+                    variant={severityVariant(cogsPct.severity)} />
+                )}
+                {cogsPct?.benchmarkLow != null && (
+                  <KpiCard label="Benchmark Range"
+                    value={`${cogsPct.benchmarkLow}–${cogsPct.benchmarkHigh}%`}
+                    variant="neutral" />
+                )}
+                {cogsPct?.targetValue != null && (
+                  <KpiCard label="Target"
+                    value={pct(cogsPct.targetValue)}
+                    variant="neutral" />
+                )}
+              </div>
+            )}
             {foodCost && beverageCost && (
               <StackedSplit
                 title="Cost of Sales by Type"
@@ -540,22 +560,41 @@ export default async function FinancialPage({
           primarySeverity={opexPct?.severity}
         >
           <div className="space-y-3">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {opexDollars && (
-                <KpiCard label="Operating Expenses" value={usd(opexDollars.metricValue)}
-                  variant={severityVariant(opexDollars.severity)} />
-              )}
-              {opexPct && (
-                <KpiCard label="OpEx %" value={pct(opexPct.metricValue)}
-                  sub="of revenue"
-                  variant={severityVariant(opexPct.severity)} />
-              )}
-              {opexPct?.benchmarkLow != null && (
-                <KpiCard label="Benchmark Range"
-                  value={`${opexPct.benchmarkLow}–${opexPct.benchmarkHigh}%`}
-                  variant="neutral" />
-              )}
-            </div>
+            {opexPct &&
+            opexPct.benchmarkLow != null &&
+            opexPct.benchmarkHigh != null &&
+            hasRealBenchmark(opexPct.benchmarkLow, opexPct.benchmarkHigh) ? (
+              // OpEx is a lower-is-better ratio; on live data the value is
+              // over the ceiling, which is action-red under any
+              // higherIsBetter. Passed explicitly for parity with COGS.
+              <BenchmarkRangeBar
+                label="Operating Expenses"
+                value={opexPct.metricValue}
+                low={opexPct.benchmarkLow}
+                high={opexPct.benchmarkHigh}
+                unit={opexPct.unit}
+                target={opexPct.targetValue}
+                higherIsBetter={false}
+                caption={opexDollars ? `total other operating expenses ${usd(opexDollars.metricValue)}` : undefined}
+              />
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {opexDollars && (
+                  <KpiCard label="Operating Expenses" value={usd(opexDollars.metricValue)}
+                    variant={severityVariant(opexDollars.severity)} />
+                )}
+                {opexPct && (
+                  <KpiCard label="OpEx %" value={pct(opexPct.metricValue)}
+                    sub="of revenue"
+                    variant={severityVariant(opexPct.severity)} />
+                )}
+                {opexPct?.benchmarkLow != null && (
+                  <KpiCard label="Benchmark Range"
+                    value={`${opexPct.benchmarkLow}–${opexPct.benchmarkHigh}%`}
+                    variant="neutral" />
+                )}
+              </div>
+            )}
             {opexLineItems.length >= 2 && opexDollars && (
               <DriverBreakdown
                 title="Operating Expense Drivers"

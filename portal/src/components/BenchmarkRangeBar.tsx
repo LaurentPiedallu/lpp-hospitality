@@ -4,9 +4,10 @@
 // value, and the gap stated in words ("19 points over range" / "within
 // range"). Pure server component, div-based (the house bar idiom — see
 // InitiativeProgress, DriverBreakdown). Palette per DESIGN.md only:
-// grey-tint track, gold band, dark marker when within range and action-red
-// when outside it. Borrows BenchmarkGauge's axis-padding idea so the marker
-// isn't pinned to an edge when the value sits well outside the band.
+// grey-tint track, gold band, dark marker except action-red when the value
+// breaches a bound in the unfavorable direction (see higherIsBetter).
+// Borrows BenchmarkGauge's axis-padding idea so the marker isn't pinned to
+// an edge when the value sits well outside the band.
 
 import { usd, pct } from "@/lib/format";
 
@@ -50,6 +51,7 @@ export default function BenchmarkRangeBar({
   unit,
   caption,
   target,
+  higherIsBetter = false,
 }: {
   label: string;
   value: number;
@@ -58,6 +60,12 @@ export default function BenchmarkRangeBar({
   unit: string;
   caption?: string;
   target?: number | null;
+  // false (default): a lower-is-better ratio (Labor, OpEx, COGS) — under the
+  // low bound is the favorable direction, so it reads neutral. true: a
+  // higher-is-better metric — under the low bound is a shortfall and reads
+  // action-red. Over the high bound is action-red either way; only the
+  // under-low side responds to this flag.
+  higherIsBetter?: boolean;
 }) {
   // ── Track scale ──────────────────────────────────────────────────────────
   // Data-driven with 15% headroom, then snapped to round endpoints; clamped
@@ -75,7 +83,11 @@ export default function BenchmarkRangeBar({
   const pos = (v: number) => Math.max(0, Math.min(100, ((v - axisMin) / span) * 100));
 
   const within = value >= low && value <= high;
-  const markerColor = within ? "#12120F" : "#C0392B";
+  // Over the high bound is bad for every metric this renders. Under the low
+  // bound is bad only when higherIsBetter — for a lower-is-better ratio it
+  // is the favorable direction and stays neutral.
+  const alarm = value > high || (value < low && higherIsBetter);
+  const markerColor = alarm ? "#C0392B" : "#12120F";
   const gapText = within
     ? "within range"
     : value > high
@@ -200,7 +212,7 @@ export default function BenchmarkRangeBar({
             fontFamily: JOST,
             fontSize: 12,
             fontWeight: 500,
-            color: within ? "rgba(18,18,15,0.55)" : "#C0392B",
+            color: alarm ? "#C0392B" : "rgba(18,18,15,0.55)",
           }}
         >
           {gapText}
