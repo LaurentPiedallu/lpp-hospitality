@@ -140,6 +140,90 @@ function StackedSplit({
   );
 }
 
+// ─── P&L waterfall — the page's numeric conclusion ─────────────────────────
+// How actual revenue nets to the actual departmental result, stepping through
+// each real cost line. Hand-built like DriverBreakdown / StackedSplit, same
+// white container. Every printed figure is a source value. The last running
+// point is anchored to `result.value` (netProfit) rather than to the running
+// sum, so the operating-expenses step silently absorbs the sub-dollar
+// rounding difference between the component figures and the departmental
+// total — the chain closes exactly and no running total is shown that could
+// disagree.
+
+function ProfitBridge({
+  revenue,
+  steps,
+  result,
+}: {
+  revenue: { label: string; value: number };  // starting magnitude, positive
+  steps: { label: string; value: number }[];  // positive magnitudes, each subtracted
+  result: { label: string; value: number };   // signed departmental result
+}) {
+  const running: number[] = [revenue.value];
+  steps.forEach((s, i) => {
+    running.push(i === steps.length - 1 ? result.value : running[i] - s.value);
+  });
+
+  const lo = Math.min(0, ...running);
+  const hi = Math.max(0, ...running);
+  const span = hi - lo || 1;
+  const pos = (v: number) => ((v - lo) / span) * 100;
+  const zeroLeft = pos(0);
+
+  const bars: { label: string; amount: number; left: number; width: number; color: string }[] = [
+    {
+      label: revenue.label,
+      amount: revenue.value,
+      left: Math.min(zeroLeft, pos(revenue.value)),
+      width: Math.abs(pos(revenue.value) - zeroLeft),
+      color: GOLD,
+    },
+    ...steps.map((s, i) => {
+      const a = pos(running[i]);
+      const b = pos(running[i + 1]);
+      return {
+        label: s.label,
+        amount: -s.value,
+        left: Math.min(a, b),
+        width: Math.abs(b - a),
+        color: "#C0392B",
+      };
+    }),
+    {
+      label: result.label,
+      amount: result.value,
+      left: Math.min(zeroLeft, pos(result.value)),
+      width: Math.abs(pos(result.value) - zeroLeft),
+      color: "#C0392B",
+    },
+  ];
+
+  return (
+    <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: 20 }}>
+      <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 16 }}>
+        How the period nets out
+      </p>
+      <div className="space-y-3">
+        {bars.map((b) => (
+          <div key={b.label}>
+            <div className="flex items-baseline justify-between" style={{ marginBottom: 4 }}>
+              <span style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.65)" }}>{b.label}</span>
+              <span style={{ fontFamily: JOST, fontSize: 12, color: "#12120F", fontWeight: 500 }}>{usd(b.amount)}</span>
+            </div>
+            <div style={{ position: "relative", height: 10, background: "rgba(18,18,15,0.06)" }}>
+              <div style={{ position: "absolute", left: `${zeroLeft}%`, top: -2, bottom: -2, width: 1, background: "rgba(18,18,15,0.22)" }} />
+              <div style={{ position: "absolute", height: "100%", left: `${b.left}%`, width: `${b.width}%`, background: b.color }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.35)", marginTop: 14 }}>
+        Step amounts are rounded to the nearest dollar; the departmental total is exact.
+      </p>
+    </div>
+  );
+}
+
 // FinancialSection extracted to src/components/FindingSection.tsx (Cross-tab
 // audit Part 3) — see call sites below, now <FindingSection ...>.
 
@@ -616,31 +700,50 @@ export default async function FinancialPage({
           allMetrics={trendFor("net_profit_pct")}
           primarySeverity={netProfitPct?.severity}
         >
-          <div style={{ background: "#12120F", padding: "36px 40px" }} className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
-            <div>
-              <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(242,237,228,0.55)", marginBottom: 10 }}>
-                Net Profit Margin
-              </p>
-              {netProfitPct && (
-                <p style={{ fontFamily: SERIF, fontSize: "clamp(2.6rem, 5vw, 3.6rem)", fontWeight: 300, lineHeight: 1, color: netProfitPct.metricValue < 0 ? "#e0796b" : "rgba(242,237,228,0.92)" }}>
-                  {pct(netProfitPct.metricValue)}
+          <div className="space-y-3">
+            <div style={{ background: "#12120F", padding: "36px 40px" }} className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
+              <div>
+                <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(242,237,228,0.55)", marginBottom: 10 }}>
+                  Net Profit Margin
                 </p>
-              )}
-              {netProfitPct?.benchmarkLow != null && (
-                <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(242,237,228,0.55)", marginTop: 8 }}>
-                  Benchmark {netProfitPct.benchmarkLow}–{netProfitPct.benchmarkHigh}%
-                </p>
+                {netProfitPct && (
+                  <p style={{ fontFamily: SERIF, fontSize: "clamp(2.6rem, 5vw, 3.6rem)", fontWeight: 300, lineHeight: 1, color: netProfitPct.metricValue < 0 ? "#e0796b" : "rgba(242,237,228,0.92)" }}>
+                    {pct(netProfitPct.metricValue)}
+                  </p>
+                )}
+                {netProfitPct?.benchmarkLow != null && (
+                  <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(242,237,228,0.55)", marginTop: 8 }}>
+                    Benchmark {netProfitPct.benchmarkLow}–{netProfitPct.benchmarkHigh}%
+                  </p>
+                )}
+              </div>
+              {netProfit && (
+                <div style={{ textAlign: "left" }}>
+                  <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(242,237,228,0.55)", marginBottom: 10 }}>
+                    Net Profit
+                  </p>
+                  <p style={{ fontFamily: SERIF, fontSize: "1.9rem", fontWeight: 300, color: netProfit.metricValue < 0 ? "#e0796b" : "rgba(242,237,228,0.92)" }}>
+                    {usd(netProfit.metricValue)}
+                  </p>
+                </div>
               )}
             </div>
-            {netProfit && (
-              <div style={{ textAlign: "left" }}>
-                <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(242,237,228,0.55)", marginBottom: 10 }}>
-                  Net Profit
-                </p>
-                <p style={{ fontFamily: SERIF, fontSize: "1.9rem", fontWeight: 300, color: netProfit.metricValue < 0 ? "#e0796b" : "rgba(242,237,228,0.92)" }}>
-                  {usd(netProfit.metricValue)}
-                </p>
-              </div>
+
+            {/* Actual-P&L waterfall — additive, alongside the card above, not
+                a replacement (Phase 3 decision to leave that card as built). */}
+            {totalRevenue && cogsDollars && laborCost && opexDollars && netProfit && (
+              <ProfitBridge
+                revenue={{ label: "Total Revenue", value: totalRevenue.metricValue }}
+                steps={[
+                  { label: "less Cost of Sales", value: cogsDollars.metricValue },
+                  { label: "less Labor", value: laborCost.metricValue },
+                  { label: "less Operating Expenses", value: opexDollars.metricValue },
+                ]}
+                result={{
+                  label: netProfit.metricValue < 0 ? "Departmental Loss" : "Departmental Profit",
+                  value: netProfit.metricValue,
+                }}
+              />
             )}
           </div>
         </FindingSection>
