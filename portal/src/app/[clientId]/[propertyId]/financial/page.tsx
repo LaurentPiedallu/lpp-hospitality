@@ -317,6 +317,23 @@ export default async function FinancialPage({
   const intel = (cat: string): Intelligence | null =>
     findIntelligence(allIntelligence as Intelligence[], cat, latest);
 
+  // Revenue, OpEx and Profitability all read from the single "Financial"
+  // Intelligence bucket — the schema has no field distinguishing which of
+  // those sections a record belongs to. findIntelligence picks by highest
+  // Estimated Annual Impact, so Revenue and OpEx routinely resolve to the
+  // SAME record and render it twice. This suppresses that duplicate on the
+  // Revenue side rather than guessing which record is "the revenue one" — a
+  // rank or keyword heuristic is exactly what caused the earlier OpEx
+  // miscategorisation and would break silently on any property/period with a
+  // different record count. The real fix is an upstream disambiguator (a
+  // "Financial Subsection" select on Intelligence, or populating the
+  // existing Related KPIs relation), neither of which exists yet.
+  // The check is a genuine identity comparison: if a future change ever
+  // lets the two sections resolve to different records, Revenue resumes
+  // rendering its own with no edit here.
+  const opexIntel = intel("Financial");
+  const revenueIntel = intel("Financial");
+
   // KPI lookup by canonical LPP Metric Key, not category/unit/name-guessing
   // (see findMetricByKey in lib/format.ts for the bug this fixes). Segment
   // defaults to "Total" inside findMetricByKey itself, so omitting it here
@@ -449,7 +466,10 @@ export default async function FinancialPage({
           id="revenue"
           heading="Revenue"
           connector="The figures below are this property's own revenue numbers; the demand-side story behind them — daypart mix, guest volume — belongs to Commercial Review."
-          intelligence={intel("Financial")}
+          // Suppressed when it would be the same record OpEx already shows
+          // (see opexIntel / revenueIntel note above). Falls back to
+          // primarySeverity; FindingSection renders no callout for null.
+          intelligence={revenueIntel === opexIntel ? null : revenueIntel}
           metrics={catMetrics("Revenue")}
           allMetrics={trendFor("total_revenue")}
           primarySeverity={totalRevenue?.severity}
@@ -634,11 +654,11 @@ export default async function FinancialPage({
           // OpEx findings are filed under Intelligence Category "Financial"
           // (alongside Revenue and Profitability) — the schema has no
           // dedicated OpEx value. Previously read "Execution", which
-          // surfaced an unrelated operational-coverage record here.
-          // Known follow-up: this now resolves the same "Financial" record
-          // the Revenue section shows (findIntelligence has no field to
-          // split one category across two sections) — separate issue.
-          intelligence={intel("Financial")}
+          // surfaced an unrelated operational-coverage record here. OpEx
+          // keeps the highest-impact Financial record; the Revenue section
+          // suppresses its callout when it resolves to this same record
+          // (see opexIntel / revenueIntel note above).
+          intelligence={opexIntel}
           metrics={catMetrics("OpEx")}
           allMetrics={trendFor("opex_pct")}
           primarySeverity={opexPct?.severity}
