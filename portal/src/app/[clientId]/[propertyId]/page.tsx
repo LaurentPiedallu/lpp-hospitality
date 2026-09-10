@@ -66,23 +66,26 @@ const CONFIDENCE_VARIANT: Record<DataConfidence, "green" | "amber" | "red" | "gr
 // Category, not just Guest; the highest Estimated Monthly Impact breaks a
 // tie among multiple Monitor records, most-recently-touched breaking a
 // further tie. Falls back to the lowest-impact Action Required record when
-// no Monitor-severity record exists for the period — a real, confirmed
-// case (Lex Yard's June Published Intelligence has zero Monitor-severity
-// records) — so the section stays populated with a genuine finding rather
-// than going empty, while still reading as a step down in urgency from
-// what's already covered earlier on the page (Top 3 Priorities). Returns
-// null if nothing qualifies even under the fallback, so the section can
-// hide entirely rather than show a placeholder.
+// no Monitor-severity record exists for the period — a defensive path for
+// properties/periods that genuinely have none — so the section stays
+// populated with a genuine finding rather than going empty, while still
+// reading as a step down in urgency from what's already covered earlier on
+// the page (Top 3 Priorities). Returns null if nothing qualifies even
+// under the fallback, so the section can hide entirely rather than show a
+// placeholder.
 //
-// Content note: checked every Published Intelligence record for Lex
-// Yard's current period directly against Notion — none match the frozen
-// spec's Strategic Risks framing (dinner demand deteriorating despite
-// rising guest scores, labor structurally outpacing revenue, growing
-// breakfast dependence). The record this function currently selects is
-// still tactical daypart-score content ("Sunday scores lowest..."). That's
-// a genuine upstream content gap, not a bug in this selection logic — the
-// visual treatment below is built and ready, the content itself needs to
-// be regenerated upstream before this section reads as intended.
+// Content note: checked every Published Intelligence record for Lex Yard's
+// current period directly against Notion — none match the frozen spec's
+// Strategic Risks framing (dinner demand deteriorating despite rising
+// guest scores, labor structurally outpacing revenue, growing breakfast
+// dependence). Lex Yard's June set has six Monitor-severity records, so
+// this currently selects the highest-monthly-impact one — Commercial
+// reservation-concentration content ("Reservations cover 49% of arrivals
+// with Thursday as peak and Sunday softest"), still tactical rather than
+// the strategic framing above. That's an upstream content gap, not a bug
+// in this selection logic — the visual treatment below is built and ready,
+// the content itself needs to be regenerated upstream before this section
+// reads as intended.
 function selectStrategicRisk(records: Intelligence[], period: string | null): Intelligence | null {
   const current = records.filter((i) => i.periodStart === period);
 
