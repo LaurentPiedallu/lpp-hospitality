@@ -30,29 +30,39 @@ const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 const SERIF = "'Cormorant Garamond', Georgia, serif";
 const GOLD = "#B8935A";
 
-// Guest Experience three-tier grouping (Commercial Review Phase 3, revised
-// Phase 6) — an editorial regroup of all 15 Rating-unit Guest Experience
-// records into what each score actually measures: the tangible product
-// dimensions guests directly rate ("Core Experience"), the cleanliness
-// signals that produce that experience ("Operational Standards"), and the
-// forward-looking referral/sentiment signals that predict retention
-// ("Advocacy & Loyalty") — including the headline Overall Guest Score
-// itself, shown both as the big number above and as a card in this tier.
-// This is a portal-side grouping only, not a Notion schema change — the
-// KPI Records carry no field for it — so it's matched by the real Metric
-// Name strings confirmed across live Guest Experience KPI Records (a
-// fixed survey-question taxonomy reused across properties, not
-// per-property freeform text) rather than derived from any Notion
-// property. Covers 8 of the 15 records as their own tier card; the other
-// 7 nest inside a Core Experience card instead (see
-// CORE_SUBMETRIC_PARENT below) rather than sitting as siblings — Server
-// Confidence, Hospitality and Friendliness, both Front-of-House scores,
-// and Host Rating are all sub-signals of Service, not their own pillar,
-// and the same is true of Food Taste under Food and the Atmosphere
-// Sub-Score under Atmosphere. Between the two maps, all 15 records are
-// accounted for exactly once; an unrecognized future metric name logs a
-// warning at the call site below instead of silently dropping off the
-// page.
+// Guest Experience grouping (Commercial Review Phase 3, revised Phase 6
+// and again in Phase 7) — an editorial regroup of the 15 Rating-unit Guest
+// Experience records into what each score actually measures: the tangible
+// product dimensions guests directly rate ("Core Experience", the hero
+// tier), the cleanliness signals that produce that experience
+// ("Operational Standards"), and the forward-looking referral/sentiment
+// signals that predict retention ("Advocacy & Loyalty"). Operational
+// Standards and Advocacy & Loyalty render together as one combined
+// "Standards & Advocacy" block below Core Experience (Phase 7) — see the
+// render below — but stay distinct GuestTier values here, since
+// Operational's cleanliness scores and Advocacy's recommend/sentiment
+// scores are still different things internally (e.g. only Advocacy's
+// metrics relate to guestIntelligence's commentary).
+//
+// The headline Overall Guest Score is deliberately NOT one of the 15
+// tier-mapped records — it's shown once, as the big number above every
+// tier (see overallRating below), and a Phase 7 fix removed it as a
+// second, duplicate card under Advocacy & Loyalty. This is a portal-side
+// grouping only, not a Notion schema change — the KPI Records carry no
+// field for it — so it's matched by the real Metric Name strings
+// confirmed across live Guest Experience KPI Records (a fixed
+// survey-question taxonomy reused across properties, not per-property
+// freeform text) rather than derived from any Notion property. Covers 7
+// of the 15 records as their own tier card; 7 more nest inside a Core
+// Experience card instead (see CORE_SUBMETRIC_PARENT below) rather than
+// sitting as siblings — Server Confidence, Hospitality and Friendliness,
+// both Front-of-House scores, and Host Rating are all sub-signals of
+// Service, not their own pillar, and the same is true of Food Taste under
+// Food and the Atmosphere Sub-Score under Atmosphere; the 15th (Overall
+// Guest Score) is the headline number above. Between the two maps plus
+// the headline exclusion, all 15 records are accounted for exactly once;
+// an unrecognized future metric name logs a warning at the call site
+// below instead of silently dropping off the page.
 type GuestTier = "core" | "operational" | "advocacy";
 const GUEST_TIER_BY_NAME: Record<string, GuestTier> = {
   "Food Score": "core",
@@ -62,12 +72,9 @@ const GUEST_TIER_BY_NAME: Record<string, GuestTier> = {
   "Restroom Cleanliness Score": "operational",
   "Guest Sentiment Score": "advocacy",
   "Likelihood to Recommend": "advocacy",
-  "Overall Guest Score": "advocacy",
 };
-const GUEST_TIER_LABEL: Record<GuestTier, string> = {
+const GUEST_TIER_LABEL: Record<"core", string> = {
   core: "Core Experience",
-  operational: "Operational Standards",
-  advocacy: "Advocacy & Loyalty",
 };
 
 // Which Core Experience card each of the 7 non-tier Guest Experience
@@ -470,36 +477,41 @@ function ThemeCard({
 }
 
 // Guest Experience tier group (Portal-Wide refinement, Phase 3) — a labeled
-// sub-grid of ThemeCards for one of the three tiers (see GUEST_TIER_BY_NAME
-// above). "emphasize" gives the Core Experience tier a heavier gold rule
-// and larger card padding than the other two — the same
-// scale-not-color-inversion differentiation Overview's Top Priority card
-// already uses, so the strongest, most load-bearing tier reads with real
-// visual weight instead of every tier looking equally minor. "extrasFor"
-// (Commercial Review Phase 6) lets one caller — Core Experience — attach
-// per-card subMetrics/analysis without every other tier needing to know
-// about them; Operational Standards and Advocacy & Loyalty omit it and
-// render exactly as before. items-stretch is explicit here (grid's own
-// default already stretches items to the row's tallest sibling) so the
-// card-height fix is visible in the code, not just relied on implicitly.
+// sub-grid of ThemeCards for a tier (see GUEST_TIER_BY_NAME above).
+// "emphasize" gives Core Experience a heavier gold rule and larger card
+// padding than the combined Standards & Advocacy block below it — the
+// same scale-not-color-inversion differentiation Overview's Top Priority
+// card already uses, so the hero tier reads with real visual weight
+// instead of every card looking equally important. "extrasFor" (Phase 6)
+// lets one caller — Core Experience — attach per-card subMetrics/analysis
+// without the combined block needing to know about them. "columns"
+// (Phase 7) lets the combined Standards & Advocacy block lay its 4 cards
+// out in one row on larger screens instead of Core Experience's 3 — same
+// gap/stretch behavior either way. items-stretch is explicit here (grid's
+// own default already stretches items to the row's tallest sibling) so
+// the card-height fix is visible in the code, not just relied on
+// implicitly.
 function GuestTierGroup({
   label,
   metrics,
   emphasize,
   extrasFor,
+  columns = 3,
 }: {
   label: string;
   metrics: KpiMetric[];
   emphasize?: boolean;
   extrasFor?: (m: KpiMetric) => { subMetrics?: { label: string; value: number }[]; analysis?: string | null };
+  columns?: 3 | 4;
 }) {
   if (metrics.length === 0) return null;
+  const gridCols = columns === 4 ? "grid-cols-2 md:grid-cols-4" : "grid-cols-1 sm:grid-cols-3";
   return (
     <div>
       <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: emphasize ? GOLD : "rgba(18,18,15,0.35)", marginBottom: 12 }}>
         {label}
       </p>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-stretch">
+      <div className={`grid ${gridCols} gap-3 items-stretch`}>
         {metrics.map((g) => {
           const extras = extrasFor?.(g);
           return (
@@ -753,30 +765,40 @@ export default async function CommercialPage({
 
   // The one Guest-category Intelligence record for this period — reused
   // for both the Evidence table's severity default (via the `intelligence`
-  // prop below) and the Advocacy & Loyalty tier's own commentary, since
-  // that's the real content it actually carries (the recommend-score-vs-
-  // conversion gap), not the Core Experience / Operational Standards tiers.
+  // prop below) and the combined Standards & Advocacy block's commentary,
+  // since that's the real content it actually carries (the recommend-
+  // score-vs-conversion gap), not the Core Experience tier.
   const guestIntelligence = intel("Guest");
 
   // Tier membership, computed once so the counts/ranges below and the
   // card grids in the render use the same lists. A metric that doesn't
-  // match either GUEST_TIER_BY_NAME (its own card) or CORE_SUBMETRIC_PARENT
-  // (nested under a Core Experience card) logs a warning rather than
-  // silently disappearing from the page (no visible "Additional Signals"
-  // catch-all any more — the two maps together are meant to be exhaustive).
+  // match GUEST_TIER_BY_NAME (its own card), CORE_SUBMETRIC_PARENT (nested
+  // under a Core Experience card), or overallRating (the headline number,
+  // deliberately not also rendered as a card — Phase 7) logs a warning
+  // rather than silently disappearing from the page (no visible
+  // "Additional Signals" catch-all any more — the three are meant to be
+  // exhaustive together).
   const guestCoreMetrics = guestRatings.filter((g) => GUEST_TIER_BY_NAME[g.metricName] === "core");
   const guestOperationalMetrics = guestRatings.filter((g) => GUEST_TIER_BY_NAME[g.metricName] === "operational");
   const guestAdvocacyMetrics = guestRatings.filter((g) => GUEST_TIER_BY_NAME[g.metricName] === "advocacy");
+  // Operational Standards + Advocacy & Loyalty render as one combined
+  // block below Core Experience (Commercial Review Phase 7) — same order
+  // as when they were two separate tiers, just merged into one grid and
+  // one summary line.
+  const guestStandardsAdvocacyMetrics = [...guestOperationalMetrics, ...guestAdvocacyMetrics];
   // Sub-metrics nested inside a given Core Experience card, by that card's
   // own Metric Name (see CORE_SUBMETRIC_PARENT above).
   const coreSubMetricsFor = (mainMetricName: string) =>
     guestRatings.filter((g) => CORE_SUBMETRIC_PARENT[g.metricName] === mainMetricName);
   const guestUnclassified = guestRatings.filter(
-    (g) => !GUEST_TIER_BY_NAME[g.metricName] && !CORE_SUBMETRIC_PARENT[g.metricName]
+    (g) =>
+      !GUEST_TIER_BY_NAME[g.metricName] &&
+      !CORE_SUBMETRIC_PARENT[g.metricName] &&
+      g.metricName !== overallRating?.metricName
   );
   if (guestUnclassified.length > 0) {
     console.warn(
-      `[commercial] ${guestUnclassified.length} Guest Experience record(s) don't match GUEST_TIER_BY_NAME or CORE_SUBMETRIC_PARENT and won't render: ` +
+      `[commercial] ${guestUnclassified.length} Guest Experience record(s) don't match GUEST_TIER_BY_NAME, CORE_SUBMETRIC_PARENT, or the headline metric, and won't render: ` +
         guestUnclassified.map((g) => g.metricName).join(", ")
     );
   }
@@ -1059,27 +1081,35 @@ export default async function CommercialPage({
 
         {/* ── Guest Experience — now supporting evidence for the finding
              the page already led with (Commercial Review Phase 5 reorder),
-             rather than the opening act. 15 records regrouped into three
-             tiers (see GUEST_TIER_BY_NAME): 8 render as their own card,
-             7 nest inside a Core Experience card instead as a smaller
-             supporting list (CORE_SUBMETRIC_PARENT, Commercial Review
-             Phase 6) — what each score actually measures, not an
-             arbitrary split. Commentary: each Core Experience card gets
-             its own pillar-specific one-liner (coreCardAnalysis), since
-             the three pillars' supporting scores are different stories;
-             Operational Standards keeps one shared tier-level line
-             (tierRangeSummary); Advocacy & Loyalty keeps the real Guest
-             Intelligence record's own Why It Matters / Recommendation,
-             since that's the tier the finding actually pertains to — plus
-             the Survey Count caveat as its own flagged line, never as a
-             card (a sample-size footnote, not a KPI). Supporting Detail
-             table hidden for this section (Phase 6) — fully redundant
-             with the cards once sub-metrics nest inside them. No
-             qualitative/open-text guest-comment data exists anywhere in
-             the KPI Records pipeline (Source Notes is pipeline provenance
-             metadata, never guest-authored text — confirmed directly, not
-             assumed) — flagged as a real content gap rather than built as
-             an empty shell. ──────────────────────────────────────────── */}
+             rather than the opening act. 15 records regrouped (see
+             GUEST_TIER_BY_NAME): 1 is the headline number above every
+             tier (Overall Guest Score, via overallRating — deliberately
+             not also a card, Phase 7), 7 render as their own card, and 7
+             nest inside a Core Experience card instead as a smaller
+             supporting list (CORE_SUBMETRIC_PARENT, Phase 6) — what each
+             score actually measures, not an arbitrary split. Core
+             Experience is the hero tier; Operational Standards and
+             Advocacy & Loyalty render together as one lighter-weight
+             "Standards & Advocacy" block beneath it (Phase 7), so the
+             page reads as one clear hero plus one coherent supporting
+             section rather than three visually-equal tiers. Commentary:
+             each Core Experience card gets its own pillar-specific
+             one-liner (coreCardAnalysis), since the three pillars'
+             supporting scores are different stories; the combined
+             Standards & Advocacy block gets one shared tier-level line
+             (tierRangeSummary, unmodified — it already generalizes over
+             whatever metrics it's given) plus the real Guest Intelligence
+             record's own Why It Matters / Recommendation, since that's
+             where the recommend-score-vs-conversion finding actually
+             lives, and the Survey Count caveat as its own flagged line,
+             never as a card (a sample-size footnote, not a KPI).
+             Supporting Detail table hidden for this section (Phase 6) —
+             fully redundant with the cards once sub-metrics nest inside
+             them. No qualitative/open-text guest-comment data exists
+             anywhere in the KPI Records pipeline (Source Notes is
+             pipeline provenance metadata, never guest-authored text —
+             confirmed directly, not assumed) — flagged as a real content
+             gap rather than built as an empty shell. ─────────────────── */}
         <CommercialSection
           id="guest-experience"
           heading="Guest Experience"
@@ -1110,16 +1140,23 @@ export default async function CommercialPage({
             </div>
 
             <div>
-              <GuestTierGroup label={GUEST_TIER_LABEL.operational} metrics={guestOperationalMetrics} />
-              {tierRangeSummary(guestOperationalMetrics) && (
+              {/* Standards & Advocacy (Commercial Review Phase 7) — a
+                  combined, lighter-weight secondary block: Operational
+                  Standards' 2 cleanliness cards and Advocacy & Loyalty's 2
+                  recommend/sentiment cards in one row, one shared summary
+                  line (tierRangeSummary works unmodified over the merged
+                  list), with the real Guest Intelligence commentary and
+                  the survey-volume caveat both still carried underneath,
+                  unchanged in content from when Advocacy & Loyalty stood
+                  alone. Not emphasized and not given per-card analysis —
+                  Core Experience above is the hero; this reads as
+                  supporting evidence for it. */}
+              <GuestTierGroup label="Standards & Advocacy" metrics={guestStandardsAdvocacyMetrics} columns={4} />
+              {tierRangeSummary(guestStandardsAdvocacyMetrics) && (
                 <p style={{ fontFamily: JOST, fontSize: 12.5, color: "rgba(18,18,15,0.55)", lineHeight: 1.6, marginTop: 10 }}>
-                  {tierRangeSummary(guestOperationalMetrics)}
+                  {tierRangeSummary(guestStandardsAdvocacyMetrics)}
                 </p>
               )}
-            </div>
-
-            <div>
-              <GuestTierGroup label={GUEST_TIER_LABEL.advocacy} metrics={guestAdvocacyMetrics} />
               {(guestIntelligence?.whyItMatters || guestIntelligence?.suggestedDecision) && (
                 <div className="space-y-3" style={{ marginTop: 10 }}>
                   {guestIntelligence?.whyItMatters && (
