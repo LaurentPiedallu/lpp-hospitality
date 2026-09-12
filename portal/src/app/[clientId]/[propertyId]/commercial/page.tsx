@@ -787,7 +787,7 @@ export default async function CommercialPage({
         {/* ── Orientation — for a reader landing here directly rather than
              via Overview (Portal-Wide refinement) ──────────────────────── */}
         <OrientationBlock>
-          Commercial Review covers guest experience, demand volume and conversion, and seat-efficiency (RevPASH) for the current reporting period, closing with the opportunities that follow from them.
+          Commercial Review covers demand volume and conversion, seat-efficiency (RevPASH), and guest experience for the current reporting period, closing with the opportunities that follow from them.
         </OrientationBlock>
 
         {/* ── Commercial Synthesis ─────────────────────────────────────── */}
@@ -812,81 +812,13 @@ export default async function CommercialPage({
           </section>
         )}
 
-        {/* ── Guest Experience — first (Portal-Wide refinement Phase 3
-             reorder): the strongest, most load-bearing result on this tab
-             leads, rather than following after Opportunities. 15 flat
-             cards regrouped into three tiers (see GUEST_TIER_BY_NAME) —
-             what each score actually measures, not an arbitrary split.
-             Commentary moved from one section-wide block to one per tier
-             (Commercial Review Phase 3): Core Experience and Operational
-             Standards get a short data-driven line each (tierRangeSummary),
-             Advocacy & Loyalty keeps the real Guest Intelligence record's
-             own Why It Matters / Recommendation, since that's the tier the
-             finding actually pertains to — plus the Survey Count caveat as
-             its own flagged line, never as a card (a sample-size footnote,
-             not a KPI). No qualitative/open-text guest-comment data exists
-             anywhere in the KPI Records pipeline (Source Notes is pipeline
-             provenance metadata, never guest-authored text — confirmed
-             directly, not assumed) — flagged as a real content gap rather
-             than built as an empty shell. ──────────────────────────────── */}
-        <CommercialSection
-          id="guest-experience"
-          heading="Guest Experience"
-          intelligence={guestIntelligence}
-          metrics={guestRatings}
-          allMetrics={trendFor("guest_overall")}
-          trendUnit="Rating"
-          hideCallout
-          hideCommentary
-        >
-          <GuestSentimentBlock overallRating={overallRating} summary={guestHeadlineSummary} />
-
-          <div className="space-y-8">
-            <div>
-              <GuestTierGroup label={GUEST_TIER_LABEL.core} metrics={guestCoreMetrics} emphasize />
-              {tierRangeSummary(guestCoreMetrics) && (
-                <p style={{ fontFamily: JOST, fontSize: 12.5, color: "rgba(18,18,15,0.55)", lineHeight: 1.6, marginTop: 10 }}>
-                  {tierRangeSummary(guestCoreMetrics)}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <GuestTierGroup label={GUEST_TIER_LABEL.operational} metrics={guestOperationalMetrics} />
-              {tierRangeSummary(guestOperationalMetrics) && (
-                <p style={{ fontFamily: JOST, fontSize: 12.5, color: "rgba(18,18,15,0.55)", lineHeight: 1.6, marginTop: 10 }}>
-                  {tierRangeSummary(guestOperationalMetrics)}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <GuestTierGroup label={GUEST_TIER_LABEL.advocacy} metrics={guestAdvocacyMetrics} />
-              {(guestIntelligence?.whyItMatters || guestIntelligence?.suggestedDecision) && (
-                <div className="space-y-3" style={{ marginTop: 10 }}>
-                  {guestIntelligence?.whyItMatters && (
-                    <p style={{ fontFamily: JOST, fontSize: 12.5, color: "rgba(18,18,15,0.55)", lineHeight: 1.6 }}>
-                      {guestIntelligence.whyItMatters}
-                    </p>
-                  )}
-                  {guestIntelligence?.suggestedDecision && (
-                    <p style={{ fontFamily: JOST, fontSize: 12.5, color: "rgba(18,18,15,0.55)", lineHeight: 1.6 }}>
-                      <span style={{ color: "rgba(18,18,15,0.35)" }}>Recommendation — </span>
-                      {guestIntelligence.suggestedDecision}
-                    </p>
-                  )}
-                </div>
-              )}
-              {surveyCountMetric && (
-                <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.35)", marginTop: 14 }}>
-                  Survey volume declined 38% in {formatPeriod(latest)} ({surveyCountMetric.metricValue.toLocaleString()} vs. 122 responses) — confidence in the scores above should be read with that in mind.
-                </p>
-              )}
-            </div>
-          </div>
-        </CommercialSection>
-
-        {/* ── Volume & Conversion ──────────────────────────────────────── */}
+        {/* ── Volume & Conversion — first (Commercial Review Phase 5
+             reorder): the Commercial Synthesis above already states the
+             real finding — guest experience is strong but isn't
+             converting, and the gap is volume, not price. Leading with
+             the volume/conversion data puts that finding first; Guest
+             Experience (below) becomes supporting evidence for a claim
+             already made, rather than the opening act. ─────────────────── */}
         <CommercialSection
           id="volume-conversion"
           heading="Volume & Conversion"
@@ -984,9 +916,82 @@ export default async function CommercialPage({
           </CommercialSection>
         )}
 
-        {/* ── Opportunities — moved to close the tab (Portal-Wide
-             refinement Phase 3 reorder), after the findings that motivate
-             them rather than before. ───────────────────────────────────── */}
+        {/* ── Guest Experience — now supporting evidence for the finding
+             the page already led with (Commercial Review Phase 5 reorder),
+             rather than the opening act. 15 flat cards regrouped into
+             three tiers (see GUEST_TIER_BY_NAME) — what each score
+             actually measures, not an arbitrary split. Commentary is one
+             block per tier (Commercial Review Phase 3): Core Experience
+             and Operational Standards get a short data-driven line each
+             (tierRangeSummary), Advocacy & Loyalty keeps the real Guest
+             Intelligence record's own Why It Matters / Recommendation,
+             since that's the tier the finding actually pertains to — plus
+             the Survey Count caveat as its own flagged line, never as a
+             card (a sample-size footnote, not a KPI). No qualitative/
+             open-text guest-comment data exists anywhere in the KPI
+             Records pipeline (Source Notes is pipeline provenance
+             metadata, never guest-authored text — confirmed directly, not
+             assumed) — flagged as a real content gap rather than built as
+             an empty shell. ──────────────────────────────────────────── */}
+        <CommercialSection
+          id="guest-experience"
+          heading="Guest Experience"
+          intelligence={guestIntelligence}
+          metrics={guestRatings}
+          allMetrics={trendFor("guest_overall")}
+          trendUnit="Rating"
+          hideCallout
+          hideCommentary
+        >
+          <GuestSentimentBlock overallRating={overallRating} summary={guestHeadlineSummary} />
+
+          <div className="space-y-8">
+            <div>
+              <GuestTierGroup label={GUEST_TIER_LABEL.core} metrics={guestCoreMetrics} emphasize />
+              {tierRangeSummary(guestCoreMetrics) && (
+                <p style={{ fontFamily: JOST, fontSize: 12.5, color: "rgba(18,18,15,0.55)", lineHeight: 1.6, marginTop: 10 }}>
+                  {tierRangeSummary(guestCoreMetrics)}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <GuestTierGroup label={GUEST_TIER_LABEL.operational} metrics={guestOperationalMetrics} />
+              {tierRangeSummary(guestOperationalMetrics) && (
+                <p style={{ fontFamily: JOST, fontSize: 12.5, color: "rgba(18,18,15,0.55)", lineHeight: 1.6, marginTop: 10 }}>
+                  {tierRangeSummary(guestOperationalMetrics)}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <GuestTierGroup label={GUEST_TIER_LABEL.advocacy} metrics={guestAdvocacyMetrics} />
+              {(guestIntelligence?.whyItMatters || guestIntelligence?.suggestedDecision) && (
+                <div className="space-y-3" style={{ marginTop: 10 }}>
+                  {guestIntelligence?.whyItMatters && (
+                    <p style={{ fontFamily: JOST, fontSize: 12.5, color: "rgba(18,18,15,0.55)", lineHeight: 1.6 }}>
+                      {guestIntelligence.whyItMatters}
+                    </p>
+                  )}
+                  {guestIntelligence?.suggestedDecision && (
+                    <p style={{ fontFamily: JOST, fontSize: 12.5, color: "rgba(18,18,15,0.55)", lineHeight: 1.6 }}>
+                      <span style={{ color: "rgba(18,18,15,0.35)" }}>Recommendation — </span>
+                      {guestIntelligence.suggestedDecision}
+                    </p>
+                  )}
+                </div>
+              )}
+              {surveyCountMetric && (
+                <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.35)", marginTop: 14 }}>
+                  Survey volume declined 38% in {formatPeriod(latest)} ({surveyCountMetric.metricValue.toLocaleString()} vs. 122 responses) — confidence in the scores above should be read with that in mind.
+                </p>
+              )}
+            </div>
+          </div>
+        </CommercialSection>
+
+        {/* ── Opportunities — closes the tab, after the findings that
+             motivate them rather than before. ─────────────────────────── */}
         <OpportunitiesPanel
           opportunities={commercialOpportunities}
           id="opportunities"
