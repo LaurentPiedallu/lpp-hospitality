@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastUpdated } from "@/lib/notion-queries";
 import {
-  usd, pct, compact, buildTrendData, looksLikeIndividualStaffMetric, findMetricByKey, findMetricByName,
+  usd, pct, compact, buildTrendData, looksLikeIndividualStaffMetric, findMetricByKey,
   metricSeriesForKey, extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark,
   parseDaypartPattern, CANONICAL_DAY_ORDER, CANONICAL_DAYPART_ORDER,
 } from "@/lib/format";
@@ -29,12 +29,6 @@ import { COMMERCIAL_METRIC_SECTION as METRIC_KEY_SECTION, COMMERCIAL_CATEGORY_SE
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 const SERIF = "'Cormorant Garamond', Georgia, serif";
 const GOLD = "#B8935A";
-
-// Rating-unit Guest Experience metrics that duplicate a canonical score
-// already shown under its own card (e.g. "Atmosphere Sub-Score" alongside
-// the canonical "Atmosphere Score"/guest_ambiance) — kept out of every
-// guest-experience display on this page (cards, table, benchmark gauges).
-const REDUNDANT_GUEST_METRIC_NAMES = new Set(["Atmosphere Sub-Score", "Food Taste Score"]);
 
 // Guest Experience three-tier grouping (Portal-Wide refinement, Phase 3) —
 // what each score actually measures, not an arbitrary split: the tangible
@@ -89,18 +83,6 @@ function severityVariant(s: Severity): "green" | "amber" | "red" {
   if (s === "Healthy") return "green";
   if (s === "Critical") return "red";
   return "amber";
-}
-
-// Guest Experience (Rating-unit) benchmark ranges are never shown, on top
-// of the general hasRealBenchmark() 0/0 check — confirmed directly against
-// the real Benchmarks database that the only Rating-unit benchmark defined
-// anywhere is a single 4.3-5.0-scale "Guest Rating Target — All Concepts,"
-// unrelated to these 0-100 guest survey scores. The Benchmark Low/High
-// values actually stored on these KPI Records (85-100, 80-100, 90-100,
-// 95-100 — not even uniform) have no traceable source in real benchmark
-// data, so none of them are shown as a real industry comparison here.
-function showsRealBenchmark(m: KpiMetric): boolean {
-  return hasRealBenchmark(m.benchmarkLow, m.benchmarkHigh) && !(m.category === "Guest Experience" && m.unit === "Rating");
 }
 
 function latestMetric(
@@ -193,7 +175,7 @@ function CommercialSection({
 
       {allMetrics.length >= 2 && (() => {
         const trendData = buildTrendData(allMetrics);
-        const realBenchmark = allMetrics[0] != null && showsRealBenchmark(allMetrics[0]);
+        const realBenchmark = hasRealBenchmark(allMetrics[0]?.benchmarkLow, allMetrics[0]?.benchmarkHigh);
         const bLow = realBenchmark ? allMetrics[0]?.benchmarkLow : undefined;
         const bHigh = realBenchmark ? allMetrics[0]?.benchmarkHigh : undefined;
         return (
@@ -254,7 +236,7 @@ function CommercialSection({
                         : m.metricValue.toLocaleString()}
                     </td>
                     <td className="px-5 py-2.5 text-right text-gray-400 text-xs">
-                      {showsRealBenchmark(m)
+                      {hasRealBenchmark(m.benchmarkLow, m.benchmarkHigh)
                         ? `${m.benchmarkLow}–${m.benchmarkHigh}${m.unit}`
                         : "—"}
                     </td>
@@ -400,54 +382,25 @@ function DaypartSplit({ segments }: { segments: { label: string; value: number; 
   );
 }
 
-// ─── Average check by daypart — comparative bars, not a stacked split ────────
-// An average check isn't a part of a whole the way covers are, so bars are
-// sized against the highest daypart value, not against a summed total — same
-// visual language as Financial Review's DriverBreakdown, without the
-// percent-of-total math that wouldn't mean anything here.
-
-function DaypartCheckBars({ items }: { items: { label: string; value: number }[] }) {
-  const max = Math.max(...items.map((i) => i.value));
-  return (
-    <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: 20 }}>
-      <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 16 }}>
-        Average Check by Daypart
-      </p>
-      <div className="space-y-3">
-        {items.map((item) => (
-          <div key={item.label}>
-            <div className="flex items-baseline justify-between" style={{ marginBottom: 4 }}>
-              <span style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.65)" }}>{item.label}</span>
-              <span style={{ fontFamily: JOST, fontSize: 12, color: "#12120F", fontWeight: 500 }}>{usd(item.value)}</span>
-            </div>
-            <div style={{ height: 5, background: "rgba(18,18,15,0.06)" }}>
-              <div style={{ height: "100%", width: `${(item.value / max) * 100}%`, background: "#B8935A" }} />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ─── RevPASH by segment — comparative bars, sorted by value ──────────────────
 // Revenue Per Available Seat Hour — capacity-efficiency, not a P&L figure,
 // so it's kept in its own section rather than mixed with revenue/COGS/labor
-// panels elsewhere on this page. $0 and a missing record are both treated
-// as "not yet available" (per confirmed real data: Lex Yard's Brunch
-// segment carries a real Published $0 record meaning no average-check data
-// has been captured for that daypart yet, not zero revenue), never
-// rendered as a real zero-height bar. Shown to 2 decimal places — this is
-// a small per-hour dollar figure where cents are the signal, unlike the
-// whole-dollar amounts usd() is built for elsewhere on this page.
+// panels elsewhere on this page. Segments with no Published RevPASH record
+// (Breakfast/Brunch, for this property/period) are filtered out by the
+// caller before reaching this component, rather than rendered as a "Not yet
+// available" placeholder row — consistent with how the rest of the portal
+// treats genuinely missing data. A real $0 record, if one ever exists, still
+// renders as a real (zero-height) bar here, since it's a value, not an
+// absence. Shown to 2 decimal places — this is a small per-hour dollar
+// figure where cents are the signal, unlike the whole-dollar amounts usd()
+// is built for elsewhere on this page.
 function revpashFmt(value: number): string {
   return `$${value.toFixed(2)}`;
 }
 
-function RevpashBars({ items }: { items: { label: string; value: number | null }[] }) {
-  const available = items.filter((i): i is { label: string; value: number } => i.value != null && i.value > 0);
-  const max = available.length > 0 ? Math.max(...available.map((i) => i.value)) : 0;
-  const sorted = [...items].sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
+function RevpashBars({ items }: { items: { label: string; value: number }[] }) {
+  const max = Math.max(...items.map((i) => i.value));
+  const sorted = [...items].sort((a, b) => b.value - a.value);
 
   return (
     <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: 20 }}>
@@ -455,26 +408,17 @@ function RevpashBars({ items }: { items: { label: string; value: number | null }
         RevPASH by Segment
       </p>
       <div className="space-y-3">
-        {sorted.map((item) => {
-          const isAvailable = item.value != null && item.value > 0;
-          return (
-            <div key={item.label}>
-              <div className="flex items-baseline justify-between" style={{ marginBottom: 4 }}>
-                <span style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.65)" }}>{item.label}</span>
-                {isAvailable ? (
-                  <span style={{ fontFamily: JOST, fontSize: 12, color: "#12120F", fontWeight: 500 }}>{revpashFmt(item.value!)}</span>
-                ) : (
-                  <span style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.3)", fontStyle: "italic" }}>Not yet available</span>
-                )}
-              </div>
-              <div style={{ height: 5, background: "rgba(18,18,15,0.06)" }}>
-                {isAvailable && (
-                  <div style={{ height: "100%", width: `${(item.value! / max) * 100}%`, background: "#B8935A" }} />
-                )}
-              </div>
+        {sorted.map((item) => (
+          <div key={item.label}>
+            <div className="flex items-baseline justify-between" style={{ marginBottom: 4 }}>
+              <span style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.65)" }}>{item.label}</span>
+              <span style={{ fontFamily: JOST, fontSize: 12, color: "#12120F", fontWeight: 500 }}>{revpashFmt(item.value)}</span>
             </div>
-          );
-        })}
+            <div style={{ height: 5, background: "rgba(18,18,15,0.06)" }}>
+              <div style={{ height: "100%", width: `${max > 0 ? (item.value / max) * 100 : 0}%`, background: "#B8935A" }} />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -629,12 +573,10 @@ export default async function CommercialPage({
 
   // Guest ratings — all Rating-unit metrics under Guest Experience category,
   // excluding any record that identifies an individual staff member by name
-  // (client-facing page — see looksLikeIndividualStaffMetric in lib/format.ts)
-  // and any metric that duplicates a canonical score shown under its own card.
+  // (client-facing page — see looksLikeIndividualStaffMetric in lib/format.ts).
   const guestRatings = catMetrics("Guest Experience")
     .filter((g) => g.unit === "Rating")
-    .filter((g) => !looksLikeIndividualStaffMetric(g.metricName || g.kpiRecord))
-    .filter((g) => !REDUNDANT_GUEST_METRIC_NAMES.has(g.metricName));
+    .filter((g) => !looksLikeIndividualStaffMetric(g.metricName || g.kpiRecord));
   // Canonical lookup, not a name-hint match — "overall" as a substring hint
   // would also match individually-named records like "Hector T Server
   // Overall Score", surfacing that person's own number under a generic
@@ -648,20 +590,6 @@ export default async function CommercialPage({
   const byKey = (key: string, category?: string, segment?: string) =>
     findMetricByKey(allMetrics, key, latest, category, segment);
 
-  // Covers — "covers" aliases to LPP Metric Key total_covers_period (no
-  // record uses the bare "covers" key any more), scoped to Revenue, and
-  // resolveCanonicalRollup pins the "Total Revenue Covers" record (7,040 for
-  // Lex Yard June — comps excluded, reconciles with Total Revenue ÷ avg
-  // check) over its Segment-"Total"-mistagged siblings: "Total Covers
-  // Period" (7,453, comps included) and the Breakfast/Lunch/Dinner daypart
-  // counts. The bare .find() here previously returned whichever the API
-  // sorted first (Dinner Covers, 2,400).
-  const coversMetric = byKey("covers", "Revenue");
-  // Comps-included cover count — shown as a secondary line under the
-  // revenue-covers headline, not in place of it. NOTE: "Total Covers
-  // Period" is an exact Notion Metric Name literal — keep it in lockstep
-  // with any upstream rename of that record.
-  const coversInclComps = findMetricByName(allMetrics, "Total Covers Period", latest, "Revenue");
   const conversionMetric = latestMetric(allMetrics, "Commercial", "%", "conversion");
   const channelMetrics = catMetrics("Commercial").filter((g) =>
     g.metricName.toLowerCase().includes("channel") ||
@@ -682,8 +610,11 @@ export default async function CommercialPage({
   // here from the old "Revenue Drivers" section. Canonical key + Segment
   // lookup, not exact-metric-name matching (which only ever checked for
   // Breakfast/Lunch/Dinner and would've silently missed a Brunch period).
-  // Only shown with 2+ dayparts present; segments sum to coversMetric's
-  // total in the real dataset, so no residual bucket is needed.
+  // Only shown with 2+ dayparts present; segments sum to the real Total
+  // Revenue Covers figure for this property, so no residual bucket is
+  // needed. (avg_check itself — headline and daypart breakdown — moved to
+  // Financial Review's Revenue section; Commercial Review no longer
+  // duplicates KPI Category "Revenue" avg-check content, only covers.)
   const daypartCoverEntries = DAYPART_SEGMENTS
     .map((seg) => ({ label: seg as string, metric: byKey("covers", "Revenue", seg) }))
     .filter((e): e is { label: string; metric: KpiMetric } => e.metric != null);
@@ -691,30 +622,12 @@ export default async function CommercialPage({
 
   // Average check — canonical key resolves to "Total Food and Beverage
   // Average Check Excluding Comps" ($86.43 for Lex Yard June, $90 benchmark
-  // floor), the standard revenue ÷ covers figure. Its Segment-"Total"
-  // siblings — "Food and Beverage Average Check Including Comps" ($78.12)
-  // and "Food Average Check Including Comps" ($57.50) — are shown as
-  // breakdown lines below, never as the headline. (All three are Published
-  // as of this engagement; an earlier note here about the $78.12 record
-  // being stuck Archived is no longer true.)
+  // floor), the standard revenue ÷ covers figure. Kept here only for the
+  // Commercial Synthesis paragraph above, which references the benchmark
+  // shortfall — the KpiCard/breakdown that used to show this headline on
+  // this section lived on KPI Category "Revenue" and was removed as a
+  // duplicate of Financial Review's own Revenue section.
   const avgCheckMetric = byKey("avg_check", "Revenue");
-  // NOTE: the Metric Name strings below are exact Notion literals — keep
-  // them in lockstep with any upstream rename of those records.
-  const avgCheckBreakdown = [
-    { m: findMetricByName(allMetrics, "Food and Beverage Average Check Including Comps", latest, "Revenue"), tag: "F&B incl. comps" },
-    { m: findMetricByName(allMetrics, "Food Average Check Including Comps", latest, "Revenue"), tag: "food incl. comps" },
-  ].filter((x): x is { m: KpiMetric; tag: string } => x.m != null);
-
-  // Average check by daypart — comparative bars, not a stacked/summed split
-  // like covers-by-daypart: an average check isn't a part of a whole, so it
-  // shouldn't be sized as a percentage of one. Only shown with 2+ dayparts
-  // present. Deliberately excludes the Segment "Food" avg_check (a
-  // food-only, all-dayparts-combined figure — a different axis entirely,
-  // not a daypart, per the internal Segment Mapping notes).
-  const daypartAvgCheckEntries = DAYPART_SEGMENTS
-    .map((seg) => ({ label: seg as string, metric: byKey("avg_check", "Revenue", seg) }))
-    .filter((e): e is { label: string; metric: KpiMetric } => e.metric != null);
-  const daypartAvgCheck = daypartAvgCheckEntries.length >= 2 ? daypartAvgCheckEntries : null;
 
   // RevPASH (Revenue Per Available Seat Hour) — a capacity-efficiency
   // metric, deliberately kept in its own section rather than mixed with the
@@ -878,32 +791,6 @@ export default async function CommercialPage({
           trendUnit="Count"
         >
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {coversMetric && (
-              <KpiCard
-                key="covers"
-                label={coversMetric.metricName || "Total Revenue Covers"}
-                value={coversMetric.metricValue.toLocaleString()}
-                sub={
-                  coversInclComps
-                    ? `${coversInclComps.metricValue.toLocaleString()} incl. comped covers`
-                    : undefined
-                }
-                variant={severityVariant(coversMetric.severity)}
-              />
-            )}
-            {avgCheckMetric && (
-              <KpiCard
-                key="avgcheck"
-                label="Average Check (excl. comps)"
-                value={usd(avgCheckMetric.metricValue)}
-                sub={
-                  avgCheckBreakdown.length > 0
-                    ? avgCheckBreakdown.map(({ m, tag }) => `${usd(m.metricValue)} ${tag}`).join(" · ")
-                    : undefined
-                }
-                variant={severityVariant(avgCheckMetric.severity)}
-              />
-            )}
             {conversionMetric && (
               <KpiCard
                 key="conv"
@@ -928,11 +815,6 @@ export default async function CommercialPage({
                 value: d.metric.metricValue,
                 color: DAYPART_COLORS[d.label],
               }))}
-            />
-          )}
-          {daypartAvgCheck && (
-            <DaypartCheckBars
-              items={daypartAvgCheck.map((d) => ({ label: d.label, value: d.metric.metricValue }))}
             />
           )}
         </CommercialSection>
@@ -960,18 +842,18 @@ export default async function CommercialPage({
           <CommercialSection
             id="seat-efficiency"
             heading="Seat Efficiency — RevPASH"
-            connector="The dinner shortfall above is also a capacity-efficiency question: which configuration converts seats into revenue best."
+            connector="The dinner shortfall above is also a capacity-efficiency question: Revenue Per Available Seat Hour shows which daypart and dinner configuration converts capacity into revenue most efficiently."
             intelligence={null}
             metrics={revpashMetrics}
             allMetrics={[]}
             hideEvidence
           >
-            <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.5)", marginTop: -8, lineHeight: 1.6 }}>
-              Revenue Per Available Seat Hour — which daypart and dinner configuration converts capacity into revenue most efficiently.
-            </p>
-
             {hasRevpashData && (
-              <RevpashBars items={revpashEntries.map((e) => ({ label: e.label, value: e.metric?.metricValue ?? null }))} />
+              <RevpashBars
+                items={revpashEntries
+                  .filter((e): e is typeof e & { metric: KpiMetric } => e.metric != null)
+                  .map((e) => ({ label: e.label, value: e.metric.metricValue }))}
+              />
             )}
 
             {revpashTrendSegments.length > 0 && (
