@@ -423,6 +423,29 @@ export function splitIntoParagraphs(text: string, targetCount = 3): string[] {
   return paragraphs;
 }
 
+// First sentence of a block of prose, terminal period included — used to
+// truncate a long Intelligence-record currentRead to a headline-length
+// excerpt (Overview's Strategic Risks card) without hand-tuning the split
+// to whatever the current live text happens to say, since which
+// Intelligence record gets selected there is itself dynamic. Splits on
+// the first literal ". " (period + space) rather than the [.!?]+ sentence
+// regex splitIntoParagraphs above uses, deliberately: that regex treats
+// any bare "." as a sentence end, which would wrongly cut a real dollar
+// figure like "$12.80 more" off after "$12." A decimal is never followed
+// by a space before its next digit, so this is safe against that failure
+// mode; it doesn't try to handle "!"/"?" endings or abbreviations like
+// "Mr." (not a mistake — this codebase's real Intelligence-record prose
+// doesn't use either), so if a future record's text makes it read badly,
+// the split point should change, not the rest of the display logic.
+// Falls back to the full trimmed text when no ". " exists at all, so a
+// single-sentence or unpunctuated record still renders something instead
+// of nothing.
+export function firstSentence(text: string): string {
+  const trimmed = text.trim();
+  const idx = trimmed.indexOf(". ");
+  return idx === -1 ? trimmed : trimmed.slice(0, idx + 1);
+}
+
 // Splits a Brief's Critical Drivers (or Recommended Focus) field into
 // individual lines. Confirmed directly against the raw Notion API payload
 // (not any rendered/cached view of it) that the Make-generated content is
