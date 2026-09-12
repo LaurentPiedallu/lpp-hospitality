@@ -4,7 +4,7 @@ import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastU
 import {
   usd, pct, compact, buildTrendData, looksLikeIndividualStaffMetric, findMetricByKey,
   metricSeriesForKey, extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark,
-  parseDaypartPattern, CANONICAL_DAY_ORDER, CANONICAL_DAYPART_ORDER,
+  parseDaypartPattern, formatPeriod, CANONICAL_DAY_ORDER, CANONICAL_DAYPART_ORDER,
 } from "@/lib/format";
 import type { DaypartCoversEntry } from "@/lib/format";
 import NavBar from "@/components/NavBar";
@@ -30,36 +30,63 @@ const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 const SERIF = "'Cormorant Garamond', Georgia, serif";
 const GOLD = "#B8935A";
 
-// Guest Experience three-tier grouping (Portal-Wide refinement, Phase 3) —
-// what each score actually measures, not an arbitrary split: the tangible
-// product/service dimensions guests directly rate ("pillars"), the
-// staff-execution signals that produce that experience ("operational
-// drivers"), and the forward-looking referral/sentiment signals that
-// predict retention rather than describe the current visit ("advocacy").
-// Matched by the real Metric Name strings confirmed across live Guest
-// Experience KPI Records — this is a fixed survey-question taxonomy
-// reused across properties, not per-property freeform text. Anything that
-// doesn't match falls into its own "Additional Signals" group below rather
-// than being silently dropped, so an unrecognized future metric name still
-// shows up somewhere.
-type GuestTier = "pillars" | "operational" | "advocacy";
+// Guest Experience three-tier grouping (Commercial Review Phase 3) — an
+// editorial regroup of all 15 Rating-unit Guest Experience records into
+// what each score actually measures: the tangible product dimensions
+// guests directly rate ("Core Experience"), the staff-execution and
+// cleanliness signals that produce that experience ("Operational
+// Standards"), and the forward-looking referral/sentiment signals that
+// predict retention ("Advocacy & Loyalty") — including the headline
+// Overall Guest Score itself, shown both as the big number above and as
+// a card in this tier. This is a portal-side grouping only, not a Notion
+// schema change — the KPI Records carry no field for it — so it's matched
+// by the real Metric Name strings confirmed across live Guest Experience
+// KPI Records (a fixed survey-question taxonomy reused across properties,
+// not per-property freeform text) rather than derived from any Notion
+// property. Covers all 15 records exactly once; an unrecognized future
+// metric name logs a warning at the call site below instead of silently
+// dropping off the page.
+type GuestTier = "core" | "operational" | "advocacy";
 const GUEST_TIER_BY_NAME: Record<string, GuestTier> = {
-  "Food Score": "pillars",
-  "Service Score": "pillars",
-  "Atmosphere Score": "pillars",
-  "Restaurant Cleanliness Score": "pillars",
-  "Restroom Cleanliness Score": "pillars",
+  "Food Score": "core",
+  "Service Score": "core",
+  "Atmosphere Score": "core",
+  "Restaurant Cleanliness Score": "operational",
+  "Restroom Cleanliness Score": "operational",
+  "Server Confidence Score": "operational",
   "Host Rating Score": "operational",
   "Hospitality and Friendliness Score": "operational",
-  "Server Confidence Score": "operational",
+  "Front-of-House Overall Server Score": "operational",
+  "Front-of-House Sentiment Server Score": "operational",
+  "Food Taste Score": "operational",
+  "Atmosphere Sub-Score": "operational",
   "Guest Sentiment Score": "advocacy",
-  "Likelihood to Recommend Score": "advocacy",
+  "Likelihood to Recommend": "advocacy",
+  "Overall Guest Score": "advocacy",
 };
 const GUEST_TIER_LABEL: Record<GuestTier, string> = {
-  pillars: "Core Experience",
-  operational: "Operational Drivers",
+  core: "Core Experience",
+  operational: "Operational Standards",
   advocacy: "Advocacy & Loyalty",
 };
+
+// One-sentence, data-driven synthesis for a tier that's uniformly (or
+// almost uniformly) Healthy and doesn't carry its own Intelligence
+// commentary — Core Experience and Operational Standards. Advocacy &
+// Loyalty uses the real Guest Intelligence record's own commentary
+// instead (see the render below), since that's where the actual
+// recommend-score-vs-conversion finding lives.
+function tierRangeSummary(metrics: KpiMetric[]): string | null {
+  if (metrics.length === 0) return null;
+  const healthyCount = metrics.filter((m) => m.severity === "Healthy").length;
+  const values = metrics.map((m) => m.metricValue);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = min === max ? min.toFixed(0) : `${min.toFixed(0)}–${max.toFixed(0)}`;
+  return healthyCount === metrics.length
+    ? `All ${metrics.length} scores read Healthy this period, ranging ${range}.`
+    : `${healthyCount} of ${metrics.length} scores read Healthy this period (range ${range}); the rest warrant a closer look.`;
+}
 
 // Opportunity Category values that belong on this tab — pulled from the
 // real "Category Mapping (LPP internal)" Notion database, not guessed.
@@ -121,6 +148,7 @@ function CommercialSection({
   trendUnit,
   hideCallout,
   hideEvidence,
+  hideCommentary,
   id,
   children,
 }: {
@@ -141,6 +169,12 @@ function CommercialSection({
   // that matter at this scale, and a real placeholder "not yet available"
   // record would otherwise show as a misleading literal "$0".
   hideEvidence?: boolean;
+  // Suppresses the auto-generated section-level Why It Matters /
+  // Recommendation block — needed when the caller renders that same
+  // Intelligence record's commentary itself, scoped more precisely than
+  // one block for the whole section (e.g. Guest Experience, which shows
+  // it under only the Advocacy & Loyalty tier it actually pertains to).
+  hideCommentary?: boolean;
   // Deep-link anchor (Cross-tab audit Part 4) — see ScrollToSection.
   id?: string;
   children: React.ReactNode;
@@ -186,7 +220,7 @@ function CommercialSection({
         );
       })()}
 
-      {(intelligence?.whyItMatters || intelligence?.suggestedDecision) && (
+      {!hideCommentary && (intelligence?.whyItMatters || intelligence?.suggestedDecision) && (
         <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden">
           <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between select-none hover:bg-gray-50 transition">
             <span>Commentary</span>
@@ -237,7 +271,7 @@ function CommercialSection({
                     </td>
                     <td className="px-5 py-2.5 text-right text-gray-400 text-xs">
                       {hasRealBenchmark(m.benchmarkLow, m.benchmarkHigh)
-                        ? `${m.benchmarkLow}–${m.benchmarkHigh}${m.unit}`
+                        ? `${m.benchmarkLow}–${m.benchmarkHigh} ${m.unit}`
                         : "—"}
                     </td>
                     <td className="px-5 py-2.5 text-right">
@@ -583,6 +617,47 @@ export default async function CommercialPage({
   // "Average rating" label even without printing their name.
   const overallRating = findMetricByKey(allMetrics, "guest_overall", latest) ?? guestRatings[0] ?? null;
 
+  // The one Guest-category Intelligence record for this period — reused
+  // for both the Evidence table's severity default (via the `intelligence`
+  // prop below) and the Advocacy & Loyalty tier's own commentary, since
+  // that's the real content it actually carries (the recommend-score-vs-
+  // conversion gap), not the Core Experience / Operational Standards tiers.
+  const guestIntelligence = intel("Guest");
+
+  // Tier membership, computed once so the counts/ranges below and the
+  // card grids in the render use the same lists. A metric that doesn't
+  // match any entry in GUEST_TIER_BY_NAME logs a warning rather than
+  // silently disappearing from the page (no visible "Additional Signals"
+  // catch-all any more — the three tiers are meant to be exhaustive).
+  const guestCoreMetrics = guestRatings.filter((g) => GUEST_TIER_BY_NAME[g.metricName] === "core");
+  const guestOperationalMetrics = guestRatings.filter((g) => GUEST_TIER_BY_NAME[g.metricName] === "operational");
+  const guestAdvocacyMetrics = guestRatings.filter((g) => GUEST_TIER_BY_NAME[g.metricName] === "advocacy");
+  const guestUnclassified = guestRatings.filter((g) => !GUEST_TIER_BY_NAME[g.metricName]);
+  if (guestUnclassified.length > 0) {
+    console.warn(
+      `[commercial] ${guestUnclassified.length} Guest Experience record(s) don't match GUEST_TIER_BY_NAME and won't render: ` +
+        guestUnclassified.map((g) => g.metricName).join(", ")
+    );
+  }
+
+  // One clean synthesis sentence in place of the raw Intelligence "Current
+  // Read" text, which used to restate nearly every individual score below
+  // it — now that scores are grouped into three tiers with their own
+  // commentary, the headline only needs to set up what follows.
+  const guestHeadlineSummary =
+    guestRatings.length > 0
+      ? guestRatings.every((g) => g.severity === "Healthy")
+        ? "Every Guest Experience score is Healthy this period, from core product ratings through advocacy and loyalty signals."
+        : "Guest Experience scores remain strong overall this period, though not every dimension reads Healthy — see the tiers below."
+      : null;
+
+  // Survey volume — a real Published KPI Record (75 for this period), but
+  // the only source for the month-over-month comparison (122 in May, a
+  // 38% decline) is the Guest Intelligence record's own prose: no May
+  // "Survey Count" KPI Record exists to diff against. Quoted here as
+  // confirmed real data rather than recomputed from KPI Records alone.
+  const surveyCountMetric = currentMetrics.find((m) => m.metricName === "Survey Count") ?? null;
+
   // KPI lookup by canonical LPP Metric Key + Segment (see Segment on
   // KpiMetric / findMetricByKey in lib/format.ts). Segment defaults to
   // "Total" inside findMetricByKey itself, so omitting it keeps every
@@ -739,38 +814,76 @@ export default async function CommercialPage({
 
         {/* ── Guest Experience — first (Portal-Wide refinement Phase 3
              reorder): the strongest, most load-bearing result on this tab
-             leads, rather than following after Opportunities. Ten flat
+             leads, rather than following after Opportunities. 15 flat
              cards regrouped into three tiers (see GUEST_TIER_BY_NAME) —
              what each score actually measures, not an arbitrary split.
-             No qualitative/open-text guest-comment data exists anywhere in
-             the KPI Records pipeline (Source Notes is pipeline provenance
-             metadata, never guest-authored text — confirmed directly, not
-             assumed) — flagged as a real content gap rather than built as
-             an empty shell. ──────────────────────────────────────────── */}
+             Commentary moved from one section-wide block to one per tier
+             (Commercial Review Phase 3): Core Experience and Operational
+             Standards get a short data-driven line each (tierRangeSummary),
+             Advocacy & Loyalty keeps the real Guest Intelligence record's
+             own Why It Matters / Recommendation, since that's the tier the
+             finding actually pertains to — plus the Survey Count caveat as
+             its own flagged line, never as a card (a sample-size footnote,
+             not a KPI). No qualitative/open-text guest-comment data exists
+             anywhere in the KPI Records pipeline (Source Notes is pipeline
+             provenance metadata, never guest-authored text — confirmed
+             directly, not assumed) — flagged as a real content gap rather
+             than built as an empty shell. ──────────────────────────────── */}
         <CommercialSection
           id="guest-experience"
           heading="Guest Experience"
-          intelligence={intel("Guest")}
+          intelligence={guestIntelligence}
           metrics={guestRatings}
           allMetrics={trendFor("guest_overall")}
           trendUnit="Rating"
           hideCallout
+          hideCommentary
         >
-          <GuestSentimentBlock overallRating={overallRating} summary={intel("Guest")?.currentRead ?? null} />
+          <GuestSentimentBlock overallRating={overallRating} summary={guestHeadlineSummary} />
 
-          {(() => {
-            const nonOverall = guestRatings.filter((g) => !g.metricName.toLowerCase().includes("overall"));
-            const byTier = (tier: GuestTier) => nonOverall.filter((g) => GUEST_TIER_BY_NAME[g.metricName] === tier);
-            const unclassified = nonOverall.filter((g) => !GUEST_TIER_BY_NAME[g.metricName]);
-            return (
-              <div className="space-y-6">
-                <GuestTierGroup label={GUEST_TIER_LABEL.pillars} metrics={byTier("pillars")} emphasize />
-                <GuestTierGroup label={GUEST_TIER_LABEL.operational} metrics={byTier("operational")} />
-                <GuestTierGroup label={GUEST_TIER_LABEL.advocacy} metrics={byTier("advocacy")} />
-                <GuestTierGroup label="Additional Signals" metrics={unclassified} />
-              </div>
-            );
-          })()}
+          <div className="space-y-8">
+            <div>
+              <GuestTierGroup label={GUEST_TIER_LABEL.core} metrics={guestCoreMetrics} emphasize />
+              {tierRangeSummary(guestCoreMetrics) && (
+                <p style={{ fontFamily: JOST, fontSize: 12.5, color: "rgba(18,18,15,0.55)", lineHeight: 1.6, marginTop: 10 }}>
+                  {tierRangeSummary(guestCoreMetrics)}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <GuestTierGroup label={GUEST_TIER_LABEL.operational} metrics={guestOperationalMetrics} />
+              {tierRangeSummary(guestOperationalMetrics) && (
+                <p style={{ fontFamily: JOST, fontSize: 12.5, color: "rgba(18,18,15,0.55)", lineHeight: 1.6, marginTop: 10 }}>
+                  {tierRangeSummary(guestOperationalMetrics)}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <GuestTierGroup label={GUEST_TIER_LABEL.advocacy} metrics={guestAdvocacyMetrics} />
+              {(guestIntelligence?.whyItMatters || guestIntelligence?.suggestedDecision) && (
+                <div className="space-y-3" style={{ marginTop: 10 }}>
+                  {guestIntelligence?.whyItMatters && (
+                    <p style={{ fontFamily: JOST, fontSize: 12.5, color: "rgba(18,18,15,0.55)", lineHeight: 1.6 }}>
+                      {guestIntelligence.whyItMatters}
+                    </p>
+                  )}
+                  {guestIntelligence?.suggestedDecision && (
+                    <p style={{ fontFamily: JOST, fontSize: 12.5, color: "rgba(18,18,15,0.55)", lineHeight: 1.6 }}>
+                      <span style={{ color: "rgba(18,18,15,0.35)" }}>Recommendation — </span>
+                      {guestIntelligence.suggestedDecision}
+                    </p>
+                  )}
+                </div>
+              )}
+              {surveyCountMetric && (
+                <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.35)", marginTop: 14 }}>
+                  Survey volume declined 38% in {formatPeriod(latest)} ({surveyCountMetric.metricValue.toLocaleString()} vs. 122 responses) — confidence in the scores above should be read with that in mind.
+                </p>
+              )}
+            </div>
+          </div>
         </CommercialSection>
 
         {/* ── Volume & Conversion ──────────────────────────────────────── */}
