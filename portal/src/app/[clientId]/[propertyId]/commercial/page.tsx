@@ -592,6 +592,39 @@ function revpashFmt(value: number): string {
   return `$${value.toFixed(2)}`;
 }
 
+// Dinner-configuration seat-efficiency comparison (Commercial Review
+// Phase 9) — the two Dinner RevPASH segments are genuinely different
+// physical setups (Monday/Sunday bar-only vs. Tuesday-Saturday both
+// floors), so which one is more seat-efficient is a real question, not a
+// fixed conclusion to hardcode. This reads both segments' live RevPASH
+// and avg_covers_per_service KPI Records and always names whichever one
+// actually has the higher RevPASH this period as the more efficient
+// configuration — the same generalize-over-whatever-the-data-says
+// discipline coreCardAnalysis uses above, rather than assuming bar-only
+// wins. The specific "more efficient despite lower volume" claim only
+// renders when the higher-RevPASH segment also runs fewer covers per
+// service; if that relationship doesn't hold (the higher-RevPASH segment
+// also runs more covers, either segment is missing, or they tie), the
+// data doesn't support this particular claim, so this stays silent
+// rather than forcing a sentence that would be wrong — same discipline
+// as every other silently-absent block on this page.
+function dinnerConfigEfficiencyNote(
+  barOnly: { label: string; revpash: KpiMetric | null; covers: KpiMetric | null },
+  bothFloors: { label: string; revpash: KpiMetric | null; covers: KpiMetric | null }
+): string | null {
+  if (!barOnly.revpash || !bothFloors.revpash || !barOnly.covers || !bothFloors.covers) return null;
+  if (barOnly.revpash.metricValue === bothFloors.revpash.metricValue) return null;
+
+  const a = { label: barOnly.label, revpash: barOnly.revpash.metricValue, covers: barOnly.covers.metricValue };
+  const b = { label: bothFloors.label, revpash: bothFloors.revpash.metricValue, covers: bothFloors.covers.metricValue };
+  const [winner, loser] = a.revpash > b.revpash ? [a, b] : [b, a];
+
+  if (winner.covers >= loser.covers) return null;
+
+  const coversRatio = Math.round((winner.covers / loser.covers) * 100);
+  return `${winner.label} runs a higher RevPASH (${revpashFmt(winner.revpash)} vs. ${revpashFmt(loser.revpash)}) than ${loser.label}, despite carrying only ${coversRatio}% of its covers per service (${winner.covers.toFixed(0)} vs. ${loser.covers.toFixed(0)}) - the lower-volume format is already the more seat-efficient one per available seat hour. Filling more of it, not just growing dinner volume overall, is the lever.`;
+}
+
 function RevpashBars({ items }: { items: { label: string; value: number }[] }) {
   const max = Math.max(...items.map((i) => i.value));
   const sorted = [...items].sort((a, b) => b.value - a.value);
@@ -910,13 +943,34 @@ export default async function CommercialPage({
   // renders for RevPASH the same way it does for every other section on
   // this page. Deliberately no Intelligence category exists for
   // Reservations/RevPASH (verified against the live schema), so this
-  // section gets the structural shell only — real data and benchmarks,
-  // no narrative commentary, same "No commentary published for this
+  // section has no Why It Matters / Recommendation pair to show — its one
+  // narrative line (dinnerEfficiencyNote below) is computed directly from
+  // these KPI Records instead, same "No commentary published for this
   // period" honesty every other section already falls back to when its
   // own Intelligence record is missing (Redesign prompt Step 3).
   const revpashMetrics = revpashEntries
     .map((e) => e.metric)
     .filter((m): m is KpiMetric => m != null);
+
+  // Dinner configuration seat-efficiency finding (Commercial Review Phase
+  // 9) — computed from the same live RevPASH records above plus each
+  // config's own avg_covers_per_service KPI Record (Category
+  // "Reservations", Segment "Dinner Bar Only" / "Dinner Both Floors").
+  // dinnerConfigEfficiencyNote does the actual comparison; this just
+  // hands it the two segments' real metrics and labels (reusing
+  // REVPASH_LABELS as the single source of truth for the label strings).
+  const dinnerEfficiencyNote = dinnerConfigEfficiencyNote(
+    {
+      label: REVPASH_LABELS["Dinner Bar Only"],
+      revpash: revpashEntries.find((e) => e.segment === "Dinner Bar Only")?.metric ?? null,
+      covers: byKey("avg_covers_per_service", "Reservations", "Dinner Bar Only"),
+    },
+    {
+      label: REVPASH_LABELS["Dinner Both Floors"],
+      revpash: revpashEntries.find((e) => e.segment === "Dinner Both Floors")?.metric ?? null,
+      covers: byKey("avg_covers_per_service", "Reservations", "Dinner Both Floors"),
+    }
+  );
 
   // Trend per segment — only where a segment actually has 2+ distinct
   // periods of revpash data (none do yet in the live dataset; this is
@@ -1049,18 +1103,18 @@ export default async function CommercialPage({
              CommercialSection like every other section — intelligence=null
              since no Intelligence category maps to Reservations, so it
              renders a real Evidence table from revpashMetrics with no
-             narrative callout, rather than a fabricated one. allMetrics=[]
+             fabricated Intelligence-style callout. allMetrics=[]
              deliberately, so CommercialSection's own single blended trend
              chart doesn't duplicate the per-segment trend grid already in
              children below — a single trend line wouldn't mean anything
              across 5 distinct operating configurations anyway.
-             The real Dinner Both Floors ($7.25) vs. Dinner Bar Only
-             ($12.80) gap below is a genuine, verified finding, but
-             connecting it causally to the broader demand story is
-             analysis, not display — flagged as a content gap rather than
-             authored here, same discipline as everywhere else in this
-             portal that doesn't invent commentary the data doesn't
-             support. ────────── */}
+             dinnerEfficiencyNote (Commercial Review Phase 9) gives this
+             section the narrative line every other section already has,
+             computed live from the two Dinner segments' real RevPASH and
+             avg_covers_per_service KPI Records rather than hand-written —
+             see dinnerConfigEfficiencyNote's own comment above for why it
+             names whichever segment actually wins this period instead of
+             assuming bar-only always does. ────────────────────────── */}
         {hasCapacitySection && (
           <CommercialSection
             id="seat-efficiency"
@@ -1077,6 +1131,12 @@ export default async function CommercialPage({
                   .filter((e): e is typeof e & { metric: KpiMetric } => e.metric != null)
                   .map((e) => ({ label: e.label, value: e.metric.metricValue }))}
               />
+            )}
+
+            {dinnerEfficiencyNote && (
+              <p style={{ fontFamily: JOST, fontSize: 12.5, color: "rgba(18,18,15,0.55)", lineHeight: 1.6 }}>
+                {dinnerEfficiencyNote}
+              </p>
             )}
 
             {revpashTrendSegments.length > 0 && (
