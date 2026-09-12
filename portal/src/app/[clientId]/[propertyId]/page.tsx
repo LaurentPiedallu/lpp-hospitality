@@ -7,7 +7,7 @@ import {
   getPublishedBriefs,
 } from "@/lib/notion-queries";
 import { deriveHealth } from "@/lib/health";
-import { usd, pct, compact, formatPeriod, splitIntoParagraphs, parseTextLines, maxIso, findMetricByKey, findMetricByName } from "@/lib/format";
+import { usd, pct, compact, formatPeriod, splitIntoParagraphs, firstSentence, parseTextLines, maxIso, findMetricByKey, findMetricByName } from "@/lib/format";
 import { selectTopPriorities, type TopPriority } from "@/lib/priorities";
 import { PRIORITY_TAB_BY_CATEGORY, INTEL_CATEGORY_TAB } from "@/lib/deep-links";
 import NavBar from "@/components/NavBar";
@@ -505,7 +505,7 @@ export default async function PropertyPage({
     { label: "Overall",  key: "guest_overall",  fallback: kpi?.guestOverall ?? null },
     { label: "Food",     key: "guest_food",     fallback: kpi?.guestFood ?? null },
     { label: "Service",  key: "guest_service",  fallback: kpi?.guestService ?? null },
-    { label: "Ambiance", key: "guest_ambiance", fallback: kpi?.guestAmbiance ?? null },
+    { label: "Atmosphere", key: "guest_ambiance", fallback: kpi?.guestAmbiance ?? null },
   ]
     .map(({ label, key, fallback }) => {
       const delta = priorPeriod ? periodDelta(key) : null;
@@ -1085,17 +1085,27 @@ export default async function PropertyPage({
         {/* Strategic Risks (renamed from Emerging Risk, Overview refinement
             Fix 3) — dark/high-contrast shared treatment via
             StrategicRiskBlock, not CollapsibleOnMobile like its neighbors
-            (see that component's own comment for why). Content unchanged;
-            the correct Strategic Risks framing (dinner demand vs. rising
-            guest scores, labor outpacing revenue, breakfast dependence)
-            doesn't exist upstream yet — confirmed against every Published
-            Intelligence record for the current period, not assumed. */}
+            (see that component's own comment for why). The correct
+            Strategic Risks framing (dinner demand vs. rising guest scores,
+            labor outpacing revenue, breakfast dependence) doesn't exist
+            upstream yet — confirmed against every Published Intelligence
+            record for the current period, not assumed. currentRead is
+            truncated to its first sentence (firstSentence, lib/format.ts)
+            rather than rendered in full — the selected record's currentRead
+            is the exact same paragraph Commercial Review's own Volume &
+            Conversion callout already renders in full, so this card only
+            needs a headline-length excerpt plus the crossLink below, not a
+            second copy of the whole paragraph. Truncation happens here at
+            the Overview call site, not inside StrategicRiskBlock itself,
+            since that component is the shared "serious finding" treatment
+            other sections may reuse later and shouldn't have this page's
+            specific duplication problem baked into it. */}
         {strategicRisk && (
           <section style={{ marginBottom: SECTION_GAP }}>
             <StrategicRiskBlock
               title="Strategic Risks"
               finding={strategicRisk.finding}
-              currentRead={strategicRisk.currentRead}
+              currentRead={strategicRisk.currentRead ? firstSentence(strategicRisk.currentRead) : strategicRisk.currentRead}
               crossLink={
                 INTEL_CATEGORY_TAB[strategicRisk.category]
                   ? {
