@@ -7,11 +7,21 @@
 // has "Identified"/"Closed", which don't exist, so most real stages fall
 // through to the "gray" default) — that's a pre-existing bug on Commercial
 // Review, not something this extraction fixes silently; flagged separately.
+//
+// "use client" (Commercial Review Phase 6) for the optional topCount
+// collapse below — same client-boundary pattern InitiativeProgress already
+// uses for its own expandable Action list, receiving server-fetched,
+// plain-JSON props (Opportunity has no functions/Dates on it).
 
+"use client";
+
+import { useState } from "react";
 import SectionHeader from "@/components/SectionHeader";
 import StatusBadge from "@/components/StatusBadge";
 import { usd } from "@/lib/format";
 import type { Opportunity, DataConfidence } from "@/types/portal";
+
+const JOST = "'Jost', 'Inter', system-ui, sans-serif";
 
 const STAGE_VARIANT: Record<string, "green" | "amber" | "blue" | "gray"> = {
   Identified: "gray",
@@ -45,6 +55,7 @@ export default function OpportunitiesPanel({
   connector,
   confidenceById,
   showTotalValue = false,
+  topCount,
 }: {
   opportunities: Opportunity[];
   // Deep-link anchor (Cross-tab audit Part 4 convention) — optional.
@@ -68,17 +79,30 @@ export default function OpportunitiesPanel({
   // false so Commercial Review and Menu Engineering's call sites, which
   // don't pass it, render exactly as before.
   showTotalValue?: boolean;
+  // When set, only the first `topCount` opportunities (by impact,
+  // already-sorted) render as full cards; the rest collapse into a
+  // compact "additional opportunities" list — title and dollar figure
+  // only — that expands on click, same interaction InitiativeProgress's
+  // Action list already uses (Commercial Review Phase 6). Display-only:
+  // every opportunity still renders, just not all as full cards. Omitted
+  // by Financial Review and Menu Engineering, which keep rendering every
+  // opportunity as a full card, unchanged.
+  topCount?: number;
 }) {
+  const [showAll, setShowAll] = useState(false);
+
   if (opportunities.length === 0) return null;
   // Sorted by impact descending (Fix 7) — matches the sort Overview's Top
   // 3 Priorities already uses, so the same set of opportunities reads in
   // the same order wherever it appears.
   const sorted = [...opportunities].sort((a, b) => b.estimatedAnnualImpact - a.estimatedAnnualImpact);
+  const fullCards = topCount != null ? sorted.slice(0, topCount) : sorted;
+  const additional = topCount != null ? sorted.slice(topCount) : [];
   return (
     <section id={id} className="space-y-4">
       <SectionHeader title={heading} />
       {connector && (
-        <p style={{ fontFamily: "'Jost', 'Inter', system-ui, sans-serif", fontSize: 12, color: "rgba(18,18,15,0.45)", fontStyle: "italic", marginTop: -8 }}>
+        <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.45)", fontStyle: "italic", marginTop: -8 }}>
           {connector}
         </p>
       )}
@@ -107,7 +131,7 @@ export default function OpportunitiesPanel({
         </p>
       )}
       <div className="grid gap-3 md:grid-cols-2">
-        {sorted.map((opp) => {
+        {fullCards.map((opp) => {
           const demandTag = opp.demandContext ? DEMAND_CONTEXT_TAG[opp.demandContext] : null;
           const confidence = confidenceById?.[opp.id];
           return (
@@ -144,6 +168,64 @@ export default function OpportunitiesPanel({
           );
         })}
       </div>
+
+      {/* Collapsed remainder (Commercial Review Phase 6) — title + dollar
+          figure only, expandable. Same toggle styling as
+          InitiativeProgress's "Show all N" control, for one consistent
+          expand/collapse idiom across the portal. */}
+      {additional.length > 0 && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            aria-expanded={showAll}
+            className="hover:text-[#12120F]"
+            style={{
+              fontFamily: JOST,
+              fontSize: 10,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: "rgba(18,18,15,0.4)",
+              cursor: "pointer",
+              userSelect: "none",
+              transition: "color 0.25s ease",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              background: "none",
+              border: 0,
+              padding: 0,
+            }}
+          >
+            <svg
+              width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true"
+              style={{ transform: showAll ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }}
+            >
+              <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {showAll ? "Show less" : `${additional.length} additional opportunit${additional.length === 1 ? "y" : "ies"}`}
+          </button>
+
+          {showAll && (
+            <div style={{ marginTop: 10, borderTop: "1px solid rgba(18,18,15,0.08)" }}>
+              {additional.map((opp) => (
+                <div
+                  key={opp.id}
+                  className="flex items-baseline justify-between"
+                  style={{ padding: "10px 0", borderBottom: "1px solid rgba(18,18,15,0.06)" }}
+                >
+                  <span style={{ fontFamily: JOST, fontSize: 12.5, color: "rgba(18,18,15,0.7)" }}>{opp.title}</span>
+                  {opp.estimatedAnnualImpact != null && (
+                    <span style={{ fontFamily: JOST, fontSize: 12.5, color: "#12120F", fontWeight: 500, whiteSpace: "nowrap", marginLeft: 12 }}>
+                      {usd(opp.estimatedAnnualImpact)} / yr
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }
