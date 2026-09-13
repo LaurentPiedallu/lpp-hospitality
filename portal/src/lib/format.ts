@@ -370,29 +370,47 @@ export function findMetricByName(
   );
 }
 
-// Looks up the Intelligence record for a category, scoped to a specific
-// period — critically, period-scoped, unlike a bare category filter. Without
-// that, a category with no record for the current period silently falls
-// through to an older period's record with the same category (confirmed
-// cause of a real bug: Financial Review's COGS narrative was showing a
-// March record because June's COGS finding happened to be categorized
-// "Data Quality" instead of "COGS").
+// Every Intelligence record for a category, scoped to a specific period —
+// critically, period-scoped, unlike a bare category filter. Without that, a
+// category with no record for the current period silently falls through to
+// an older period's record with the same category (confirmed cause of a
+// real bug: Financial Review's COGS narrative was showing a March record
+// because June's COGS finding happened to be categorized "Data Quality"
+// instead of "COGS").
 //
-// When a period has more than one record sharing a category — the model has
-// no field that otherwise disambiguates which one belongs to a given
-// section — this prefers the one with the larger Estimated Annual Impact,
-// on the reasoning that the more financially material finding is the more
-// relevant one for a financial-review context. Verified this cleanly picks
-// the right record where it mattered (a $4.58M finding vs. a $60K one), but
-// it's a heuristic, not a real link, and won't always be correct.
+// Sorted by Estimated Annual Impact descending, the same "more financially
+// material finding leads" ordering findIntelligence below has always used
+// for picking a single record — this just keeps the rest instead of
+// discarding them. Confirmed a real content-loss bug: a bare .find()/single
+// -pick read of this same data silently dropped 5 of Commercial Review's 6
+// Commercial-category records and 1 of Financial Review's 2 Financial
+// -category records (one of which — a $421K revenue-shortfall finding —
+// had no other home anywhere in the portal, since Revenue's callout was
+// separately hard-suppressed whenever it matched OpEx's).
+export function findAllIntelligence(
+  intelligence: Intelligence[],
+  category: string,
+  periodStart: string | null
+): Intelligence[] {
+  return intelligence
+    .filter((i) => i.category === category && i.periodStart === periodStart)
+    .sort((a, b) => b.estimatedAnnualImpact - a.estimatedAnnualImpact);
+}
+
+// The single most financially material Intelligence record for a category
+// — the first result of findAllIntelligence above. Kept as its own function
+// (rather than inlining `findAllIntelligence(...)[0] ?? null` at every call
+// site) since most callers only ever want one record for a section's
+// primary callout; Menu Engineering is still on this single-record form,
+// unchanged, since it currently has no Menu-category record to lose (a
+// second one would silently drop the same way Commercial/Financial's did
+// until this fix — worth revisiting if that ever populates).
 export function findIntelligence(
   intelligence: Intelligence[],
   category: string,
   periodStart: string | null
 ): Intelligence | null {
-  const candidates = intelligence.filter((i) => i.category === category && i.periodStart === periodStart);
-  if (candidates.length === 0) return null;
-  return candidates.reduce((best, i) => (i.estimatedAnnualImpact > best.estimatedAnnualImpact ? i : best));
+  return findAllIntelligence(intelligence, category, periodStart)[0] ?? null;
 }
 
 // Looks up one specific Intelligence record by its Finding title — the only

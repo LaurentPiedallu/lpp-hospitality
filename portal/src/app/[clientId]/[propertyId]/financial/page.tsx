@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastUpdated } from "@/lib/notion-queries";
-import { usd, pct, findMetricByKey, findMetricByName, metricSeriesForKey, findIntelligence, findIntelligenceByFinding, firstSentence, extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark } from "@/lib/format";
+import { usd, pct, findMetricByKey, findMetricByName, metricSeriesForKey, findAllIntelligence, findIntelligenceByFinding, firstSentence, extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
@@ -12,6 +12,8 @@ import KpiCard from "@/components/KpiCard";
 import BenchmarkRangeBar from "@/components/BenchmarkRangeBar";
 import EmptyState from "@/components/EmptyState";
 import FindingSection from "@/components/FindingSection";
+import CalloutBlock from "@/components/CalloutBlock";
+import StatusBadge from "@/components/StatusBadge";
 import OrientationBlock from "@/components/OrientationBlock";
 import ScrollToSection from "@/components/ScrollToSection";
 import OpportunitiesPanel from "@/components/OpportunitiesPanel";
@@ -42,6 +44,24 @@ function severityVariant(s: Severity): "green" | "amber" | "red" {
   if (s === "Healthy") return "green";
   if (s === "Critical") return "red";
   return "amber";
+}
+
+// One additional Intelligence record in a section that already shows its
+// primary one via FindingSection's own built-in callout — same
+// CalloutBlock + StatusBadge treatment as that primary callout, matching
+// the portal-wide convention for "more than one record in one section"
+// (same component Commercial Review uses for its own extra records). Used
+// wherever intelAll(cat) returns more than one record for a section.
+function ExtraIntelCard({ record }: { record: Intelligence }) {
+  if (!record.currentRead) return null;
+  return (
+    <CalloutBlock>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <p>{record.currentRead}</p>
+        <StatusBadge label={record.severity} variant={severityVariant(record.severity)} />
+      </div>
+    </CalloutBlock>
+  );
 }
 
 function latestPeriod(metrics: KpiMetric[]): string | null {
@@ -313,26 +333,39 @@ export default async function FinancialPage({
 
   // Intelligence by category, scoped to the current period — a category with
   // no record for this period must not fall through to an older one (see
-  // findIntelligence in lib/format.ts for the bug this fixes).
-  const intel = (cat: string): Intelligence | null =>
-    findIntelligence(allIntelligence as Intelligence[], cat, latest);
+  // findIntelligence in lib/format.ts for the bug this fixes). intelAll
+  // returns every Published/Client-Visible record for the category, not
+  // just the top one — intel(cat) is its highest-impact pick, kept for
+  // sections that only need one record for their primary callout.
+  // Previously intel() (then findIntelligence directly) was the only way
+  // to read a category, which silently dropped every record beyond the
+  // single winner — confirmed real content loss here: "Financial" category
+  // has 2 Published/Client-Visible records for Lex Yard's current period,
+  // and only the higher-impact one ("Kitchen allocation...") ever
+  // rendered, on both Revenue and OpEx (see below).
+  const intelAll = (cat: string): Intelligence[] =>
+    findAllIntelligence(allIntelligence as Intelligence[], cat, latest);
+  const intel = (cat: string): Intelligence | null => intelAll(cat)[0] ?? null;
 
   // Revenue, OpEx and Profitability all read from the single "Financial"
   // Intelligence bucket — the schema has no field distinguishing which of
-  // those sections a record belongs to. findIntelligence picks by highest
-  // Estimated Annual Impact, so Revenue and OpEx routinely resolve to the
-  // SAME record and render it twice. This suppresses that duplicate on the
-  // Revenue side rather than guessing which record is "the revenue one" — a
-  // rank or keyword heuristic is exactly what caused the earlier OpEx
-  // miscategorisation and would break silently on any property/period with a
-  // different record count. The real fix is an upstream disambiguator (a
-  // "Financial Subsection" select on Intelligence, or populating the
-  // existing Related KPIs relation), neither of which exists yet.
-  // The check is a genuine identity comparison: if a future change ever
-  // lets the two sections resolve to different records, Revenue resumes
-  // rendering its own with no edit here.
-  const opexIntel = intel("Financial");
-  const revenueIntel = intel("Financial");
+  // those sections a record belongs to. Before this fix, both sections
+  // called the same single-record lookup and always got the SAME
+  // (highest-impact) record, so Revenue's callout was hard-suppressed
+  // whenever it matched OpEx's — which was always, since there was only
+  // ever one record to find. That silently orphaned the second Financial
+  // record ("Dinner cover collapse drives $421K total revenue shortfall")
+  // everywhere in the portal. Now that intelAll returns both: OpEx keeps
+  // the highest-impact record (unchanged), Revenue gets the next one
+  // instead of a hard-coded null — which happens to be exactly the
+  // revenue-shortfall finding, a better thematic fit for Revenue anyway.
+  // Any further records beyond these two (none currently) render as extra
+  // cards inside OpEx's own section below, so nothing in this category is
+  // silently dropped regardless of how many records it ever grows to.
+  const financialIntelAll = intelAll("Financial");
+  const opexIntel = financialIntelAll[0] ?? null;
+  const revenueIntel = financialIntelAll[1] ?? null;
+  const opexExtraIntel = financialIntelAll.slice(2);
 
   // Execution-category finding used as brief corroborating context for
   // Revenue's implicit "this is a demand issue, not an execution issue"
@@ -480,10 +513,12 @@ export default async function FinancialPage({
           id="revenue"
           heading="Revenue"
           connector="The figures below are this property's own revenue numbers; the demand-side story behind them — daypart mix, guest volume — belongs to Commercial Review."
-          // Suppressed when it would be the same record OpEx already shows
-          // (see opexIntel / revenueIntel note above). Falls back to
-          // primarySeverity; FindingSection renders no callout for null.
-          intelligence={revenueIntel === opexIntel ? null : revenueIntel}
+          // The second-highest-impact "Financial" record (see
+          // financialIntelAll note above) — no longer hard-suppressed to
+          // null now that it's a genuinely different record than OpEx's.
+          // Falls back to primarySeverity; FindingSection renders no
+          // callout for null.
+          intelligence={revenueIntel}
           metrics={catMetrics("Revenue")}
           allMetrics={trendFor("total_revenue")}
           primarySeverity={totalRevenue?.severity}
@@ -556,6 +591,11 @@ export default async function FinancialPage({
           allMetrics={trendFor("labor_pct")}
           primarySeverity={laborPct?.severity}
         >
+          {/* Any Labor-category records beyond the primary one above (none
+              currently for Lex Yard) — see ExtraIntelCard's own comment. */}
+          {intelAll("Labor").slice(1).map((rec) => (
+            <ExtraIntelCard key={rec.id} record={rec} />
+          ))}
           <div className="space-y-3">
             {laborPct &&
             laborPct.benchmarkLow != null &&
@@ -619,6 +659,11 @@ export default async function FinancialPage({
           allMetrics={trendFor("cogs_pct")}
           primarySeverity={cogsPct?.severity}
         >
+          {/* Any COGS-category records beyond the primary one above (none
+              currently for Lex Yard) — see ExtraIntelCard's own comment. */}
+          {intelAll("COGS").slice(1).map((rec) => (
+            <ExtraIntelCard key={rec.id} record={rec} />
+          ))}
           <div className="space-y-3">
             {cogsPct &&
             cogsPct.benchmarkLow != null &&
@@ -681,14 +726,20 @@ export default async function FinancialPage({
           // (alongside Revenue and Profitability) — the schema has no
           // dedicated OpEx value. Previously read "Execution", which
           // surfaced an unrelated operational-coverage record here. OpEx
-          // keeps the highest-impact Financial record; the Revenue section
-          // suppresses its callout when it resolves to this same record
-          // (see opexIntel / revenueIntel note above).
+          // keeps the highest-impact Financial record; the second-highest
+          // now renders on Revenue instead of being suppressed (see
+          // financialIntelAll / opexIntel / revenueIntel note above).
           intelligence={opexIntel}
           metrics={catMetrics("OpEx")}
           allMetrics={trendFor("opex_pct")}
           primarySeverity={opexPct?.severity}
         >
+          {/* Any Financial-category records beyond the two OpEx/Revenue
+              already show (none currently for Lex Yard) — kept here rather
+              than silently dropped if this category ever grows past 2. */}
+          {opexExtraIntel.map((rec) => (
+            <ExtraIntelCard key={rec.id} record={rec} />
+          ))}
           <div className="space-y-3">
             {opexPct &&
             opexPct.benchmarkLow != null &&
@@ -746,6 +797,12 @@ export default async function FinancialPage({
           allMetrics={trendFor("net_profit_pct")}
           primarySeverity={netProfitPct?.severity}
         >
+          {/* Any Profitability-category records beyond the primary one
+              above (none currently for Lex Yard) — see ExtraIntelCard's
+              own comment. */}
+          {intelAll("Profitability").slice(1).map((rec) => (
+            <ExtraIntelCard key={rec.id} record={rec} />
+          ))}
           <div className="space-y-3">
             <div style={{ background: "#12120F", padding: "36px 40px" }} className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
               <div>
