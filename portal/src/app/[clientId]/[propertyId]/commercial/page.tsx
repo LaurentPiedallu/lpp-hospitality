@@ -4,7 +4,8 @@ import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastU
 import {
   usd, pct, compact, buildTrendData, looksLikeIndividualStaffMetric, findMetricByKey,
   metricSeriesForKey, extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark,
-  parseDaypartPattern, formatPeriod, findIntelligenceByFinding, CANONICAL_DAY_ORDER, CANONICAL_DAYPART_ORDER,
+  parseDaypartPattern, formatPeriod, findIntelligenceByFinding, findAllIntelligence,
+  CANONICAL_DAY_ORDER, CANONICAL_DAYPART_ORDER,
 } from "@/lib/format";
 import type { DaypartCoversEntry } from "@/lib/format";
 import NavBar from "@/components/NavBar";
@@ -161,6 +162,25 @@ function severityVariant(s: Severity): "green" | "amber" | "red" {
   if (s === "Healthy") return "green";
   if (s === "Critical") return "red";
   return "amber";
+}
+
+// One additional Intelligence record in a section that already shows its
+// primary one via CommercialSection's own built-in callout — same
+// CalloutBlock + StatusBadge treatment as that primary callout (and as the
+// no-show card added this session), so a section with several records for
+// its category reads as a set of consistent siblings rather than one
+// styled callout and a pile of plain text. Used wherever intelAll(cat)
+// returns more than one record.
+function ExtraIntelCard({ record }: { record: Intelligence }) {
+  if (!record.currentRead) return null;
+  return (
+    <CalloutBlock>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <p>{record.currentRead}</p>
+        <StatusBadge label={record.severity} variant={severityVariant(record.severity)} />
+      </div>
+    </CalloutBlock>
+  );
 }
 
 function latestMetric(
@@ -772,8 +792,19 @@ export default async function CommercialPage({
   const trendFor = (metricKey: string, category?: string) =>
     metricSeriesForKey(allMetrics, metricKey, category);
 
-  const intel = (cat: string): Intelligence | null =>
-    (allIntelligence as Intelligence[]).find((i) => i.category === cat) ?? null;
+  // intelAll/intel replaced a bare, unscoped `.find()` that silently kept
+  // whichever record for a category happened to come first in Notion's own
+  // row order — no period scoping (an older period's record could win) and
+  // no way to see the other records in a multi-record category at all.
+  // Confirmed real content loss: Commercial category has 6 Published/
+  // Client-Visible records for Lex Yard's current period; this returned 1.
+  // findAllIntelligence (lib/format.ts) is period-scoped and ranks by
+  // Estimated Annual Impact, same convention Financial Review's `intel`
+  // already used — intel(cat) below is just its top pick, kept for callers
+  // that still only want one record for a section's primary callout.
+  const intelAll = (cat: string): Intelligence[] =>
+    findAllIntelligence(allIntelligence as Intelligence[], cat, latest);
+  const intel = (cat: string): Intelligence | null => intelAll(cat)[0] ?? null;
 
   // Execution-category finding that directly corroborates Volume &
   // Conversion's own Commercial-category commentary — it references the
@@ -786,11 +817,14 @@ export default async function CommercialPage({
   // lookup: if this record's text changes upstream, or it stops existing
   // for a future period, this section updates with it rather than
   // rendering stale or fabricated content.
-  const noShowIntel = findIntelligenceByFinding(
-    allIntelligence as Intelligence[],
-    "No-show rate at 4% reflects strong reservation-to-arrival conversion",
-    latest
-  );
+  const NO_SHOW_FINDING = "No-show rate at 4% reflects strong reservation-to-arrival conversion";
+  const noShowIntel = findIntelligenceByFinding(allIntelligence as Intelligence[], NO_SHOW_FINDING, latest);
+  // The Commercial-category record the no-show card is anchored to — used
+  // below to interleave the no-show card right after THIS record's own
+  // card, wherever in the ranked list it lands (not a comparison against
+  // NO_SHOW_FINDING itself, which is a different category and would never
+  // match any record in the Commercial-category list being iterated).
+  const RESERVED_COVER_FINDING = "Reservations cover 49% of arrivals with Thursday as peak and Sunday softest";
 
   // Individual staff names detected from this property's own KPI Records
   // (see extractIndividualStaffNames in lib/format.ts) — used below to keep
@@ -1084,25 +1118,26 @@ export default async function CommercialPage({
           allMetrics={trendFor("covers", "Revenue")}
           trendUnit="Count"
         >
-          {/* Supporting card for the 49% reserved-cover finding above — a
-              second, Execution-sourced record that reads the same figure
-              from the conversion side rather than the demand-mix side (see
-              noShowIntel above for the live lookup and the cross-tab
-              routing fix). Same CalloutBlock + StatusBadge treatment as the
-              section's own primary Commercial finding immediately above it
-              (rendered by CommercialSection itself) — gold left-accent
-              border and a severity chip, so the two read as a consistent
-              pair rather than one styled callout and one plain box. This
-              record's own Severity ("Healthy") drives the chip, not the
-              Commercial finding's "Monitor" above it. */}
-          {noShowIntel?.currentRead && (
-            <CalloutBlock>
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <p>{noShowIntel.currentRead}</p>
-                <StatusBadge label={noShowIntel.severity} variant={severityVariant(noShowIntel.severity)} />
-              </div>
-            </CalloutBlock>
-          )}
+          {/* Every Commercial-category record beyond the top-impact one
+              CommercialSection already shows as its primary callout above
+              (intelAll("Commercial") — see intel/intelAll's own comment for
+              the bug this replaces: a bare .find() silently dropped 5 of
+              Lex Yard's 6 Commercial-category records). The no-show record
+              is a separate Execution-category lookup (noShowIntel above),
+              not part of this array, but belongs in the same narrative
+              thread as the 49% reserved-cover finding — it's interleaved
+              right after whichever record that is, regardless of whether
+              that record lands as the primary callout or one of the extras
+              here, so the pairing survives even if the ranking above ever
+              reorders which Commercial record leads. */}
+          {intelAll("Commercial").flatMap((rec, idx) => {
+            const nodes: React.ReactNode[] = [];
+            if (idx > 0) nodes.push(<ExtraIntelCard key={rec.id} record={rec} />);
+            if (rec.finding === RESERVED_COVER_FINDING && noShowIntel?.currentRead) {
+              nodes.push(<ExtraIntelCard key={`${rec.id}-noshow`} record={noShowIntel} />);
+            }
+            return nodes;
+          })}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {conversionMetric && (
               <KpiCard
@@ -1251,6 +1286,17 @@ export default async function CommercialPage({
                 Survey volume declined 38% in {formatPeriod(latest)} ({surveyCountMetric.metricValue.toLocaleString()} vs. 122 responses) — confidence in the scores above should be read with that in mind.
               </p>
             )}
+            {/* Additional Guest-category records beyond guestIntelligence
+                (the top-impact one, summarized above via whyItMatters/
+                suggestedDecision rather than a CalloutBlock — this
+                section's own established, more compact treatment). A
+                second Guest record still gets the portal-wide
+                CalloutBlock + StatusBadge card, same as every other
+                "extra" record on this page, since this section has no
+                second compact slot to fold it into. */}
+            {intelAll("Guest").slice(1).map((rec) => (
+              <ExtraIntelCard key={rec.id} record={rec} />
+            ))}
           </div>
 
           <GuestTierGroup
