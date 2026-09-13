@@ -134,7 +134,7 @@ function CategorySelector({
 function IntelligenceCard({ item, clientId, propertyId }: { item: Intelligence; clientId: string; propertyId: string }) {
   const stale = isStale(item.createdAt);
   const age = relativeAge(item.createdAt);
-  const crossLink = resolveIntelCrossLink(item.category);
+  const crossLink = resolveIntelCrossLink(item);
 
   return (
     <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderLeft: "3px solid #B8935A", borderRadius: 0 }}>
@@ -189,7 +189,7 @@ function IntelligenceCard({ item, clientId, propertyId }: { item: Intelligence; 
         {crossLink && (
           <div className="text-right" style={{ borderTop: "1px solid rgba(18,18,15,0.06)", paddingTop: 10 }}>
             <Link
-              href={`/${clientId}/${propertyId}${crossLink.segment}?category=${encodeURIComponent(item.category)}`}
+              href={`/${clientId}/${propertyId}${crossLink.segment}?category=${encodeURIComponent(crossLink.queryCategory)}`}
               className="hover:text-[#D4AF7A]"
               style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: GOLD, textDecoration: "none", transition: "color 0.25s ease" }}
             >

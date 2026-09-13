@@ -4,7 +4,7 @@ import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastU
 import {
   usd, pct, compact, buildTrendData, looksLikeIndividualStaffMetric, findMetricByKey,
   metricSeriesForKey, extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark,
-  parseDaypartPattern, formatPeriod, CANONICAL_DAY_ORDER, CANONICAL_DAYPART_ORDER,
+  parseDaypartPattern, formatPeriod, findIntelligenceByFinding, CANONICAL_DAY_ORDER, CANONICAL_DAYPART_ORDER,
 } from "@/lib/format";
 import type { DaypartCoversEntry } from "@/lib/format";
 import NavBar from "@/components/NavBar";
@@ -775,6 +775,23 @@ export default async function CommercialPage({
   const intel = (cat: string): Intelligence | null =>
     (allIntelligence as Intelligence[]).find((i) => i.category === cat) ?? null;
 
+  // Execution-category finding that directly corroborates Volume &
+  // Conversion's own Commercial-category commentary — it references the
+  // same 49% reserved-cover figure from the other side (conversion quality,
+  // not demand mix). Looked up by its own Finding title (a stable key)
+  // rather than by category, since Execution-category records default to
+  // Financial Review everywhere else (see INTEL_FINDING_OVERRIDE in
+  // lib/deep-links.ts for the matching Intelligence-tab cross-link fix) —
+  // this is the one exception that belongs on this tab instead. Live
+  // lookup: if this record's text changes upstream, or it stops existing
+  // for a future period, this section updates with it rather than
+  // rendering stale or fabricated content.
+  const noShowIntel = findIntelligenceByFinding(
+    allIntelligence as Intelligence[],
+    "No-show rate at 4% reflects strong reservation-to-arrival conversion",
+    latest
+  );
+
   // Individual staff names detected from this property's own KPI Records
   // (see extractIndividualStaffNames in lib/format.ts) — used below to keep
   // Opportunity text (title/Next Step) from naming a staff member even
@@ -1067,6 +1084,23 @@ export default async function CommercialPage({
           allMetrics={trendFor("covers", "Revenue")}
           trendUnit="Count"
         >
+          {/* Supporting card for the 49% reserved-cover finding above — a
+              second, Execution-sourced record that reads the same figure
+              from the conversion side rather than the demand-mix side (see
+              noShowIntel above for the live lookup and the cross-tab
+              routing fix). Plain white bordered box, the same "secondary
+              supporting content" tier DaypartSplit/RevpashBars already use
+              elsewhere on this page, not the gold-bordered CalloutBlock the
+              section's own primary Commercial finding gets above — this
+              stays a supporting line, not a second callout competing with
+              it. */}
+          {noShowIntel?.currentRead && (
+            <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: 20 }}>
+              <p style={{ fontFamily: JOST, fontSize: 12.5, color: "rgba(18,18,15,0.6)", lineHeight: 1.6 }}>
+                {noShowIntel.currentRead}
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {conversionMetric && (
               <KpiCard

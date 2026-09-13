@@ -5,6 +5,8 @@
 // Menu Engineering without changing any mapping value — each block below
 // carries the same routing reasoning that used to live next to its page.
 
+import type { Intelligence } from "@/types/portal";
+
 export interface TabTarget {
   segment: string;
   label: string;
@@ -99,12 +101,44 @@ const SECTION_BY_SEGMENT: Record<string, Record<string, string>> = {
   "/menu": MENU_CATEGORY_SECTION,
 };
 
+// Per-record override for INTEL_CATEGORY_TAB's category-level default —
+// needed when one record shares a category with others that all correctly
+// route elsewhere, but this specific record's content belongs on a
+// different tab. Every other Execution-category record legitimately
+// defaults to Financial Review (that's where Execution's Operating
+// Expenses narrative lives); this one is about reservation-to-arrival
+// conversion, which is Commercial Review's Volume & Conversion territory
+// instead (it directly references that section's own 49% reserved-cover
+// finding). Keyed by the record's own Finding title — the only per-record
+// stable key Intelligence carries — so this stays directly auditable
+// against Notion's title field rather than an opaque page id.
+const INTEL_FINDING_OVERRIDE: Record<string, TabTarget & { sectionId: string | null; queryCategory: string }> = {
+  "No-show rate at 4% reflects strong reservation-to-arrival conversion": {
+    segment: "/commercial",
+    label: "Commercial Review",
+    sectionId: "volume-conversion",
+    // Commercial Review's own COMMERCIAL_CATEGORY_SECTION has no
+    // "Execution" entry (this record's real Intelligence Category), so the
+    // query param sent to the destination tab uses "Commercial" instead —
+    // the value that map already resolves to "volume-conversion".
+    queryCategory: "Commercial",
+  },
+};
+
 // Resolves an Intelligence record's category into a full destination: which
 // tab, and which section id within it (for ScrollToSection). Returns null
-// for categories with no tab mapping at all.
-export function resolveIntelCrossLink(category: string): (TabTarget & { sectionId: string | null }) | null {
-  const tab = INTEL_CATEGORY_TAB[category];
+// for categories with no tab mapping at all. Takes the record itself
+// (rather than a bare category string) so a per-record override above can
+// take precedence over the category-level default for the one record that
+// needs it, while every other record keeps its existing category-derived
+// destination unchanged.
+export function resolveIntelCrossLink(
+  intelligence: Pick<Intelligence, "category" | "finding">
+): (TabTarget & { sectionId: string | null; queryCategory: string }) | null {
+  const override = INTEL_FINDING_OVERRIDE[intelligence.finding];
+  if (override) return override;
+  const tab = INTEL_CATEGORY_TAB[intelligence.category];
   if (!tab) return null;
-  const sectionId = SECTION_BY_SEGMENT[tab.segment]?.[category] ?? null;
-  return { ...tab, sectionId };
+  const sectionId = SECTION_BY_SEGMENT[tab.segment]?.[intelligence.category] ?? null;
+  return { ...tab, sectionId, queryCategory: intelligence.category };
 }

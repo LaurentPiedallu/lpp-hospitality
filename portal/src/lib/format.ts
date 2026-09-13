@@ -395,6 +395,33 @@ export function findIntelligence(
   return candidates.reduce((best, i) => (i.estimatedAnnualImpact > best.estimatedAnnualImpact ? i : best));
 }
 
+// Looks up one specific Intelligence record by its Finding title — the only
+// per-record stable key Intelligence carries — rather than by category.
+// Same exact-match/period-scoped convention as findMetricByName above,
+// applied to Intelligence instead of KpiMetric. Needed when a page wants one
+// named record as corroborating context for a different section than that
+// record's own Intelligence Category would default to (e.g. an
+// Execution-category finding surfaced on Commercial or Financial Review
+// instead of wherever Execution normally routes) — findIntelligence's
+// category+impact resolution can't target one specific record by title, and
+// shouldn't be loosened to try, since every other caller relies on it
+// picking within a category. Period-scoped for the same reason
+// findIntelligence is: a record for an older period must not silently keep
+// showing once a newer period exists without a same-titled record of its
+// own — this returns null in that case, not stale content.
+export function findIntelligenceByFinding(
+  intelligence: Intelligence[],
+  finding: string,
+  periodStart: string | null
+): Intelligence | null {
+  const target = finding.trim().toLowerCase();
+  return (
+    intelligence.find(
+      (i) => i.finding.trim().toLowerCase() === target && i.periodStart === periodStart
+    ) ?? null
+  );
+}
+
 // Splits a block of prose into up to `targetCount` paragraphs by grouping
 // consecutive sentences into roughly-equal-sized chunks. This is a purely
 // structural split, not a summary — it doesn't shorten or reword the text,
