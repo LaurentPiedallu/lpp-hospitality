@@ -531,6 +531,31 @@ export default async function PropertyPage({
       } => c.metric != null
     );
 
+  // Likelihood to Recommend / Guest Sentiment Score — small supporting
+  // figures beside the Overall card, not two more full cards in the row
+  // (Portal-Wide consistency pass): the same treatment Commercial
+  // Review's own header now uses for these two (Phase 8) — outcome
+  // context for the headline rating, not a pillar in its own right.
+  // Neither has a canonical LPP Metric Key of its own (both are tagged
+  // "unclassified" upstream), so — same as Commercial Review's
+  // GUEST_OUTCOME_SHORT — these are looked up by exact Metric Name
+  // rather than by key like the four guestMetric() cards above, off the
+  // same allMetrics this whole section already reads, so the numbers
+  // stay in sync with Commercial automatically rather than being
+  // hand-copied.
+  const GUEST_OUTCOME_SHORT: Record<string, string> = {
+    "Likelihood to Recommend": "Recommend",
+    "Guest Sentiment Score": "Sentiment",
+  };
+  const guestOutcomeStats = Object.entries(GUEST_OUTCOME_SHORT)
+    .map(([name, label]) => ({
+      label,
+      value: (allMetrics as KpiMetric[]).find(
+        (m) => m.metricName === name && m.category === "Guest Experience" && m.unit === "Rating" && m.periodStart === latestPeriod
+      )?.metricValue ?? null,
+    }))
+    .filter((s): s is { label: string; value: number } => s.value != null);
+
   // Structural split only — groups sentences into shorter paragraphs, does
   // not shorten or reword. See splitIntoParagraphs in lib/format.ts. Only
   // used by the old-format fallback below (hasNewBriefFormat === false).
@@ -1054,6 +1079,26 @@ export default async function PropertyPage({
                         arrowSize={11}
                       />
                     </p>
+                  )}
+                  {/* Recommend / Sentiment — Overall card only, small
+                      supporting figures beside the headline rating rather
+                      than two more cards in the row (see guestOutcomeStats
+                      above). Half the Overall number's own size, same
+                      number+caption pairing every other stat on this page
+                      uses, just scaled down. */}
+                  {metricKey === "guest_overall" && guestOutcomeStats.length > 0 && (
+                    <div className="flex" style={{ gap: 16, marginTop: 8 }}>
+                      {guestOutcomeStats.map((s) => (
+                        <div key={s.label}>
+                          <p style={{ fontFamily: SERIF, fontSize: "1.1rem", fontWeight: 400, lineHeight: 1, color: "#12120F" }}>
+                            {s.value.toFixed(1)}
+                          </p>
+                          <p style={{ fontFamily: JOST, fontSize: 8, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginTop: 3 }}>
+                            {s.label}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   )}
                   {/* flex: 1 slot, present on every card regardless of whether this
                       one has text — so the grid's row-stretch gives all four cards
