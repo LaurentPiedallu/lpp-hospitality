@@ -169,6 +169,10 @@ async function MenuBatchView({
   // table, no Trend chart), leaving just the current-read callout and
   // Executive Interpretation toggle, driven entirely by the Menu-category
   // Intelligence finding for this batch's own Reporting Period.
+  // Single-pick only — silently drops any Menu-category record beyond the
+  // highest-impact one, same bug Commercial/Financial Review had before
+  // findAllIntelligence (lib/format.ts). Not fixed here: 0 Menu-category
+  // records exist today, so it's dormant, not active data loss.
   const menuIntel = findIntelligence(intelligence, "Menu", activeBatch.reportingPeriod);
 
   // Daypart scope (Menu Engineering rebuild, Phase 0 item 3) — computed
