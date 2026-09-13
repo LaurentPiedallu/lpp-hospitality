@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastUpdated } from "@/lib/notion-queries";
-import { usd, pct, findMetricByKey, findMetricByName, metricSeriesForKey, findIntelligence, extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark } from "@/lib/format";
+import { usd, pct, findMetricByKey, findMetricByName, metricSeriesForKey, findIntelligence, findIntelligenceByFinding, firstSentence, extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
@@ -334,6 +334,20 @@ export default async function FinancialPage({
   const opexIntel = intel("Financial");
   const revenueIntel = intel("Financial");
 
+  // Execution-category finding used as brief corroborating context for
+  // Revenue's implicit "this is a demand issue, not an execution issue"
+  // claim — full operational coverage across every daypart in June rules
+  // out a scheduling/staffing gap as the cause of the revenue shortfall.
+  // Looked up by its own Finding title (a stable key), same live-lookup
+  // convention as noShowIntel on Commercial Review — Execution-category
+  // records default to Financial Review already (see INTEL_CATEGORY_TAB in
+  // lib/deep-links.ts), so no cross-tab routing fix is needed for this one.
+  const opCoverageIntel = findIntelligenceByFinding(
+    allIntelligence as Intelligence[],
+    "Full operational coverage achieved across all dayparts in June",
+    latest
+  );
+
   // KPI lookup by canonical LPP Metric Key, not category/unit/name-guessing
   // (see findMetricByKey in lib/format.ts for the bug this fixes). Segment
   // defaults to "Total" inside findMetricByKey itself, so omitting it here
@@ -474,6 +488,18 @@ export default async function FinancialPage({
           allMetrics={trendFor("total_revenue")}
           primarySeverity={totalRevenue?.severity}
         >
+          {/* Brief corroborating context, not a card of its own — evidences
+              the connector's demand-vs-execution framing above with a real
+              operational-coverage finding rather than asserting it.
+              Truncated to its first sentence (firstSentence, lib/format.ts)
+              the same way Overview's Strategic Risks card excerpts a
+              currentRead paragraph, since this is supporting color for the
+              shortfall finding below, not a second narrative of its own. */}
+          {opCoverageIntel?.currentRead && (
+            <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.5)", lineHeight: 1.6 }}>
+              {firstSentence(opCoverageIntel.currentRead)}
+            </p>
+          )}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {totalRevenue && (
               <KpiCard label={totalRevenue.metricName} value={usd(totalRevenue.metricValue)}
