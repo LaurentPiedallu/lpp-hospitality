@@ -340,7 +340,7 @@ export async function getInitiatives(propertyId: string): Promise<Initiative[]> 
     databaseId: NOTION_DBS.INITIATIVES,
     filter: publishedAnd(relationFilter("Property", propertyId)),
   });
-  return pages.map((p) => {
+  return Promise.all(pages.map(async (p) => {
     const priority = select(p, "Priority") || "Medium";
     const completionFraction = rollupNumber(p, "Completion %");
     const targetCompletion = p.properties?.["Target Completion"]?.date?.start ?? null;
@@ -359,10 +359,12 @@ export async function getInitiatives(propertyId: string): Promise<Initiative[]> 
       targetCompletion,
       expectedImpact: num(p, "Expected Impact"),
       nextMilestone: richText(p, "Next Milestone"),
-      actionIds: relationIds(p, "Actions"),
+      // May exceed Notion's 25-item relation cap (confirmed on Lex Yard's
+      // Commercial Initiative) — relationIds() re-fetches in full when so.
+      actionIds: await relationIds(p, "Actions"),
       completionPct: completionFraction != null ? Math.round(completionFraction * 100) : null,
     };
-  });
+  }));
 }
 
 // Update an Action's Status in Notion and return the confirmed value from
@@ -378,7 +380,7 @@ export async function updateActionStatus(
 
 // ─── Briefs ───────────────────────────────────────────────────────────────────
 
-function toBrief(p: Awaited<ReturnType<typeof queryDatabase>>[number], clientId: string): Brief {
+async function toBrief(p: Awaited<ReturnType<typeof queryDatabase>>[number], clientId: string): Promise<Brief> {
   return {
     id: p.id,
     clientId,
@@ -403,7 +405,7 @@ function toBrief(p: Awaited<ReturnType<typeof queryDatabase>>[number], clientId:
     // exist on the page, so this is safe to read now.
     outlook: richText(p, "Outlook"),
     ownershipQuestions: richText(p, "Ownership Discussion"),
-    driverFindingIds: relationIds(p, "Driver Findings"),
+    driverFindingIds: await relationIds(p, "Driver Findings"),
   };
 }
 
@@ -413,7 +415,7 @@ export async function getBriefs(clientId: string): Promise<Brief[]> {
     filter: publishedAnd(relationFilter("Client", clientId)),
     sorts: [{ property: "Published Date", direction: "descending" }],
   });
-  return pages.map((p) => toBrief(p, clientId));
+  return Promise.all(pages.map((p) => toBrief(p, clientId)));
 }
 
 // The most recent Published Brief for a specific property — this establishes
@@ -427,7 +429,7 @@ export async function getLatestPublishedBrief(propertyId: string, clientId: stri
     sorts: [{ property: "Reporting Period", direction: "descending" }],
     pageSize: 1,
   });
-  return pages[0] ? toBrief(pages[0], clientId) : null;
+  return pages[0] ? await toBrief(pages[0], clientId) : null;
 }
 
 // Every Published Brief for a property, newest first — unlike
@@ -444,7 +446,7 @@ export async function getPublishedBriefs(propertyId: string, clientId: string): 
     filter: publishedAnd(relationFilter("Property", propertyId)),
     sorts: [{ property: "Reporting Period", direction: "descending" }],
   });
-  return pages.map((p) => toBrief(p, clientId));
+  return Promise.all(pages.map((p) => toBrief(p, clientId)));
 }
 
 // "Last updated" for the property hero — most recent Notion last_edited_time

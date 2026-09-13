@@ -52,8 +52,55 @@ export function relationId(page: NotionPage, prop: string): string {
   return page.properties?.[prop]?.relation?.[0]?.id ?? "";
 }
 
-export function relationIds(page: NotionPage, prop: string): string[] {
-  return (page.properties?.[prop]?.relation ?? []).map((r: { id: string }) => r.id);
+// Notion's page/query responses cap a relation property at 25 related items
+// and flag the property with has_more: true when there are more. Below the
+// cap this returns the array already on the page (no extra request). Once
+// has_more is set, the initial 25 are discarded and the full list is
+// re-fetched via the "retrieve a page property item" endpoint, which
+// paginates independently of — and isn't capped like — the page/query
+// response. Confirmed live on Lex Yard's Commercial Initiative (32 linked
+// Actions, only 25 present in the query response, has_more: true) — this is
+// deliberately generic rather than scoped to that one relation, since any
+// relation property can cross 25 as data grows.
+export async function relationIds(page: NotionPage, prop: string): Promise<string[]> {
+  const relProp = page.properties?.[prop];
+  const initial: string[] = (relProp?.relation ?? []).map((r: { id: string }) => r.id);
+  if (!relProp?.has_more) return initial;
+  return getFullRelationIds(page.id as string, relProp.id as string);
+}
+
+// Paginates the "retrieve a page property item" endpoint for one relation
+// property, collecting every related page ID regardless of count. Only
+// called by relationIds() above once a property reports has_more.
+async function getFullRelationIds(pageId: string, propertyId: string): Promise<string[]> {
+  const ids: string[] = [];
+  let cursor: string | undefined;
+
+  do {
+    // propertyId comes back from Notion already URL-encoded (e.g. "yn%7B%3F")
+    // — re-encoding it with encodeURIComponent double-escapes the `%` and
+    // silently matches no property (200 OK, empty result), so it's inserted
+    // into the path as-is here.
+    const url = new URL(`https://api.notion.com/v1/pages/${pageId}/properties/${propertyId}`);
+    url.searchParams.set("page_size", "100");
+    if (cursor) url.searchParams.set("start_cursor", cursor);
+
+    const res = await fetch(url.toString(), { method: "GET", headers: headers() });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Notion property fetch failed (${res.status}): ${err}`);
+    }
+
+    const data = (await res.json()) as {
+      results: Array<{ relation: { id: string } }>;
+      next_cursor: string | null;
+      has_more: boolean;
+    };
+    ids.push(...data.results.map((r) => r.relation.id));
+    cursor = data.has_more && data.next_cursor ? data.next_cursor : undefined;
+  } while (cursor);
+
+  return ids;
 }
 
 // Rollup properties nest their value under `.rollup`, typed by the rollup's
