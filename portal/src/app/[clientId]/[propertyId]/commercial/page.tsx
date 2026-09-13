@@ -1088,18 +1088,20 @@ export default async function CommercialPage({
               second, Execution-sourced record that reads the same figure
               from the conversion side rather than the demand-mix side (see
               noShowIntel above for the live lookup and the cross-tab
-              routing fix). Plain white bordered box, the same "secondary
-              supporting content" tier DaypartSplit/RevpashBars already use
-              elsewhere on this page, not the gold-bordered CalloutBlock the
-              section's own primary Commercial finding gets above — this
-              stays a supporting line, not a second callout competing with
-              it. */}
+              routing fix). Same CalloutBlock + StatusBadge treatment as the
+              section's own primary Commercial finding immediately above it
+              (rendered by CommercialSection itself) — gold left-accent
+              border and a severity chip, so the two read as a consistent
+              pair rather than one styled callout and one plain box. This
+              record's own Severity ("Healthy") drives the chip, not the
+              Commercial finding's "Monitor" above it. */}
           {noShowIntel?.currentRead && (
-            <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: 20 }}>
-              <p style={{ fontFamily: JOST, fontSize: 12.5, color: "rgba(18,18,15,0.6)", lineHeight: 1.6 }}>
-                {noShowIntel.currentRead}
-              </p>
-            </div>
+            <CalloutBlock>
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <p>{noShowIntel.currentRead}</p>
+                <StatusBadge label={noShowIntel.severity} variant={severityVariant(noShowIntel.severity)} />
+              </div>
+            </CalloutBlock>
           )}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {conversionMetric && (
