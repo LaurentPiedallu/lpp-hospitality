@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastUpdated } from "@/lib/notion-queries";
-import { usd, pct, findMetricByKey, findMetricByName, metricSeriesForKey, findAllIntelligence, findIntelligenceByFinding, firstSentence, extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark } from "@/lib/format";
+import { usd, pct, findMetricByKey, findMetricByName, metricSeriesForKey, findAllIntelligence, findIntelligenceByFinding, extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
@@ -52,15 +52,46 @@ function severityVariant(s: Severity): "green" | "amber" | "red" {
 // the portal-wide convention for "more than one record in one section"
 // (same component Commercial Review uses for its own extra records). Used
 // wherever intelAll(cat) returns more than one record for a section.
-function ExtraIntelCard({ record }: { record: Intelligence }) {
+//
+// showCommentary (opt-in, default off) restores Why It Matters / Suggested
+// Decision behind the same collapsed "LPP Perspective" toggle this page's
+// own primary FindingSection callouts already use — plain text was
+// rendering Current Read only, silently dropping the stakes/reasoning half
+// of every extra record. Per-record editorial call at each call site, not
+// a blanket default.
+function ExtraIntelCard({ record, showCommentary }: { record: Intelligence; showCommentary?: boolean }) {
   if (!record.currentRead) return null;
   return (
-    <CalloutBlock>
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <p>{record.currentRead}</p>
-        <StatusBadge label={record.severity} variant={severityVariant(record.severity)} />
-      </div>
-    </CalloutBlock>
+    <>
+      <CalloutBlock>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <p>{record.currentRead}</p>
+          <StatusBadge label={record.severity} variant={severityVariant(record.severity)} />
+        </div>
+      </CalloutBlock>
+      {showCommentary && (record.whyItMatters || record.suggestedDecision) && (
+        <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden group">
+          <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between select-none hover:bg-gray-50 transition">
+            <span>LPP Perspective</span>
+            <span className="text-gray-400 text-xs group-open:rotate-180 transition-transform">▼</span>
+          </summary>
+          <div className="px-5 pb-5 pt-2 space-y-4 border-t border-gray-50">
+            {record.whyItMatters && (
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Why It Matters</p>
+                <p className="text-sm text-gray-700 leading-relaxed">{record.whyItMatters}</p>
+              </div>
+            )}
+            {record.suggestedDecision && (
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Recommendation</p>
+                <p className="text-sm text-gray-700 leading-relaxed">{record.suggestedDecision}</p>
+              </div>
+            )}
+          </div>
+        </details>
+      )}
+    </>
   );
 }
 
@@ -523,18 +554,16 @@ export default async function FinancialPage({
           allMetrics={trendFor("total_revenue")}
           primarySeverity={totalRevenue?.severity}
         >
-          {/* Brief corroborating context, not a card of its own — evidences
-              the connector's demand-vs-execution framing above with a real
-              operational-coverage finding rather than asserting it.
-              Truncated to its first sentence (firstSentence, lib/format.ts)
-              the same way Overview's Strategic Risks card excerpts a
-              currentRead paragraph, since this is supporting color for the
-              shortfall finding below, not a second narrative of its own. */}
-          {opCoverageIntel?.currentRead && (
-            <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.5)", lineHeight: 1.6 }}>
-              {firstSentence(opCoverageIntel.currentRead)}
-            </p>
-          )}
+          {/* Full record, not the truncated first-sentence excerpt this used
+              to render: "This represents 56 services across four distinct
+              formats without a single scheduling gap" — the actual point
+              of the finding, not a throwaway detail — was being cut by
+              firstSentence(). Same ExtraIntelCard treatment as Commercial
+              Review's restored records, with its LPP Perspective toggle
+              enabled — the stakes argument (guest trust, hotel partner
+              confidence, scheduling gaps as a revenue-loss vector) wasn't
+              rendering anywhere either. */}
+          {opCoverageIntel && <ExtraIntelCard record={opCoverageIntel} showCommentary />}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {totalRevenue && (
               <KpiCard label={totalRevenue.metricName} value={usd(totalRevenue.metricValue)}
