@@ -291,17 +291,20 @@ export async function getRisks(propertyId: string, periodIso?: string): Promise<
 
 // clientVisibleOnly: apply at every call site that surfaces Intelligence
 // *content* (finding/currentRead/whyItMatters/suggestedDecision text) to a
-// client session — Overview, Financial Review, Commercial Review, the
-// Intelligence tab, and the /api/data/intelligence REST endpoint. The
-// "Client Visible" checkbox is already backfilled false for Data Quality
-// category records and any record naming an individual by name (verified
-// against live data: zero exceptions across all three properties among
-// Published records). Deliberately NOT the default — two real callers need
-// every record regardless of visibility: the rate-limit check in
-// /api/intelligence/request (must see the true most-recent record per
-// category, not just the client-visible one, or it under-limits) and
-// getLastUpdated below (a max-timestamp computation, never renders
-// content, so filtering it would just be a wrong "last updated" figure).
+// client session — Overview, Financial Review, Commercial Review, and the
+// /api/data/intelligence REST endpoint. (The client-facing Intelligence tab
+// this was also written for no longer exists — removed in favor of every
+// record having a native home on Commercial/Financial Review — and the
+// /api/intelligence/request rate-limit check that needed the unfiltered
+// view was deleted alongside it, since that route only ever triggered the
+// same Make regeneration Scenario B already owns.) The "Client Visible"
+// checkbox is already backfilled false for Data Quality category records
+// and any record naming an individual by name (verified against live
+// data: zero exceptions across all three properties among Published
+// records). Deliberately NOT the default — getLastUpdated below (a
+// max-timestamp computation, never renders content, so filtering it would
+// just be a wrong "last updated" figure) still needs every record
+// regardless of visibility.
 export async function getIntelligence(
   propertyId: string,
   opts?: { clientVisibleOnly?: boolean }
