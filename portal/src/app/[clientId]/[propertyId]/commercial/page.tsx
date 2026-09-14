@@ -215,6 +215,64 @@ function ExtraIntelCard({ record, showCommentary }: { record: Intelligence; show
   );
 }
 
+// Consolidated replacement for two separate ExtraIntelCards (Tuesday
+// dinner/Sunday brunch + Sunday bar-only dinner) — see
+// sundayEconomicsTuesdayIntel/sundayEconomicsBarOnlyIntel below for why.
+// The card's own line is hand-authored (not raw pasted text, same
+// "interpolate only real, stated figures into authored prose" convention
+// as guestHeadlineSummary elsewhere on this page) — Tuesday's own
+// two-floor dinner cover count isn't given a specific number in either
+// source record (only the 165-cover Tue-Sat average is), so none is
+// invented for it here. The Commentary toggle keeps both records' real,
+// unedited Why It Matters text rather than merging those into one new
+// sentence too — the reasoning genuinely differs (fixed-cost-per-cover
+// framing for Tuesday/Sunday-brunch vs. per-operating-hour margin framing
+// for Sunday bar-only), so both are worth keeping in full rather than
+// picking one.
+function SundayEconomicsCard({
+  tuesdayIntel,
+  barOnlyIntel,
+}: {
+  tuesdayIntel: Intelligence;
+  barOnlyIntel: Intelligence;
+}) {
+  return (
+    <>
+      <CalloutBlock>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <p>
+            Sunday is the weakest day on the calendar for both formats it runs — brunch averages just 46 covers and bar-only dinner comes in at 93, the softest read of the week for each — while Tuesday, the softest night of the two-floor dinner block, adds a third recurring low-volume service to the same trough.
+          </p>
+          {/* Both source records carry Severity "Monitor" today — using
+              Tuesday's as the representative value rather than building a
+              rank-comparison for two records that currently agree. */}
+          <StatusBadge label={tuesdayIntel.severity} variant={severityVariant(tuesdayIntel.severity)} />
+        </div>
+      </CalloutBlock>
+      <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden group">
+        <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between select-none hover:bg-gray-50 transition">
+          <span>Commentary</span>
+          <span className="text-gray-400 text-xs group-open:rotate-180 transition-transform">▼</span>
+        </summary>
+        <div className="px-5 pb-5 pt-2 space-y-4 border-t border-gray-50">
+          {tuesdayIntel.whyItMatters && (
+            <div>
+              <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Why It Matters</p>
+              <p className="text-sm text-gray-700 leading-relaxed">{tuesdayIntel.whyItMatters}</p>
+            </div>
+          )}
+          {barOnlyIntel.whyItMatters && (
+            <div>
+              <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Why It Matters</p>
+              <p className="text-sm text-gray-700 leading-relaxed">{barOnlyIntel.whyItMatters}</p>
+            </div>
+          )}
+        </div>
+      </details>
+    </>
+  );
+}
+
 function latestMetric(
   metrics: KpiMetric[],
   category: string,
@@ -841,20 +899,20 @@ export default async function CommercialPage({
   // Per-record editorial call: which extra records' Why It Matters is worth
   // restoring behind a Commentary toggle (see ExtraIntelCard's showCommentary
   // prop above), not a blanket "every extra record gets one" default.
-  // Reservations-49%, Tuesday-dinner/Sunday-brunch, and Thursday-peak carry
-  // real, distinct stakes arguments (forecast precision, per-service margin
-  // compression, single-day concentration risk) not covered anywhere else
-  // on this page. "Guest scores exceptional" is deliberately excluded —
-  // its stakes argument (guest experience as a durable retention asset) is
-  // generic enough to read as redundant with the Commercial Synthesis
-  // paragraph's own conversion framing above. Weekday-lunch and Sunday-
-  // bar-only-dinner are intentionally left out of this set for now — open
-  // call, not yet decided (see the no-show interleave below for a fourth
-  // restored record handled separately, since it isn't part of this
-  // category's own list).
+  // Reservations-49%, Weekday-lunch, and Thursday-peak carry real, distinct
+  // stakes arguments (forecast precision, mid-week cost-recovery threshold,
+  // single-day concentration risk) not covered anywhere else on this page.
+  // "Guest scores exceptional" is deliberately excluded — its stakes
+  // argument (guest experience as a durable retention asset) is generic
+  // enough to read as redundant with the Commercial Synthesis paragraph's
+  // own conversion framing above. Tuesday-dinner/Sunday-brunch and Sunday-
+  // bar-only-dinner are NOT in this set — both are consolidated into
+  // SundayEconomicsCard below instead of rendering as their own
+  // ExtraIntelCards (see sundayEconomicsTuesdayIntel /
+  // sundayEconomicsBarOnlyIntel further down).
   const COMMENTARY_RESTORED_FINDINGS = new Set([
     "Reservations cover 49% of arrivals with Thursday as peak and Sunday softest",
-    "Tuesday dinner is the softest two-floor night; Sunday brunch averages just 46 covers",
+    "Weekday lunch mid-week concentration leaves Monday and Friday underleveraged",
     "Thursday peak creates concentration risk across all tracked dayparts",
   ]);
 
@@ -877,6 +935,22 @@ export default async function CommercialPage({
   // NO_SHOW_FINDING itself, which is a different category and would never
   // match any record in the Commercial-category list being iterated).
   const RESERVED_COVER_FINDING = "Reservations cover 49% of arrivals with Thursday as peak and Sunday softest";
+
+  // Two Commercial-category records that both restate nearly the same
+  // Sunday-brunch (46 covers, 4 Sundays) and bar-only-dinner (93 covers)
+  // figures from slightly different angles — shown as two separate cards,
+  // they read as duplicate restatements of the same underlying KPI data
+  // rather than two distinct findings. Consolidated into one card
+  // (SundayEconomicsCard below) instead, per explicit editorial decision —
+  // not a general rule applied to any two records that happen to share a
+  // topic elsewhere on this page. Looked up here (rather than inline in
+  // the render loop) so both records are available together regardless of
+  // where each lands in intelAll("Commercial")'s impact-ranked order.
+  const TUESDAY_SUNDAY_BRUNCH_FINDING = "Tuesday dinner is the softest two-floor night; Sunday brunch averages just 46 covers";
+  const SUNDAY_BARONLY_FINDING = "Sunday dinner (bar-only) is the lightest segment at 93-cover avg";
+  const commercialIntelAll = intelAll("Commercial");
+  const sundayEconomicsTuesdayIntel = commercialIntelAll.find((r) => r.finding === TUESDAY_SUNDAY_BRUNCH_FINDING) ?? null;
+  const sundayEconomicsBarOnlyIntel = commercialIntelAll.find((r) => r.finding === SUNDAY_BARONLY_FINDING) ?? null;
 
   // Individual staff names detected from this property's own KPI Records
   // (see extractIndividualStaffNames in lib/format.ts) — used below to keep
@@ -1185,19 +1259,42 @@ export default async function CommercialPage({
         >
           {/* Every Commercial-category record beyond the top-impact one
               CommercialSection already shows as its primary callout above
-              (intelAll("Commercial") — see intel/intelAll's own comment for
-              the bug this replaces: a bare .find() silently dropped 5 of
-              Lex Yard's 6 Commercial-category records). The no-show record
-              is a separate Execution-category lookup (noShowIntel above),
-              not part of this array, but belongs in the same narrative
-              thread as the 49% reserved-cover finding — it's interleaved
-              right after whichever record that is, regardless of whether
-              that record lands as the primary callout or one of the extras
-              here, so the pairing survives even if the ranking above ever
-              reorders which Commercial record leads. */}
-          {intelAll("Commercial").flatMap((rec, idx) => {
+              (commercialIntelAll — see intel/intelAll's own comment for the
+              bug this replaces: a bare .find() silently dropped 5 of Lex
+              Yard's 6 Commercial-category records). Tuesday-dinner/Sunday-
+              brunch and Sunday-bar-only-dinner are skipped as individual
+              cards here — both render together as one SundayEconomicsCard,
+              positioned at Tuesday's own slot in the ranking, only when
+              both real records exist this period (falls back to Tuesday's
+              own ExtraIntelCard, with its Commentary restored, if Sunday
+              bar-only's record is ever absent — see the fallback branch
+              below). The no-show record is a separate Execution-category
+              lookup (noShowIntel above), not part of this array, but
+              belongs in the same narrative thread as the 49% reserved-cover
+              finding — it's interleaved right after whichever record that
+              is, regardless of whether that record lands as the primary
+              callout or one of the extras here, so the pairing survives
+              even if the ranking above ever reorders which Commercial
+              record leads. */}
+          {commercialIntelAll.flatMap((rec, idx) => {
             const nodes: React.ReactNode[] = [];
-            if (idx > 0) {
+
+            if (rec.finding === SUNDAY_BARONLY_FINDING) {
+              // Absorbed into SundayEconomicsCard at Tuesday's slot below,
+              // unless Tuesday's own record doesn't exist this period — in
+              // that case, render Sunday bar-only's real card on its own
+              // rather than silently dropping it. (If Tuesday's record
+              // exists but is itself the section's primary — idx 0, not
+              // possible with today's live data — this card is dropped
+              // rather than duplicating Tuesday's own primary callout; see
+              // the matching idx > 0 guard below.)
+              if (!sundayEconomicsTuesdayIntel && idx > 0) {
+                nodes.push(<ExtraIntelCard key={rec.id} record={rec} showCommentary />);
+              }
+              return nodes;
+            }
+
+            if (idx > 0 && rec.finding !== TUESDAY_SUNDAY_BRUNCH_FINDING) {
               nodes.push(
                 <ExtraIntelCard
                   key={rec.id}
@@ -1206,6 +1303,32 @@ export default async function CommercialPage({
                 />
               );
             }
+
+            if (rec.finding === TUESDAY_SUNDAY_BRUNCH_FINDING) {
+              // idx > 0 guard: if Tuesday's own record ever ranked as the
+              // section's top-impact record, CommercialSection's built-in
+              // callout already shows its real Current Read at idx 0 — the
+              // consolidated card would then duplicate that content instead
+              // of supplementing it. Doesn't happen with today's live data
+              // (Beverage's $420K always outranks Tuesday's $144K), left
+              // unhandled beyond this guard rather than restructuring the
+              // primary-callout slot itself for a case that can't occur yet.
+              if (idx > 0 && sundayEconomicsBarOnlyIntel) {
+                nodes.push(
+                  <SundayEconomicsCard
+                    key="sunday-economics"
+                    tuesdayIntel={rec}
+                    barOnlyIntel={sundayEconomicsBarOnlyIntel}
+                  />
+                );
+              } else if (idx > 0) {
+                // Sunday bar-only's record doesn't exist this period —
+                // nothing to consolidate with, so Tuesday's own card
+                // renders normally, Commentary included.
+                nodes.push(<ExtraIntelCard key={rec.id} record={rec} showCommentary />);
+              }
+            }
+
             if (rec.finding === RESERVED_COVER_FINDING && noShowIntel?.currentRead) {
               // No-show's stakes argument matters more than its Healthy
               // severity suggests: it's a caution against a decision this
