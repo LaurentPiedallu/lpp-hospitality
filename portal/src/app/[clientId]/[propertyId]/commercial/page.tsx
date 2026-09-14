@@ -171,15 +171,47 @@ function severityVariant(s: Severity): "green" | "amber" | "red" {
 // its category reads as a set of consistent siblings rather than one
 // styled callout and a pile of plain text. Used wherever intelAll(cat)
 // returns more than one record.
-function ExtraIntelCard({ record }: { record: Intelligence }) {
+//
+// showCommentary (opt-in, default off) restores Why It Matters / Suggested
+// Decision behind the same collapsed "Commentary" toggle the section's own
+// primary callout already uses (CommercialSection's built-in Commentary
+// details) — plain text was rendering Current Read only, silently dropping
+// the stakes/reasoning half of every extra record. Not turned on for every
+// record: it's a per-record editorial call which stakes arguments are
+// worth surfacing, made at each call site below, not a blanket default.
+function ExtraIntelCard({ record, showCommentary }: { record: Intelligence; showCommentary?: boolean }) {
   if (!record.currentRead) return null;
   return (
-    <CalloutBlock>
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <p>{record.currentRead}</p>
-        <StatusBadge label={record.severity} variant={severityVariant(record.severity)} />
-      </div>
-    </CalloutBlock>
+    <>
+      <CalloutBlock>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <p>{record.currentRead}</p>
+          <StatusBadge label={record.severity} variant={severityVariant(record.severity)} />
+        </div>
+      </CalloutBlock>
+      {showCommentary && (record.whyItMatters || record.suggestedDecision) && (
+        <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden group">
+          <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between select-none hover:bg-gray-50 transition">
+            <span>Commentary</span>
+            <span className="text-gray-400 text-xs group-open:rotate-180 transition-transform">▼</span>
+          </summary>
+          <div className="px-5 pb-5 pt-2 space-y-4 border-t border-gray-50">
+            {record.whyItMatters && (
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Why It Matters</p>
+                <p className="text-sm text-gray-700 leading-relaxed">{record.whyItMatters}</p>
+              </div>
+            )}
+            {record.suggestedDecision && (
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Recommendation</p>
+                <p className="text-sm text-gray-700 leading-relaxed">{record.suggestedDecision}</p>
+              </div>
+            )}
+          </div>
+        </details>
+      )}
+    </>
   );
 }
 
@@ -806,6 +838,26 @@ export default async function CommercialPage({
     findAllIntelligence(allIntelligence as Intelligence[], cat, latest);
   const intel = (cat: string): Intelligence | null => intelAll(cat)[0] ?? null;
 
+  // Per-record editorial call: which extra records' Why It Matters is worth
+  // restoring behind a Commentary toggle (see ExtraIntelCard's showCommentary
+  // prop above), not a blanket "every extra record gets one" default.
+  // Reservations-49%, Tuesday-dinner/Sunday-brunch, and Thursday-peak carry
+  // real, distinct stakes arguments (forecast precision, per-service margin
+  // compression, single-day concentration risk) not covered anywhere else
+  // on this page. "Guest scores exceptional" is deliberately excluded —
+  // its stakes argument (guest experience as a durable retention asset) is
+  // generic enough to read as redundant with the Commercial Synthesis
+  // paragraph's own conversion framing above. Weekday-lunch and Sunday-
+  // bar-only-dinner are intentionally left out of this set for now — open
+  // call, not yet decided (see the no-show interleave below for a fourth
+  // restored record handled separately, since it isn't part of this
+  // category's own list).
+  const COMMENTARY_RESTORED_FINDINGS = new Set([
+    "Reservations cover 49% of arrivals with Thursday as peak and Sunday softest",
+    "Tuesday dinner is the softest two-floor night; Sunday brunch averages just 46 covers",
+    "Thursday peak creates concentration risk across all tracked dayparts",
+  ]);
+
   // Execution-category finding that directly corroborates Volume &
   // Conversion's own Commercial-category commentary — it references the
   // same 49% reserved-cover figure from the other side (conversion quality,
@@ -902,23 +954,36 @@ export default async function CommercialPage({
     );
   }
 
-  // One clean synthesis sentence in place of the raw Intelligence "Current
-  // Read" text, which used to restate nearly every individual score below
-  // it — now that scores are grouped into three tiers with their own
-  // commentary, the headline only needs to set up what follows.
-  const guestHeadlineSummary =
-    guestRatings.length > 0
-      ? guestRatings.every((g) => g.severity === "Healthy")
-        ? "Every Guest Experience score is Healthy this period, from core product ratings through advocacy and loyalty signals."
-        : "Guest Experience scores remain strong overall this period, though not every dimension reads Healthy — see the tiers below."
-      : null;
-
   // Survey volume — a real Published KPI Record (75 for this period), but
   // the only source for the month-over-month comparison (122 in May, a
   // 38% decline) is the Guest Intelligence record's own prose: no May
   // "Survey Count" KPI Record exists to diff against. Quoted here as
   // confirmed real data rather than recomputed from KPI Records alone.
+  // Moved above guestHeadlineSummary, which now reads it too.
   const surveyCountMetric = currentMetrics.find((m) => m.metricName === "Survey Count") ?? null;
+
+  // Headline next to the score. Previously a hardcoded boolean over raw KPI
+  // severities (guestRatings.every(...) === "Healthy"), which ignored
+  // guestIntelligence entirely — every underlying score reads Healthy, but
+  // guestIntelligence's own Severity is "Monitor" specifically because of
+  // the survey-volume decline (see the caveat sentence and Commentary
+  // below, both sourced from this same record), and the old sentence never
+  // reflected that argument at all. Sourced live off guestIntelligence's
+  // real Severity + the real surveyCountMetric figure instead, in the same
+  // "interpolate live values into hand-authored prose" convention this
+  // page's own Commercial Synthesis paragraph already uses above — not a
+  // paste of Current Read (that renders in full via the no-longer-hidden
+  // Commentary toggle below) or Why It Matters (already its own paragraph
+  // directly beneath this headline), just a short lede consistent with
+  // both without repeating either verbatim.
+  const guestHeadlineSummary =
+    guestRatings.length === 0
+      ? null
+      : guestIntelligence?.severity === "Healthy"
+        ? "Every Guest Experience score is Healthy this period, from core product ratings through advocacy and loyalty signals."
+        : surveyCountMetric
+          ? `Every score reads Healthy this period, but survey volume has fallen to ${surveyCountMetric.metricValue.toLocaleString()} responses — confidence in these numbers is weakening right when it's needed most to validate recovery.`
+          : "Guest Experience scores remain strong overall this period, though not every dimension reads Healthy — see the tiers below.";
 
   // KPI lookup by canonical LPP Metric Key + Segment (see Segment on
   // KpiMetric / findMetricByKey in lib/format.ts). Segment defaults to
@@ -1132,9 +1197,24 @@ export default async function CommercialPage({
               reorders which Commercial record leads. */}
           {intelAll("Commercial").flatMap((rec, idx) => {
             const nodes: React.ReactNode[] = [];
-            if (idx > 0) nodes.push(<ExtraIntelCard key={rec.id} record={rec} />);
+            if (idx > 0) {
+              nodes.push(
+                <ExtraIntelCard
+                  key={rec.id}
+                  record={rec}
+                  showCommentary={COMMENTARY_RESTORED_FINDINGS.has(rec.finding)}
+                />
+              );
+            }
             if (rec.finding === RESERVED_COVER_FINDING && noShowIntel?.currentRead) {
-              nodes.push(<ExtraIntelCard key={`${rec.id}-noshow`} record={noShowIntel} />);
+              // No-show's stakes argument matters more than its Healthy
+              // severity suggests: it's a caution against a decision this
+              // same section is otherwise steering toward (pushing reserved-
+              // cover share higher also raises no-show risk if the
+              // confirmation/reminder process doesn't scale with it) — worth
+              // surfacing even though every other Healthy record on this
+              // page (Guest scores exceptional) is left collapsed-out.
+              nodes.push(<ExtraIntelCard key={`${rec.id}-noshow`} record={noShowIntel} showCommentary />);
             }
             return nodes;
           })}

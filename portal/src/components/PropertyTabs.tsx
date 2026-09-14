@@ -8,16 +8,18 @@ export type PropertyTabKey =
   | "commercial"
   | "menu"
   | "initiatives"
-  | "intelligence"
   | "upload";
 
+// Intelligence tab removed — every Published/Client-Visible Intelligence
+// record now has a native home on Commercial or Financial Review (see
+// intelligence/page.tsx, which redirects the old route rather than 404ing
+// it). Data/lookup logic elsewhere in the portal is untouched.
 const TABS: { key: PropertyTabKey; label: string; segment: string }[] = [
   { key: "overview", label: "Overview", segment: "" },
   { key: "financial", label: "Financial Review", segment: "/financial" },
   { key: "commercial", label: "Commercial Review", segment: "/commercial" },
   { key: "menu", label: "Menu Engineering", segment: "/menu" },
   { key: "initiatives", label: "Initiatives", segment: "/initiatives" },
-  { key: "intelligence", label: "Intelligence", segment: "/intelligence" },
   { key: "upload", label: "Upload", segment: "/upload" },
 ];
 
