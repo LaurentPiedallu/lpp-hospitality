@@ -471,7 +471,14 @@ export default async function FinancialPage({
   // Expenses" isn't clear from the data (it doesn't reconcile cleanly
   // against opex or against opex + COGS + labor), so it's deliberately
   // excluded rather than guessed into a breakdown it might not belong in.
-  const OPEX_DRIVER_NAMES = ["Kitchen Allocation", "Plants and Decorations", "Consulting Fees", "Uniform Cleaning"];
+  // "Kitchen Allocation Expense" is the real Notion Metric Name (see
+  // format.ts's own CANONICAL_METRIC_NAME comment block, which documents
+  // this exact string) — this allowlist previously had the bare "Kitchen
+  // Allocation" instead, a pre-existing mismatch that silently zeroed
+  // opexLineItems on Lex Yard itself, caught live while verifying the new
+  // dynamic-driver-naming connector below (it fell back to generic wording
+  // on the one property it was least expected to).
+  const OPEX_DRIVER_NAMES = ["Kitchen Allocation Expense", "Plants and Decorations", "Consulting Fees", "Uniform Cleaning"];
   const opexLineItems = currentMetrics
     .filter((m) => m.category === "OpEx" && OPEX_DRIVER_NAMES.includes(m.metricName))
     .sort((a, b) => b.metricValue - a.metricValue);
