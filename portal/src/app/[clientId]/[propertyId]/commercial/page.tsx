@@ -987,6 +987,17 @@ export default async function CommercialPage({
   // "Average rating" label even without printing their name.
   const overallRating = findMetricByKey(allMetrics, "guest_overall", latest) ?? guestRatings[0] ?? null;
 
+  // Volume & Conversion's connector specifically claims guest-experience
+  // strength as its premise — that claim needs overallRating to actually
+  // exist, not just any Commercial-category data. Previously an
+  // unconditional string, so it asserted "guest-experience strength" even
+  // when Guest Experience (two sections down) had zero data (confirmed live
+  // on Peacock Alley: "No guest feedback yet" directly contradicts this
+  // connector's own premise on the same page).
+  const volumeConversionConnector = overallRating
+    ? "That guest-experience strength doesn't yet fully convert into dinner volume — the breakdown below shows where."
+    : undefined;
+
   // The one Guest-category Intelligence record for this period — reused
   // for both the Evidence table's severity default (via the `intelligence`
   // prop below) and the header's own commentary (Phase 8), since that's
@@ -1244,7 +1255,7 @@ export default async function CommercialPage({
         <CommercialSection
           id="volume-conversion"
           heading="Volume & Conversion"
-          connector="That guest-experience strength doesn't yet fully convert into dinner volume — the breakdown below shows where."
+          connector={volumeConversionConnector}
           intelligence={intel("Commercial")}
           metrics={catMetrics("Commercial")}
           // Scoped correctly now (canonical "covers" key), but this won't

@@ -479,6 +479,48 @@ export default async function FinancialPage({
   const netProfit = byKey("net_profit");
   const netProfitPct = byKey("net_profit_pct");
 
+  // Section connectors — each is only real content once its own section has
+  // real data to back it up. Previously these were plain string literals
+  // passed unconditionally, so every connector rendered as a stated fact
+  // regardless of whether any KPI data existed underneath it (confirmed
+  // live on Peacock Alley, zero financial data published: all five
+  // connectors below rendered their claims — "labor did not scale down",
+  // "cost control held" — with zero KPI cards or evidence beneath any of
+  // them, and the page's one real EmptyState only appears after all five
+  // sections have already spoken). Gated on each section's own primary
+  // metric — the same one already driving that section's KPI cards/
+  // BenchmarkRangeBar — rather than a page-level or shared "any data exists"
+  // check, since these five KPI categories are independent Notion records
+  // that can arrive on different schedules (a partial P&L upload could
+  // populate Revenue/Labor before OpEx/Profitability exist for the same
+  // period), so a single all-or-nothing gate would either hide sections
+  // that do have real data or keep showing ones that don't.
+  const revenueConnector = totalRevenue
+    ? "The figures below are this property's own revenue numbers; the demand-side story behind them — daypart mix, guest volume — belongs to Commercial Review."
+    : undefined;
+  const laborConnector = laborPct
+    ? "Following the dinner shortfall above, labor did not scale down to match the reduced volume."
+    : undefined;
+  const cogsConnector = cogsPct
+    ? "Unlike labor, food and beverage cost control held through the same volume decline."
+    : undefined;
+  // OpEx names whichever line item is actually this property's largest,
+  // read from opexLineItems (already sorted by value above) instead of
+  // asserting "Kitchen Allocation" for every property. That was previously
+  // hardcoded and happened to be correct at both properties with live OpEx
+  // data today — Kitchen Allocation is a real, dominant, hotel-shared cost
+  // at Lex Yard and Yoshoku — but was correct by coincidence, not by
+  // construction. Falls back to generic wording (no item named) when a
+  // property has an OpEx total but no itemized driver breakdown yet.
+  const opexConnector = opexPct
+    ? opexLineItems.length > 0
+      ? `The larger structural pressure sits here — the ${opexLineItems[0].metricName} charge below does not flex with revenue the way labor or COGS do.`
+      : "The larger structural pressure sits here — the charges below do not flex with revenue the way labor or COGS do."
+    : undefined;
+  const profitabilityConnector = netProfit
+    ? "The combined effect of the revenue shortfall, labor ratio, and OpEx allocation above nets out below."
+    : undefined;
+
   // Page-level synthesis — the cause-and-effect chain across sections,
   // specific to this property/period's real dollar drivers. This is
   // intentionally NOT built from a single Notion field the way Overview's
@@ -543,7 +585,7 @@ export default async function FinancialPage({
         <FindingSection
           id="revenue"
           heading="Revenue"
-          connector="The figures below are this property's own revenue numbers; the demand-side story behind them — daypart mix, guest volume — belongs to Commercial Review."
+          connector={revenueConnector}
           // The second-highest-impact "Financial" record (see
           // financialIntelAll note above) — no longer hard-suppressed to
           // null now that it's a genuinely different record than OpEx's.
@@ -614,7 +656,7 @@ export default async function FinancialPage({
         <FindingSection
           id="labor"
           heading="Labor"
-          connector="Following the dinner shortfall above, labor did not scale down to match the reduced volume."
+          connector={laborConnector}
           intelligence={intel("Labor")}
           metrics={catMetrics("Labor")}
           allMetrics={trendFor("labor_pct")}
@@ -682,7 +724,7 @@ export default async function FinancialPage({
         <FindingSection
           id="cogs"
           heading="Food & Beverage COGS"
-          connector="Unlike labor, food and beverage cost control held through the same volume decline."
+          connector={cogsConnector}
           intelligence={intel("COGS")}
           metrics={catMetrics("COGS")}
           allMetrics={trendFor("cogs_pct")}
@@ -750,7 +792,7 @@ export default async function FinancialPage({
         <FindingSection
           id="opex"
           heading="Operating Expenses"
-          connector="The larger structural pressure sits here — the Kitchen Allocation charge below does not flex with revenue the way labor or COGS do."
+          connector={opexConnector}
           // OpEx findings are filed under Intelligence Category "Financial"
           // (alongside Revenue and Profitability) — the schema has no
           // dedicated OpEx value. Previously read "Execution", which
@@ -820,7 +862,7 @@ export default async function FinancialPage({
         <FindingSection
           id="profitability"
           heading="Profitability"
-          connector="The combined effect of the revenue shortfall, labor ratio, and OpEx allocation above nets out below."
+          connector={profitabilityConnector}
           intelligence={intel("Profitability")}
           metrics={catMetrics("Profitability")}
           allMetrics={trendFor("net_profit_pct")}

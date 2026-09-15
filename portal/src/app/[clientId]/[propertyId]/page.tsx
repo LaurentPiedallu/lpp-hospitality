@@ -250,12 +250,37 @@ export default async function PropertyPage({
 
   const latestBrief = briefs[0] ?? null;
 
-  // Opportunities are an internal-only analytical input (feeds Actions and
-  // the Brief) and must be scoped to the current Reporting Period — the
-  // most recent Published Brief's period — never aggregated across every
-  // period ever generated for this property.
+  // The most recent period with real KPI data, independent of whether a
+  // Brief has been Published for it — same derivation Financial Review uses
+  // (latestPeriod() in financial/page.tsx), just inlined here since it's a
+  // two-line computation with no shared home yet. Moved up from further
+  // below (where it's also used for Financial Snapshot captions etc.) so it
+  // can back the opportunity lookup and Strategic Risk selection too — see
+  // those two below for why they needed this instead of currentPeriod.
+  const latestDataPeriod =
+    (allMetrics as KpiMetric[]).map((m) => m.periodStart).filter(Boolean).sort().reverse()[0] ?? null;
+
+  // The most recent *reviewed* period — the current Published Brief's
+  // period, if one exists. Still needed for content that is genuinely
+  // Brief-scoped: the Since Last Review deltas below compare this property's
+  // last two Published Briefs, not just any two periods with KPI data (see
+  // priorPeriod below), and the Executive Brief section itself only ever
+  // shows Brief content. Deliberately NOT used for Opportunities or
+  // Strategic Risk any more — those need real, current data to exist, not a
+  // Published Brief, and a property can have real June data with its June
+  // Brief still Draft (confirmed live: Yoshoku). See latestDataPeriod above.
   const currentPeriod = latestBrief?.reportingPeriodStart ?? null;
-  const opportunities = currentPeriod ? await getOpportunities(propertyId, currentPeriod) : [];
+
+  // Opportunities are an internal-only analytical input (feeds Actions and
+  // the Brief) and must be scoped to a single period — the most recent one
+  // with real data, never aggregated across every period ever generated for
+  // this property. Previously scoped to currentPeriod (the Brief's period),
+  // which silently zeroed this out for any property without a Published
+  // Brief yet even when real Opportunity/KPI data exists for the period
+  // (confirmed live: Yoshoku shows $876K/yr in real opportunities on
+  // Financial Review, but Overview showed "—" and Top 3 Priorities was
+  // entirely absent, solely because its June Brief is still Draft).
+  const opportunities = latestDataPeriod ? await getOpportunities(propertyId, latestDataPeriod) : [];
 
   // The prior *reviewed* period — the next distinct period among this
   // property's Published Briefs, not just any period with KPI data. A
@@ -281,7 +306,11 @@ export default async function PropertyPage({
   const topPriorities = selectTopPriorities(opportunities as Opportunity[], intelligence as Intelligence[]);
 
   // Strategic Risk — see selectStrategicRisk above for the selection logic.
-  const strategicRisk = selectStrategicRisk(intelligence as Intelligence[], currentPeriod);
+  // Scoped to latestDataPeriod, not currentPeriod, for the same reason
+  // Opportunities is above: a real Monitor-severity finding for the current
+  // period shouldn't go missing just because that period's Brief isn't
+  // Published yet.
+  const strategicRisk = selectStrategicRisk(intelligence as Intelligence[], latestDataPeriod);
 
   // Admin-only signal: financial numbers are all missing even though a
   // summary exists — check whether real data is sitting unpublished in Notion.
@@ -294,9 +323,6 @@ export default async function PropertyPage({
       ? await hasUnpublishedFinancialData(propertyId)
       : false;
 
-  const latestPeriod = (allMetrics as KpiMetric[])
-    .map((m) => m.periodStart).filter(Boolean).sort().reverse()[0] ?? null;
-
   // Financial Snapshot captions — the LPP Interpretation from the specific
   // KPI Record driving that card's value, not a generic property-level
   // field. Left blank (not a placeholder) when the record or its
@@ -306,7 +332,7 @@ export default async function PropertyPage({
     // their canonical total record — otherwise the caption is pulled from
     // whichever sub-component Notion stored first (e.g. the "Beverage
     // revenue of $154K…" line under the Revenue card).
-    return findMetricByKey(allMetrics as KpiMetric[], key, latestPeriod)?.interpretation?.trim() ?? "";
+    return findMetricByKey(allMetrics as KpiMetric[], key, latestDataPeriod)?.interpretation?.trim() ?? "";
   }
   const revenueInterpretation    = metricInterpretation("total_revenue");
   const laborInterpretation      = metricInterpretation("labor_pct");
@@ -325,7 +351,7 @@ export default async function PropertyPage({
   // wired to the real field so the variance badge activates the moment
   // Target Value gets populated, per Phase 5's "leave room for it."
   function metricTarget(key: string): number | null {
-    return findMetricByKey(allMetrics as KpiMetric[], key, latestPeriod)?.targetValue ?? null;
+    return findMetricByKey(allMetrics as KpiMetric[], key, latestDataPeriod)?.targetValue ?? null;
   }
 
   // Compact sub-component breakdown for a Financial Snapshot tile — the
@@ -340,7 +366,7 @@ export default async function PropertyPage({
   // corresponding records.
   function metricBreakdown(names: string[], category: string): { label: string; value: string }[] {
     return names
-      .map((n) => findMetricByName(allMetrics as KpiMetric[], n, latestPeriod, category))
+      .map((n) => findMetricByName(allMetrics as KpiMetric[], n, latestDataPeriod, category))
       .filter((m): m is KpiMetric => m != null)
       .map((m) => ({
         // Drop only a leading "Total " on this compact tile (the tile
@@ -477,7 +503,7 @@ export default async function PropertyPage({
   // rather than silently averaging or picking one arbitrarily.
   function guestMetric(key: string, fallback: number | null): { display: string; isRange: boolean } | null {
     const raw = (allMetrics as KpiMetric[])
-      .filter((m) => m.lppMetricKey === key && m.periodStart === latestPeriod)
+      .filter((m) => m.lppMetricKey === key && m.periodStart === latestDataPeriod)
       .map((m) => m.metricValue);
     if (raw.length === 0) {
       return fallback != null ? { display: fallback.toFixed(1), isRange: false } : null;
@@ -551,7 +577,7 @@ export default async function PropertyPage({
     .map(([name, label]) => ({
       label,
       value: (allMetrics as KpiMetric[]).find(
-        (m) => m.metricName === name && m.category === "Guest Experience" && m.unit === "Rating" && m.periodStart === latestPeriod
+        (m) => m.metricName === name && m.category === "Guest Experience" && m.unit === "Rating" && m.periodStart === latestDataPeriod
       )?.metricValue ?? null,
     }))
     .filter((s): s is { label: string; value: number } => s.value != null);
@@ -967,8 +993,8 @@ export default async function PropertyPage({
             header={
               <div className="flex items-center justify-between">
                 <SectionHeader title="Financial Snapshot" />
-                {latestPeriod && (
-                  <span style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.4)" }}>{formatPeriod(latestPeriod)}</span>
+                {latestDataPeriod && (
+                  <span style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.4)" }}>{formatPeriod(latestDataPeriod)}</span>
                 )}
               </div>
             }
