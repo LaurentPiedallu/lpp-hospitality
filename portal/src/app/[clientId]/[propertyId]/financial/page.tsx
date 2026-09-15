@@ -471,14 +471,23 @@ export default async function FinancialPage({
   // Expenses" isn't clear from the data (it doesn't reconcile cleanly
   // against opex or against opex + COGS + labor), so it's deliberately
   // excluded rather than guessed into a breakdown it might not belong in.
-  // "Kitchen Allocation Expense" is the real Notion Metric Name (see
-  // format.ts's own CANONICAL_METRIC_NAME comment block, which documents
-  // this exact string) — this allowlist previously had the bare "Kitchen
-  // Allocation" instead, a pre-existing mismatch that silently zeroed
-  // opexLineItems on Lex Yard itself, caught live while verifying the new
-  // dynamic-driver-naming connector below (it fell back to generic wording
-  // on the one property it was least expected to).
-  const OPEX_DRIVER_NAMES = ["Kitchen Allocation Expense", "Plants and Decorations", "Consulting Fees", "Uniform Cleaning"];
+  // Both "Kitchen Allocation Expense" and bare "Kitchen Allocation" are
+  // live Notion Metric Names for the same cost line — confirmed live that
+  // Lex Yard's real record uses the "Expense" suffix (matching format.ts's
+  // own CANONICAL_METRIC_NAME comment block) while Yoshoku's uses the bare
+  // name, so a single string can't match both properties' data. This
+  // allowlist previously had only the bare name, which meant it never
+  // actually matched Lex Yard's own record — caught live while verifying
+  // the new dynamic-driver-naming connector below (it fell back to generic
+  // wording, first on Lex Yard with only the bare name allowlisted, then
+  // on Yoshoku after switching to only the "Expense" variant).
+  const OPEX_DRIVER_NAMES = [
+    "Kitchen Allocation Expense",
+    "Kitchen Allocation",
+    "Plants and Decorations",
+    "Consulting Fees",
+    "Uniform Cleaning",
+  ];
   const opexLineItems = currentMetrics
     .filter((m) => m.category === "OpEx" && OPEX_DRIVER_NAMES.includes(m.metricName))
     .sort((a, b) => b.metricValue - a.metricValue);
