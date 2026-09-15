@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getProperty, getMenuBatches, getMenuItems, getIntelligence, getOpportunities, getKpiMetrics, getLastUpdated } from "@/lib/notion-queries";
-import { formatPeriod, findIntelligence, findMetricByKey } from "@/lib/format";
+import { formatPeriod, findAllIntelligence, findMetricByKey } from "@/lib/format";
 import { MENU_CATEGORY_ORDER, menuCategoryLabel, computeItemPairings } from "@/lib/menu";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
@@ -16,12 +16,65 @@ import MenuCategorySection from "@/components/MenuCategorySection";
 import MenuQuadrantScorecard from "@/components/MenuQuadrantScorecard";
 import MenuCogsComparison from "@/components/MenuCogsComparison";
 import FindingSection from "@/components/FindingSection";
+import CalloutBlock from "@/components/CalloutBlock";
+import StatusBadge from "@/components/StatusBadge";
 import ScrollToSection from "@/components/ScrollToSection";
 import OpportunitiesPanel from "@/components/OpportunitiesPanel";
 import { MENU_CATEGORY_SECTION } from "@/lib/deep-links";
-import type { Opportunity } from "@/types/portal";
+import type { Opportunity, Intelligence, Severity } from "@/types/portal";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
+
+function severityVariant(s: Severity): "green" | "amber" | "red" {
+  if (s === "Healthy") return "green";
+  if (s === "Critical") return "red";
+  return "amber";
+}
+
+// One additional Intelligence record beyond the primary one FindingSection
+// already shows via its own built-in callout — same CalloutBlock +
+// StatusBadge treatment, same component (duplicated locally, not shared)
+// Financial Review and Commercial Review already use for this exact case.
+// Menu Engineering had no second slot for this before now because
+// findIntelligence (the single-record picker) silently dropped anything
+// past the first match — see findAllIntelligence's own comment in
+// format.ts for the bug this replaces on Commercial/Financial, which
+// applies identically here now that Menu is on the same helper.
+function ExtraIntelCard({ record, showCommentary }: { record: Intelligence; showCommentary?: boolean }) {
+  if (!record.currentRead) return null;
+  return (
+    <>
+      <CalloutBlock>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <p>{record.currentRead}</p>
+          <StatusBadge label={record.severity} variant={severityVariant(record.severity)} />
+        </div>
+      </CalloutBlock>
+      {showCommentary && (record.whyItMatters || record.suggestedDecision) && (
+        <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden group">
+          <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between select-none hover:bg-gray-50 transition">
+            <span>LPP Perspective</span>
+            <span className="text-gray-400 text-xs group-open:rotate-180 transition-transform">▼</span>
+          </summary>
+          <div className="px-5 pb-5 pt-2 space-y-4 border-t border-gray-50">
+            {record.whyItMatters && (
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Why It Matters</p>
+                <p className="text-sm text-gray-700 leading-relaxed">{record.whyItMatters}</p>
+              </div>
+            )}
+            {record.suggestedDecision && (
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Recommendation</p>
+                <p className="text-sm text-gray-700 leading-relaxed">{record.suggestedDecision}</p>
+              </div>
+            )}
+          </div>
+        </details>
+      )}
+    </>
+  );
+}
 
 // ─── Period selector — plain links (batch is chosen server-side via
 // searchParams), consistent with how PropertyTabs navigates elsewhere on
@@ -169,7 +222,17 @@ async function MenuBatchView({
   // table, no Trend chart), leaving just the current-read callout and
   // Executive Interpretation toggle, driven entirely by the Menu-category
   // Intelligence finding for this batch's own Reporting Period.
-  const menuIntel = findIntelligence(intelligence, "Menu", activeBatch.reportingPeriod);
+  //
+  // findAllIntelligence, not the single-record findIntelligence this used
+  // to call — this was the one category-scoped lookup on the whole portal
+  // still on the old single-pick form (see findIntelligence's own comment
+  // in format.ts, which named this exact call site as the known gap left
+  // deliberately unfixed while Menu had at most one record to lose). No
+  // live property has a second Menu-category record today, so
+  // menuIntelAll.length is 1 everywhere in production right now — this
+  // only changes behavior the moment a second one is Published.
+  const menuIntelAll = findAllIntelligence(intelligence, "Menu", activeBatch.reportingPeriod);
+  const menuIntel = menuIntelAll[0] ?? null;
 
   // Daypart scope (Menu Engineering rebuild, Phase 0 item 3) — computed
   // from the real items rather than assumed. Confirmed directly against
@@ -227,7 +290,15 @@ async function MenuBatchView({
       </div>
 
       {(menuIntel?.currentRead || menuIntel?.whyItMatters || menuIntel?.suggestedDecision) && (
-        <FindingSection id="menu-insights" heading="Menu Insights" intelligence={menuIntel} metrics={[]} allMetrics={[]} trendColor="#B8935A" />
+        <FindingSection id="menu-insights" heading="Menu Insights" intelligence={menuIntel} metrics={[]} allMetrics={[]} trendColor="#B8935A">
+          {/* Any Menu-category records beyond the primary one above — same
+              ExtraIntelCard treatment Financial Review's Labor/COGS extras
+              use (none currently for any live property, since no property
+              has a second Menu-category record yet). */}
+          {menuIntelAll.slice(1).map((rec) => (
+            <ExtraIntelCard key={rec.id} record={rec} />
+          ))}
+        </FindingSection>
       )}
 
       {items.length === 0 ? (
