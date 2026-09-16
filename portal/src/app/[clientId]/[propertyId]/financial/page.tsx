@@ -14,7 +14,6 @@ import EmptyState from "@/components/EmptyState";
 import FindingSection from "@/components/FindingSection";
 import CalloutBlock from "@/components/CalloutBlock";
 import StatusBadge from "@/components/StatusBadge";
-import OrientationBlock from "@/components/OrientationBlock";
 import ScrollToSection from "@/components/ScrollToSection";
 import OpportunitiesPanel from "@/components/OpportunitiesPanel";
 import type { KpiMetric, Intelligence, Opportunity, Severity } from "@/types/portal";
@@ -569,12 +568,6 @@ export default async function FinancialPage({
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 80px" }} className="space-y-12">
 
-        {/* ── Orientation — for a reader landing here directly rather than
-             via Overview (Portal-Wide refinement) ──────────────────────── */}
-        <OrientationBlock>
-          Financial Review covers revenue, labor, food &amp; beverage cost, operating expenses, and profitability for the current reporting period, each measured against its own benchmark or budget where one exists.
-        </OrientationBlock>
-
         {/* ── Financial Synthesis ──────────────────────────────────────── */}
         {synthesis && (
           <section>
@@ -598,6 +591,13 @@ export default async function FinancialPage({
         )}
 
         {/* ── Revenue ──────────────────────────────────────────────────── */}
+        {/* Evidence consolidation Part 0/3: Evidence stays visible here
+            (collapsed by default, as before) — confirmed live that Revenue
+            carries real stray metrics with no stat-block home: Total Covers
+            Period + Breakfast/Dinner/Lunch Covers (total_covers_period
+            siblings beyond the "Total Revenue Covers" headline), and the
+            "Including Comps" + daypart Average Check variants beyond the
+            "Excluding Comps" headline. Not hidden. */}
         <FindingSection
           id="revenue"
           heading="Revenue"
@@ -677,6 +677,12 @@ export default async function FinancialPage({
           metrics={catMetrics("Labor")}
           allMetrics={trendFor("labor_pct")}
           primarySeverity={laborPct?.severity}
+          // Evidence consolidation Part 0/3: every real Labor-category KPI
+          // Record for Lex Yard's current period (Total Payroll/Taxes and
+          // Benefits, Total Wages, Taxes and Benefits, Labor %) is already
+          // shown above via BenchmarkRangeBar + DriverBreakdown — confirmed
+          // against live data, no stray metric exists only in Evidence.
+          hideEvidence
         >
           {/* Any Labor-category records beyond the primary one above (none
               currently for Lex Yard) — see ExtraIntelCard's own comment. */}
@@ -745,6 +751,12 @@ export default async function FinancialPage({
           metrics={catMetrics("COGS")}
           allMetrics={trendFor("cogs_pct")}
           primarySeverity={cogsPct?.severity}
+          // Evidence consolidation Part 0/3: every real COGS-category KPI
+          // Record for Lex Yard's current period (Total Cost of Sales, Food
+          // Cost of Sales, Beverage Cost of Sales, COGS %) is already shown
+          // above via BenchmarkRangeBar + StackedSplit — confirmed against
+          // live data, no stray metric exists only in Evidence.
+          hideEvidence
         >
           {/* Any COGS-category records beyond the primary one above (none
               currently for Lex Yard) — see ExtraIntelCard's own comment. */}
@@ -805,6 +817,19 @@ export default async function FinancialPage({
         </FindingSection>
 
         {/* ── OpEx ─────────────────────────────────────────────────────── */}
+        {/* Evidence consolidation Part 0/3: Evidence stays visible here —
+            confirmed live that "opex" + Segment "Total" has a genuine
+            3-way collision (Total Expenses $990,467 / Total Other Operating
+            Expenses $631,486 / Kitchen Allocation Expense $542,634).
+            resolveCanonicalRollup correctly resolves opexDollars to "Total
+            Other Operating Expenses", but "Total Expenses" has no
+            stat-block home anywhere on this page. Kitchen Allocation
+            Expense is meant to surface via OPEX_DRIVER_NAMES below, but
+            that DriverBreakdown only renders once opexLineItems.length >= 2
+            — Lex Yard's real data has exactly one matching record this
+            period, so it doesn't render either, making it a second real
+            stray metric this period. Both are only visible via Evidence.
+            Not hidden. */}
         <FindingSection
           id="opex"
           heading="Operating Expenses"
@@ -875,6 +900,15 @@ export default async function FinancialPage({
         </FindingSection>
 
         {/* ── Profitability — distinct layout as the page's conclusion ──── */}
+        {/* Evidence consolidation Part 0/3: Evidence stays visible here —
+            confirmed live that both net_profit and net_profit_pct collide
+            with a sibling "Gross Profit" pair (Gross Profit $464,342 /
+            76.3%) at the same key + Segment "Total". CANONICAL_METRIC_NAME
+            correctly resolves netProfit/netProfitPct to "Departmental
+            Profit/(Loss)" (-$526,125 / -86.5%, matching the live Overview
+            figure), but the real Gross Profit $ and % records have no
+            stat-block home anywhere on this page — genuine stray metrics,
+            only visible via Evidence. Not hidden. */}
         <FindingSection
           id="profitability"
           heading="Profitability"

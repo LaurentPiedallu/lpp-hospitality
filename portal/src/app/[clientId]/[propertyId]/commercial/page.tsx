@@ -17,8 +17,8 @@ import CalloutBlock from "@/components/CalloutBlock";
 import KpiCard from "@/components/KpiCard";
 import StatusBadge from "@/components/StatusBadge";
 import TrendChart from "@/components/TrendChart";
+import EvidenceTable from "@/components/EvidenceTable";
 import EmptyState from "@/components/EmptyState";
-import OrientationBlock from "@/components/OrientationBlock";
 import ScrollToSection from "@/components/ScrollToSection";
 import OpportunitiesPanel from "@/components/OpportunitiesPanel";
 import type { KpiMetric, Intelligence, Opportunity, Severity } from "@/types/portal";
@@ -172,6 +172,12 @@ function severityVariant(s: Severity): "green" | "amber" | "red" {
 // styled callout and a pile of plain text. Used wherever intelAll(cat)
 // returns more than one record.
 //
+// Title (Commercial Review restructure Part 2) is the record's own real
+// Finding text — every call site of this component previously rendered
+// with no visible title at all (Volume & Conversion's cards, and Guest
+// Experience's, which also had no Commentary toggle at either — that part
+// is unchanged here, still per-record via showCommentary below).
+//
 // showCommentary (opt-in, default off) restores Why It Matters / Suggested
 // Decision behind the same collapsed "Commentary" toggle the section's own
 // primary callout already uses (CommercialSection's built-in Commentary
@@ -184,9 +190,14 @@ function ExtraIntelCard({ record, showCommentary }: { record: Intelligence; show
   return (
     <>
       <CalloutBlock>
-        <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="space-y-2">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            {record.finding && (
+              <p className="text-sm font-medium text-gray-900">{record.finding}</p>
+            )}
+            <StatusBadge label={record.severity} variant={severityVariant(record.severity)} />
+          </div>
           <p>{record.currentRead}</p>
-          <StatusBadge label={record.severity} variant={severityVariant(record.severity)} />
         </div>
       </CalloutBlock>
       {showCommentary && (record.whyItMatters || record.suggestedDecision) && (
@@ -239,14 +250,24 @@ function SundayEconomicsCard({
   return (
     <>
       <CalloutBlock>
-        <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="space-y-2">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            {/* Title (Commercial Review restructure Part 2) — this card
+                consolidates two real records with no single Finding of its
+                own, so both real titles show, same as both records' real
+                Why It Matters text already does below. */}
+            <p className="text-sm font-medium text-gray-900">
+              {tuesdayIntel.finding}
+              {barOnlyIntel.finding && <>; {barOnlyIntel.finding}</>}
+            </p>
+            {/* Both source records carry Severity "Monitor" today — using
+                Tuesday's as the representative value rather than building a
+                rank-comparison for two records that currently agree. */}
+            <StatusBadge label={tuesdayIntel.severity} variant={severityVariant(tuesdayIntel.severity)} />
+          </div>
           <p>
             Sunday is the weakest day on the calendar for both formats it runs — brunch averages just 46 covers and bar-only dinner comes in at 93, the softest read of the week for each — while Tuesday, the softest night of the two-floor dinner block, adds a third recurring low-volume service to the same trough.
           </p>
-          {/* Both source records carry Severity "Monitor" today — using
-              Tuesday's as the representative value rather than building a
-              rank-comparison for two records that currently agree. */}
-          <StatusBadge label={tuesdayIntel.severity} variant={severityVariant(tuesdayIntel.severity)} />
         </div>
       </CalloutBlock>
       <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden group">
@@ -356,12 +377,19 @@ function CommercialSection({
       {/* Current read callout — hidden entirely when there's no real
           commentary (same rule as FindingSection's Fix 3: an internal
           pipeline state must not leak into client-facing copy as a literal
-          placeholder string). */}
+          placeholder string). Title (Commercial Review restructure Part 2)
+          is the record's own real Finding text — this callout previously
+          had no visible title at all, just the currentRead paragraph. */}
       {!hideCallout && intelligence?.currentRead && (
         <CalloutBlock>
-          <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="space-y-2">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              {intelligence.finding && (
+                <p className="text-sm font-medium text-gray-900">{intelligence.finding}</p>
+              )}
+              <StatusBadge label={severity} variant={severityVariant(severity)} />
+            </div>
             <p>{intelligence.currentRead}</p>
-            <StatusBadge label={severity} variant={severityVariant(severity)} />
           </div>
         </CalloutBlock>
       )}
@@ -381,13 +409,20 @@ function CommercialSection({
         );
       })()}
 
+      {/* LPP Perspective — always visible (Commercial Review restructure
+          Part 1), relabeled from "Commentary" for consistency with
+          FindingSection/Overview's existing convention now that both
+          components render this content the same way (previously the one
+          real divergence between this and FindingSection's own now-shared
+          treatment). Same bordered, gold-accented "headline content"
+          styling as FindingSection uses. */}
       {!hideCommentary && (intelligence?.whyItMatters || intelligence?.suggestedDecision) && (
-        <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden">
-          <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between select-none hover:bg-gray-50 transition">
-            <span>Commentary</span>
-            <span className="text-gray-400 text-xs">▼</span>
-          </summary>
-          <div className="px-5 pb-5 pt-2 space-y-4 border-t border-gray-50">
+        <div
+          className="bg-white rounded-none overflow-hidden"
+          style={{ border: "1px solid rgba(18,18,15,0.08)", borderLeft: "3px solid #B8935A" }}
+        >
+          <div className="px-5 py-4 space-y-4">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-widest">LPP Perspective</p>
             {intelligence.whyItMatters && (
               <div>
                 <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Why It Matters</p>
@@ -401,48 +436,21 @@ function CommercialSection({
               </div>
             )}
           </div>
-        </details>
+        </div>
       )}
 
+      {/* Supporting detail — now delegates to the shared EvidenceTable
+          (Commercial Review restructure Part 3) instead of a hand-rolled
+          table, so this gets the same notable-rows-only filtering and
+          rationale sub-line Financial Review's Evidence already has,
+          rather than dumping every metric unfiltered. */}
       {metrics.length > 0 && !hideEvidence && (
         <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden">
           <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between select-none hover:bg-gray-50 transition">
             <span>Supporting detail</span>
             <span className="text-gray-400 text-xs">▼</span>
           </summary>
-          <div className="border-t border-gray-50 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-50">
-                  <th className="text-left px-5 py-2.5 text-xs text-gray-400 font-medium">Metric</th>
-                  <th className="text-right px-5 py-2.5 text-xs text-gray-400 font-medium">Value</th>
-                  <th className="text-right px-5 py-2.5 text-xs text-gray-400 font-medium">Benchmark</th>
-                  <th className="text-right px-5 py-2.5 text-xs text-gray-400 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {metrics.map((m) => (
-                  <tr key={m.id} className="border-b border-gray-50 last:border-0">
-                    <td className="px-5 py-2.5 text-gray-700">{m.metricName || m.kpiRecord}</td>
-                    <td className="px-5 py-2.5 text-right font-medium text-gray-900">
-                      {m.unit === "$" ? usd(m.metricValue)
-                        : m.unit === "%" ? pct(m.metricValue)
-                        : m.unit === "Rating" ? m.metricValue.toFixed(1)
-                        : m.metricValue.toLocaleString()}
-                    </td>
-                    <td className="px-5 py-2.5 text-right text-gray-400 text-xs">
-                      {hasRealBenchmark(m.benchmarkLow, m.benchmarkHigh)
-                        ? `${m.benchmarkLow}–${m.benchmarkHigh} ${m.unit}`
-                        : "—"}
-                    </td>
-                    <td className="px-5 py-2.5 text-right">
-                      <StatusBadge label={m.severity} variant={severityVariant(m.severity)} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <EvidenceTable metrics={metrics} sectionSeverity={severity} />
         </details>
       )}
     </section>
@@ -1217,12 +1225,6 @@ export default async function CommercialPage({
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 80px" }} className="space-y-12">
 
-        {/* ── Orientation — for a reader landing here directly rather than
-             via Overview (Portal-Wide refinement) ──────────────────────── */}
-        <OrientationBlock>
-          Commercial Review covers demand volume and conversion, seat-efficiency (RevPASH), and guest experience for the current reporting period, closing with the opportunities that follow from them.
-        </OrientationBlock>
-
         {/* ── Commercial Synthesis ─────────────────────────────────────── */}
         {synthesis && (
           <section>
@@ -1258,6 +1260,16 @@ export default async function CommercialPage({
           connector={volumeConversionConnector}
           intelligence={intel("Commercial")}
           metrics={catMetrics("Commercial")}
+          // Evidence consolidation Part 3: explicit hideEvidence, matching
+          // RevPASH's already-correct pattern below. "Commercial" is an
+          // Intelligence category, not a real KPI Category (the schema's
+          // actual values are Revenue/Labor/COGS/OpEx/Profitability/Guest
+          // Experience/Reservations/Menu/Execution) — catMetrics("Commercial")
+          // is always [], so Supporting detail already never rendered here.
+          // Not fixing the category-key mismatch (out of scope for this
+          // pass); just making the already-empty result explicit rather
+          // than incidental.
+          hideEvidence
           // Scoped correctly now (canonical "covers" key), but this won't
           // render a 2-point trend yet even so: confirmed against real data
           // that the only March-period record under this key is mistagged

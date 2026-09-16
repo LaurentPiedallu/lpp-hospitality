@@ -165,6 +165,15 @@ function shortenDecisionPhrase(sentence: string, priorityWords: Set<string>): st
     .trim()
     .replace(/^(Laurent\s+(needs to|must|should)\s+)/i, "")
     .replace(/^(A\s+go\s+or\s+no-go\s+decision\s+on\s+)/i, "")
+    // Tag copy tightening (Commercial Review restructure Part 4) — strips a
+    // leading action verb ("commission a", "authorize", "implement a", ...)
+    // that reads as narrator scaffolding in a full sentence but as noise in
+    // a short tag, and folds " versus " to "/" (matches "full-time/
+    // part-time scheduling audit" rather than "...full-time versus
+    // part-time..."). Presentation only — doesn't touch which sentence
+    // matched which priority, that's matchDecisionsToPriorities above.
+    .replace(/^(commission|authorize|implement|launch|conduct|approve|confirm)\s+(a|an)?\s*/i, "")
+    .replace(/\s+versus\s+/gi, "/")
     .replace(/,?\s*within\s+\d+\s+(day|days|week|weeks)\b.*$/i, "")
     .replace(/[.,;]+$/, "");
   const words = cleaned.split(/\s+/);
@@ -337,7 +346,7 @@ function TopPriorityCard({
       )}
       {decisionTag && (
         <div style={{ marginBottom: target ? 12 : 0 }}>
-          <StatusBadge label={`Requires authorization: ${decisionTag}`} variant="amber" />
+          <StatusBadge label={`Requires: ${decisionTag}`} variant="amber" />
         </div>
       )}
       {target && (
@@ -1130,7 +1139,7 @@ export default async function PropertyPage({
                 {decisionTagByPriorityId.get(topPriorities[0].id) && (
                   <div style={{ marginBottom: 22 }}>
                     <StatusBadge
-                      label={`Requires authorization: ${decisionTagByPriorityId.get(topPriorities[0].id)}`}
+                      label={`Requires: ${decisionTagByPriorityId.get(topPriorities[0].id)}`}
                       variant="amber"
                     />
                   </div>

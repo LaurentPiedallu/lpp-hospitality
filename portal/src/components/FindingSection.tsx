@@ -34,6 +34,9 @@ export default function FindingSection({
   allMetrics,
   primarySeverity,
   trendColor = "#2563eb",
+  hideCallout,
+  hideEvidence,
+  hideCommentary,
   id,
   children,
 }: {
@@ -50,6 +53,15 @@ export default function FindingSection({
   // any line item in the category and mislead the badge.
   primarySeverity?: Severity;
   trendColor?: string;
+  // Suppression props (Commercial Review restructure Part 3) — same
+  // meaning/behavior as CommercialSection's own identically-named props,
+  // now that both components support the same set. None of Financial
+  // Review's or Menu Engineering's existing call sites pass these, so this
+  // is additive — every current call site's behavior is unchanged unless a
+  // caller opts in.
+  hideCallout?: boolean;
+  hideEvidence?: boolean;
+  hideCommentary?: boolean;
   // Deep-link anchor (Cross-tab audit Part 4) — lets ScrollToSection find
   // and scroll-highlight this section from a query-param-driven landing.
   // Optional: sections that aren't a deep-link destination don't need one.
@@ -74,7 +86,7 @@ export default function FindingSection({
           published yet") must not leak into client-facing copy as a
           literal placeholder string. Same "if a field is missing, don't
           render that sub-element" rule as everywhere else in the portal. */}
-      {intelligence?.currentRead && (
+      {!hideCallout && intelligence?.currentRead && (
         <CalloutBlock>
           <div className="space-y-3">
             <StatusBadge label={severity} variant={severityVariant(severity)} />
@@ -107,19 +119,22 @@ export default function FindingSection({
         );
       })()}
 
-      {/* LPP Perspective toggle — renamed from "Executive Interpretation"
-          (Financial Review refinement Fix 5): that label asserted a
-          single objective read rather than signaling whose read this is.
-          Overview already uses "LPP Perspective" for the same kind of
-          content; same label, same meaning, everywhere in the portal.
-          Internal structure (Why It Matters / Recommendation) unchanged. */}
-      {(intelligence?.whyItMatters || intelligence?.suggestedDecision) && (
-        <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden group">
-          <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between select-none hover:bg-gray-50 transition">
-            <span>LPP Perspective</span>
-            <span className="text-gray-400 text-xs group-open:rotate-180 transition-transform">▼</span>
-          </summary>
-          <div className="px-5 pb-5 pt-2 space-y-4 border-t border-gray-50">
+      {/* LPP Perspective — always visible (Commercial Review restructure
+          Part 1). Previously a collapsed <details> a reader had to know to
+          open; this is the section's headline finding, not optional
+          supporting detail, so it now renders permanently with visual
+          weight to match — a bordered, gold-accented block (same "headline
+          content" visual language CalloutBlock already uses elsewhere on
+          this page), not just an unwrapped accordion. Internal structure
+          (Why It Matters / Recommendation) unchanged; label unchanged
+          ("LPP Perspective", same as Overview uses for the same content). */}
+      {!hideCommentary && (intelligence?.whyItMatters || intelligence?.suggestedDecision) && (
+        <div
+          className="bg-white rounded-none overflow-hidden"
+          style={{ border: "1px solid rgba(18,18,15,0.08)", borderLeft: "3px solid #B8935A" }}
+        >
+          <div className="px-5 py-4 space-y-4">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-widest">LPP Perspective</p>
             {intelligence.whyItMatters && (
               <div>
                 <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Why It Matters</p>
@@ -133,13 +148,18 @@ export default function FindingSection({
               </div>
             )}
           </div>
-        </details>
+        </div>
       )}
 
       {/* Evidence toggle — raw metrics. This <details> is disclosure level 1
           ("show me raw metrics at all"); the notable-rows-only vs. show-all
-          toggle inside EvidenceTable is level 2 and stays independent of it. */}
-      {metrics.length > 0 && (
+          toggle inside EvidenceTable is level 2 and stays independent of it.
+          hideEvidence (Commercial Review restructure Part 3) suppresses
+          this entirely for sections where every metric here is already
+          shown in the stat block above (see Part 0's per-section audit) —
+          Financial Review's five sections still default to false/visible
+          unless a caller explicitly opts in below. */}
+      {metrics.length > 0 && !hideEvidence && (
         <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden">
           <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between select-none hover:bg-gray-50 transition">
             <span>Evidence</span>
