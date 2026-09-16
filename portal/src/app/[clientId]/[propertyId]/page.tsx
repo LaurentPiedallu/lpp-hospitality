@@ -107,6 +107,116 @@ function selectStrategicRisk(records: Intelligence[], period: string | null): In
   return null;
 }
 
+// Decision -> Priority matching — folds "Decision Needed" into the
+// specific Top 3 Priority card it unlocks, instead of a standalone
+// paragraph that often just restates authorizations the priority's own
+// nextStep already implies.
+//
+// Sentence-level, not whole-field: decisionsRequired is frequently a
+// compound sentence bundling multiple distinct asks (confirmed on Lex
+// Yard's live June Brief — one sentence asks Laurent to BOTH renegotiate
+// the kitchen allocation AND commission a scheduling audit), and not every
+// ask corresponds to something in the visible Top 3 at all — the
+// kitchen-allocation ask maps to a real Opportunity ("Introduce a variable
+// kitchen allocation tied to actual covers", $0 impact, "No lever
+// available...") that exists in Notion but never ranks into the Top 3, not
+// to any of the three priorities actually shown.
+//
+// Matching is deliberately conservative: whole-sentence keyword overlap
+// against each priority's own title+nextStep (its most specific,
+// distinguishing text), requiring >=3 shared significant words (>=4
+// letters, common stopwords excluded) AND a clear leader (>=2 words ahead
+// of the runner-up). A bare "kitchen allocation" overlap (2 words) does
+// NOT clear this bar on purpose — checked live Notion data first and found
+// two different real Opportunities sharing that exact phrase for two
+// different actions (renegotiate vs audit-for-misclassification); a looser
+// bar would have force-matched the wrong one.
+function significantWords(text: string): string[] {
+  const stop = new Set([
+    "that", "this", "with", "from", "have", "been", "were", "will", "should",
+    "would", "could", "must", "needs", "need", "laurent", "within", "until",
+    "before", "after", "which", "their", "there", "about", "across", "those",
+    "these", "when", "where", "held", "review", "complete", "decision",
+  ]);
+  return (text.toLowerCase().match(/[a-z][a-z-]{3,}/g) ?? []).filter((w) => !stop.has(w));
+}
+
+// Short tag phrase for a matched decision — strips the sentence's narrator
+// scaffolding ("Laurent needs to...", a trailing "within N days" clause)
+// rather than showing the full sentence in a small tag. When the sentence
+// is itself compound ("X and Y"), picks whichever "and"-joined sub-clause
+// actually overlaps with the matched priority, so the tag reflects the
+// specific ask this priority unlocks, not whichever clause happened to
+// come first. Caps length so a long ask still reads as a tag.
+function shortenDecisionPhrase(sentence: string, priorityWords: Set<string>): string {
+  const subClauses = sentence.split(/\s+and\s+/i);
+  let clause = subClauses[0];
+  if (subClauses.length > 1) {
+    let bestScore = -1;
+    for (const c of subClauses) {
+      const score = significantWords(c).filter((w) => priorityWords.has(w)).length;
+      if (score > bestScore) {
+        bestScore = score;
+        clause = c;
+      }
+    }
+  }
+  const cleaned = clause
+    .trim()
+    .replace(/^(Laurent\s+(needs to|must|should)\s+)/i, "")
+    .replace(/^(A\s+go\s+or\s+no-go\s+decision\s+on\s+)/i, "")
+    .replace(/,?\s*within\s+\d+\s+(day|days|week|weeks)\b.*$/i, "")
+    .replace(/[.,;]+$/, "");
+  const words = cleaned.split(/\s+/);
+  return words.length > 8 ? words.slice(0, 8).join(" ") + "…" : cleaned;
+}
+
+interface DecisionMatch {
+  priorityId: string;
+  phrase: string;
+}
+
+function matchDecisionsToPriorities(
+  decisionsRequired: string,
+  priorities: TopPriority[]
+): { matches: DecisionMatch[]; unmatched: string[] } {
+  const sentences = decisionsRequired
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const priorityWordSets = priorities.map((p) => new Set(significantWords(`${p.title} ${p.nextStep}`)));
+
+  const matches: DecisionMatch[] = [];
+  const unmatched: string[] = [];
+
+  for (const sentence of sentences) {
+    const sentenceWords = significantWords(sentence);
+    let bestIdx = -1;
+    let bestScore = 0;
+    let secondScore = 0;
+    priorityWordSets.forEach((words, i) => {
+      const score = sentenceWords.filter((w) => words.has(w)).length;
+      if (score > bestScore) {
+        secondScore = bestScore;
+        bestScore = score;
+        bestIdx = i;
+      } else if (score > secondScore) {
+        secondScore = score;
+      }
+    });
+    if (bestIdx >= 0 && bestScore >= 3 && bestScore - secondScore >= 2) {
+      matches.push({
+        priorityId: priorities[bestIdx].id,
+        phrase: shortenDecisionPhrase(sentence, priorityWordSets[bestIdx]),
+      });
+    } else {
+      unmatched.push(sentence);
+    }
+  }
+  return { matches, unmatched };
+}
+
 function PrimarySectionHeader({ title }: { title: string }) {
   return (
     <h2 style={{ fontFamily: SERIF, fontSize: "1.9rem", fontWeight: 400, color: "#12120F", marginBottom: 24 }}>
@@ -169,6 +279,7 @@ function TopPriorityCard({
   clientId,
   propertyId,
   annualOpportunity,
+  decisionTag,
 }: {
   priority: TopPriority;
   clientId: string;
@@ -176,6 +287,11 @@ function TopPriorityCard({
   // Number pairing (Fix 6) — real anchor already computed on the page
   // (same figure the "at a glance" strip shows), not fabricated per-card.
   annualOpportunity: number;
+  // Decision -> Priority matching — see matchDecisionsToPriorities above.
+  // Short phrase only (e.g. "renegotiation of the kitchen cost
+  // allocation…"), not the full decision sentence; absent when no decision
+  // sentence confidently matched this priority.
+  decisionTag?: string;
 }) {
   const target = PRIORITY_TAB_BY_CATEGORY[priority.category];
   return (
@@ -191,7 +307,13 @@ function TopPriorityCard({
         </div>
         {priority.confidence && (
           <span style={{ flexShrink: 0 }}>
-            <StatusBadge label={priority.confidence} variant={CONFIDENCE_VARIANT[priority.confidence]} />
+            {/* Labeled "Confidence: X" (Fix — was a bare "High"/"Medium"/
+                etc., easily misread as the Priority field's own
+                Critical/High/Medium/Low tier, which is a different real
+                field that isn't rendered here at all). Same data source
+                (priority.confidence) and same absent-when-null behavior,
+                text only. */}
+            <StatusBadge label={`Confidence: ${priority.confidence}`} variant={CONFIDENCE_VARIANT[priority.confidence]} />
           </span>
         )}
       </div>
@@ -209,9 +331,14 @@ function TopPriorityCard({
         </div>
       )}
       {priority.nextStep && (
-        <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.55)", lineHeight: 1.6, marginBottom: target ? 12 : 0 }}>
+        <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.55)", lineHeight: 1.6, marginBottom: decisionTag || target ? 12 : 0 }}>
           {priority.nextStep}
         </p>
+      )}
+      {decisionTag && (
+        <div style={{ marginBottom: target ? 12 : 0 }}>
+          <StatusBadge label={`Requires authorization: ${decisionTag}`} variant="amber" />
+        </div>
       )}
       {target && (
         <Link
@@ -304,6 +431,17 @@ export default async function PropertyPage({
   // Biggest Opportunity section used to be); [1] and [2] render as standard
   // cards.
   const topPriorities = selectTopPriorities(opportunities as Opportunity[], intelligence as Intelligence[]);
+
+  // Decision -> Priority matching — see matchDecisionsToPriorities above.
+  // decisionTagByPriorityId feeds the small "Requires authorization: ..."
+  // tag on whichever priority card (including the #1 hero) a decision
+  // sentence confidently matched; unmatchedDecisions feeds the minimal
+  // fallback line for the rest, replacing the old standalone "Decision
+  // needed" paragraph entirely.
+  const { matches: decisionMatches, unmatched: unmatchedDecisions } = latestBrief?.decisionsRequired
+    ? matchDecisionsToPriorities(latestBrief.decisionsRequired, topPriorities)
+    : { matches: [], unmatched: [] };
+  const decisionTagByPriorityId = new Map(decisionMatches.map((m) => [m.priorityId, m.phrase]));
 
   // Strategic Risk — see selectStrategicRisk above for the selection logic.
   // Scoped to latestDataPeriod, not currentPeriod, for the same reason
@@ -853,15 +991,25 @@ export default async function PropertyPage({
                   {latestBrief.executiveRead}
                 </p>
               )}
-              {/* Decision needed — promoted visually (heavier weight, gold
-                  top rule) since it's the single most actionable line in
-                  the brief; previously the least visually weighted line
-                  in the section. */}
-              {latestBrief.decisionsRequired && (
-                <p style={{ fontFamily: JOST, fontSize: 15, fontWeight: 600, color: "#12120F", lineHeight: 1.6, borderTop: "1px solid rgba(184,147,90,0.3)", paddingTop: 16, marginTop: 4 }}>
-                  <span style={{ color: GOLD }}>Decision needed{"  "}</span>
-                  {latestBrief.decisionsRequired}
-                </p>
+              {/* Decision needed — no longer a standalone paragraph here.
+                  Decision sentences that confidently matched a Top 3
+                  Priority now render as a "Requires authorization" tag on
+                  that priority's own card (see matchDecisionsToPriorities
+                  above and decisionTagByPriorityId below); this is only the
+                  minimal fallback for a decision sentence that didn't match
+                  any of the three — real asks don't silently disappear, but
+                  they no longer get the full heavy-weight treatment
+                  wholesale just because SOME of decisionsRequired matched
+                  elsewhere. */}
+              {unmatchedDecisions.length > 0 && (
+                <div style={{ borderTop: "1px solid rgba(184,147,90,0.3)", paddingTop: 16, marginTop: 4 }} className="space-y-2">
+                  {unmatchedDecisions.map((sentence, i) => (
+                    <p key={i} style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.6)", lineHeight: 1.6 }}>
+                      <span style={{ color: GOLD, fontWeight: 600 }}>Also requires a decision{"  "}</span>
+                      {sentence}
+                    </p>
+                  ))}
+                </div>
               )}
             </div>
 
@@ -973,6 +1121,20 @@ export default async function PropertyPage({
                     {topPriorities[0].nextStep}
                   </p>
                 )}
+                {/* Decision -> Priority matching (see matchDecisionsToPriorities
+                    above) — the hero slot gets this too, not just #2/#3's
+                    TopPriorityCard, since a decision sentence can confidently
+                    match the #1 priority (confirmed live: Lex Yard's
+                    scheduling-audit ask matches its #1 "Restructure FT-to-PT
+                    ratio" priority, not #2 or #3). */}
+                {decisionTagByPriorityId.get(topPriorities[0].id) && (
+                  <div style={{ marginBottom: 22 }}>
+                    <StatusBadge
+                      label={`Requires authorization: ${decisionTagByPriorityId.get(topPriorities[0].id)}`}
+                      variant="amber"
+                    />
+                  </div>
+                )}
                 {topPriorities[0].impactAnnual > 0 && (
                   <div style={{ marginBottom: PRIORITY_TAB_BY_CATEGORY[topPriorities[0].category] ? 22 : 0 }}>
                     <p style={{ fontFamily: SERIF, fontSize: "clamp(2.4rem, 5vw, 3.4rem)", fontWeight: 400, color: GOLD, lineHeight: 1 }}>
@@ -1006,7 +1168,14 @@ export default async function PropertyPage({
             {topPriorities.length > 1 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {topPriorities.slice(1).map((priority) => (
-                  <TopPriorityCard key={priority.id} priority={priority} clientId={clientId} propertyId={propertyId} annualOpportunity={annualOpportunity} />
+                  <TopPriorityCard
+                    key={priority.id}
+                    priority={priority}
+                    clientId={clientId}
+                    propertyId={propertyId}
+                    annualOpportunity={annualOpportunity}
+                    decisionTag={decisionTagByPriorityId.get(priority.id)}
+                  />
                 ))}
               </div>
             )}
