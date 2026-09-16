@@ -2,8 +2,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import {
-  getClients, getClient, getProperties, getLatestKpiSummary, getActions,
-  hasUnpublishedFinancialData, getPublishedBriefs, getOpportunities, getIntelligence,
+  getClients, getClient, getProperties, getLatestKpiSummary, getKpiMetrics, getActions,
+  hasUnpublishedFinancialData, getOpportunities, getIntelligence,
 } from "@/lib/notion-queries";
 import { deriveHealth } from "@/lib/health";
 import { compact } from "@/lib/format";
@@ -11,7 +11,7 @@ import { selectTopPriorities } from "@/lib/priorities";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import { propertyPhoto } from "@/lib/property-photos";
-import type { Client, Property, KpiSummary, Opportunity, Intelligence } from "@/types/portal";
+import type { Client, Property, KpiSummary, Opportunity, Intelligence, KpiMetric } from "@/types/portal";
 import type { HealthColor } from "@/lib/health";
 
 const JOST = "'Jost', 'Inter', system-ui, sans-serif";
@@ -59,20 +59,27 @@ async function loadDashboard(session: Awaited<ReturnType<typeof getSession>>): P
 
       const cards: PropertyCard[] = await Promise.all(
         properties.map(async (property) => {
-          const [kpi, actions, briefs, intelligence] = await Promise.all([
+          const [kpi, actions, allMetrics, intelligence] = await Promise.all([
             getLatestKpiSummary(property.id),
             getActions(property.id),
-            getPublishedBriefs(property.id, client.id),
+            getKpiMetrics(property.id),
             getIntelligence(property.id),
           ]);
 
-          // Same convention as the property Overview page: Opportunities are
-          // scoped to the current period (the most recent Published Brief's
-          // Reporting Period), never aggregated across every period ever
-          // generated for this property.
-          const currentPeriod = briefs[0]?.reportingPeriodStart ?? null;
-          const opportunities: Opportunity[] = currentPeriod
-            ? await getOpportunities(property.id, currentPeriod)
+          // Same convention as the property Overview page (see
+          // latestDataPeriod in [propertyId]/page.tsx): Opportunities are
+          // scoped to the most recent period with real Published KPI data,
+          // never to the latest Published Brief's period. A property can
+          // have real, current Opportunity data while its Brief is still
+          // Draft/Archived (confirmed live: Yoshoku has no Published Brief
+          // at all, which previously zeroed this card out even though real
+          // June Opportunities exist) — anchoring to the Brief silently
+          // went stale in exactly that case. Never aggregated across every
+          // period ever generated for this property.
+          const latestDataPeriod =
+            (allMetrics as KpiMetric[]).map((m) => m.periodStart).filter(Boolean).sort().reverse()[0] ?? null;
+          const opportunities: Opportunity[] = latestDataPeriod
+            ? await getOpportunities(property.id, latestDataPeriod)
             : [];
           const annualOpportunity = opportunities.reduce((s, o) => s + o.estimatedAnnualImpact, 0);
           const topPriorities = selectTopPriorities(opportunities, intelligence as Intelligence[]);
