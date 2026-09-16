@@ -596,6 +596,18 @@ export default async function PropertyPage({
   // Executive Summary rendering above instead.
   const hasNewBriefFormat = !!latestBrief?.executiveRead?.trim();
 
+  // Version-branch within the new hierarchical format itself, same
+  // has*/trim() convention as hasNewBriefFormat above: Scenario C's prompt
+  // was updated to stop writing "LPP Perspective" on Briefs it generates
+  // from today onward, so this can no longer be assumed present just
+  // because hasNewBriefFormat is true. When it IS populated (every Brief
+  // generated before today's prompt change), keep the existing
+  // Situation/Why It Matters two-block split unchanged. When it's empty
+  // (new-format Briefs from today onward), Executive Brief renders
+  // executiveRead alone as a single paragraph with no label split — see
+  // the Executive Brief section below.
+  const hasLppPerspective = !!latestBrief?.lppPerspective?.trim();
+
   // Drivers grouping (Cross-tab audit Part 5) — replaces the old
   // unstructured criticalDrivers text field with the real Driver Findings
   // relation (Brief -> Intelligence), grouped into "Financial & Commercial"
@@ -801,29 +813,44 @@ export default async function PropertyPage({
                 page background rather than a special callout, unlike
                 CalloutBlock/the old bordered treatment. "Situation" and
                 "Why It Matters" relabel the same two real fields Notion
-                already generates (executiveRead / lppPerspective) — full
+                used to generate (executiveRead / lppPerspective) — full
                 text preserved, not compressed. The spec's ~100-word target
                 assumed a shorter dedicated field for each part, which
                 doesn't exist yet; hitting it would mean cutting real
                 generated analysis myself, so that's flagged back rather
                 than done here — this structure is ready for shorter copy
-                the moment it exists. */}
+                the moment it exists.
+
+                Version branch (see hasLppPerspective above): Scenario C
+                stopped writing LPP Perspective on Briefs generated from
+                today onward, so a new-format Brief only ever has
+                executiveRead — rendered alone, no Situation/Why It Matters
+                label split, since a split implies a second real block that
+                no longer exists for these Briefs. Old-format Briefs (every
+                one generated before today) keep the two-block rendering
+                exactly as before. */}
             <div className="space-y-4">
               <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: GOLD }}>
                 Executive Brief
               </p>
-              <p style={{ fontFamily: SERIF, fontSize: "1.05rem", fontWeight: 400, color: "#12120F", lineHeight: 1.75 }}>
-                <span style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, color: "rgba(18,18,15,0.4)" }}>
-                  Situation{"  "}
-                </span>
-                {latestBrief.executiveRead}
-              </p>
-              {latestBrief.lppPerspective && (
+              {hasLppPerspective ? (
+                <>
+                  <p style={{ fontFamily: SERIF, fontSize: "1.05rem", fontWeight: 400, color: "#12120F", lineHeight: 1.75 }}>
+                    <span style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, color: "rgba(18,18,15,0.4)" }}>
+                      Situation{"  "}
+                    </span>
+                    {latestBrief.executiveRead}
+                  </p>
+                  <p style={{ fontFamily: SERIF, fontSize: "1.05rem", fontWeight: 400, color: "#12120F", lineHeight: 1.75 }}>
+                    <span style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, color: "rgba(18,18,15,0.4)" }}>
+                      Why It Matters{"  "}
+                    </span>
+                    {latestBrief.lppPerspective}
+                  </p>
+                </>
+              ) : (
                 <p style={{ fontFamily: SERIF, fontSize: "1.05rem", fontWeight: 400, color: "#12120F", lineHeight: 1.75 }}>
-                  <span style={{ fontFamily: JOST, fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, color: "rgba(18,18,15,0.4)" }}>
-                    Why It Matters{"  "}
-                  </span>
-                  {latestBrief.lppPerspective}
+                  {latestBrief.executiveRead}
                 </p>
               )}
               {/* Decision needed — promoted visually (heavier weight, gold
