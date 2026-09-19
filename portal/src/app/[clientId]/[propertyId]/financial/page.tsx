@@ -928,33 +928,43 @@ export default async function FinancialPage({
             <ExtraIntelCard key={rec.id} record={rec} />
           ))}
           <div className="space-y-3">
-            <div style={{ background: "#12120F", padding: "36px 40px" }} className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
-              <div>
-                <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(242,237,228,0.55)", marginBottom: 10 }}>
-                  Net Profit Margin
-                </p>
-                {netProfitPct && (
-                  <p style={{ fontFamily: SERIF, fontSize: "clamp(2.6rem, 5vw, 3.6rem)", fontWeight: 300, lineHeight: 1, color: netProfitPct.metricValue < 0 ? "#e0796b" : "rgba(242,237,228,0.92)" }}>
-                    {pct(netProfitPct.metricValue)}
+            {/* Outer shell gated on netProfitPct (Peacock Alley black-box
+                fix) — this "hero stat card" background/padding used to
+                render unconditionally while only the value lines inside it
+                checked for real data, so a property with zero Profitability
+                data got an empty dark box with just the "Net Profit Margin"
+                label. Same gating convention every other stat element on
+                this page already uses, and the same condition ProfitBridge
+                below already gates on. */}
+            {netProfitPct && (
+              <div style={{ background: "#12120F", padding: "36px 40px" }} className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
+                <div>
+                  <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(242,237,228,0.55)", marginBottom: 10 }}>
+                    Net Profit Margin
                   </p>
-                )}
-                {netProfitPct?.benchmarkLow != null && (
-                  <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(242,237,228,0.55)", marginTop: 8 }}>
-                    Benchmark {netProfitPct.benchmarkLow}–{netProfitPct.benchmarkHigh}%
-                  </p>
+                  {netProfitPct && (
+                    <p style={{ fontFamily: SERIF, fontSize: "clamp(2.6rem, 5vw, 3.6rem)", fontWeight: 300, lineHeight: 1, color: netProfitPct.metricValue < 0 ? "#e0796b" : "rgba(242,237,228,0.92)" }}>
+                      {pct(netProfitPct.metricValue)}
+                    </p>
+                  )}
+                  {netProfitPct?.benchmarkLow != null && (
+                    <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(242,237,228,0.55)", marginTop: 8 }}>
+                      Benchmark {netProfitPct.benchmarkLow}–{netProfitPct.benchmarkHigh}%
+                    </p>
+                  )}
+                </div>
+                {netProfit && (
+                  <div style={{ textAlign: "left" }}>
+                    <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(242,237,228,0.55)", marginBottom: 10 }}>
+                      Net Profit
+                    </p>
+                    <p style={{ fontFamily: SERIF, fontSize: "1.9rem", fontWeight: 300, color: netProfit.metricValue < 0 ? "#e0796b" : "rgba(242,237,228,0.92)" }}>
+                      {usd(netProfit.metricValue)}
+                    </p>
+                  </div>
                 )}
               </div>
-              {netProfit && (
-                <div style={{ textAlign: "left" }}>
-                  <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(242,237,228,0.55)", marginBottom: 10 }}>
-                    Net Profit
-                  </p>
-                  <p style={{ fontFamily: SERIF, fontSize: "1.9rem", fontWeight: 300, color: netProfit.metricValue < 0 ? "#e0796b" : "rgba(242,237,228,0.92)" }}>
-                    {usd(netProfit.metricValue)}
-                  </p>
-                </div>
-              )}
-            </div>
+            )}
 
             {/* Actual-P&L waterfall — additive, alongside the card above, not
                 a replacement (Phase 3 decision to leave that card as built). */}
