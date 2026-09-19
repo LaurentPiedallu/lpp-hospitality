@@ -155,6 +155,38 @@ function DriverBreakdown({
   );
 }
 
+// ─── Single driver stat — fallback when exactly one item matches ────────────
+// DriverBreakdown requires >=2 items to be a meaningful comparison; a bar
+// chart with one bar compared to nothing isn't useful. But a real, dominant
+// driver with no second item to compare against is still worth surfacing
+// (confirmed live: both Lex Yard and Yoshoku's June OpEx data have exactly
+// one OPEX_DRIVER_NAMES match each) — so it renders as a plain labeled stat
+// instead of being silently dropped.
+
+function SingleDriverStat({
+  title,
+  total,
+  item,
+}: {
+  title: string;
+  total: number;
+  item: { label: string; value: number };
+}) {
+  return (
+    <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, padding: 20 }}>
+      <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 16 }}>
+        {title}
+      </p>
+      <div className="flex items-baseline justify-between">
+        <span style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.65)" }}>{item.label}</span>
+        <span style={{ fontFamily: JOST, fontSize: 12, color: "#12120F", fontWeight: 500 }}>
+          {usd(item.value)} <span style={{ color: "rgba(18,18,15,0.35)" }}>· {((item.value / total) * 100).toFixed(0)}% of total OpEx</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ─── Stacked bar — for a two-part split that sums exactly to the total ───────
 
 function StackedSplit({
@@ -826,13 +858,12 @@ export default async function FinancialPage({
             Expenses $631,486 / Kitchen Allocation Expense $542,634).
             resolveCanonicalRollup correctly resolves opexDollars to "Total
             Other Operating Expenses", but "Total Expenses" has no
-            stat-block home anywhere on this page. Kitchen Allocation
-            Expense is meant to surface via OPEX_DRIVER_NAMES below, but
-            that DriverBreakdown only renders once opexLineItems.length >= 2
-            — Lex Yard's real data has exactly one matching record this
-            period, so it doesn't render either, making it a second real
-            stray metric this period. Both are only visible via Evidence.
-            Not hidden. */}
+            stat-block home anywhere on this page — a genuine stray metric,
+            only visible via Evidence, not hidden. Kitchen Allocation
+            Expense/Kitchen Allocation surfaces via OPEX_DRIVER_NAMES below:
+            confirmed live that both Lex Yard and Yoshoku's June data have
+            exactly one matching record each, so it renders via
+            SingleDriverStat rather than the >=2-item DriverBreakdown. */}
         <FindingSection
           id="opex"
           heading="Operating Expenses"
@@ -890,6 +921,13 @@ export default async function FinancialPage({
                     variant="neutral" />
                 )}
               </div>
+            )}
+            {opexLineItems.length === 1 && opexDollars && (
+              <SingleDriverStat
+                title="Operating Expense Drivers"
+                total={opexDollars.metricValue}
+                item={{ label: opexLineItems[0].metricName, value: opexLineItems[0].metricValue }}
+              />
             )}
             {opexLineItems.length >= 2 && opexDollars && (
               <DriverBreakdown
