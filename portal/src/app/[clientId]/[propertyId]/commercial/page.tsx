@@ -10,7 +10,7 @@ import {
 import type { DaypartCoversEntry } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
-import PropertyHeader from "@/components/PropertyHeader";
+import PropertyHeaderSlim from "@/components/PropertyHeaderSlim";
 import PropertyTabs from "@/components/PropertyTabs";
 import SectionHeader from "@/components/SectionHeader";
 import CalloutBlock from "@/components/CalloutBlock";
@@ -1220,7 +1220,10 @@ export default async function CommercialPage({
     <PageWrapper noTopPadding>
       <ScrollToSection targetId={scrollTargetId} />
       <NavBar session={session} transparentAtTop />
-      <PropertyHeader property={property} lastUpdated={lastUpdated} />
+      {/* Slim, photo-free header (Phase 4B rollout) — every interior tab
+          except Overview uses this now; Overview keeps the full photo hero
+          as the one deliberate first-impression moment. */}
+      <PropertyHeaderSlim property={property} lastUpdated={lastUpdated} />
       <PropertyTabs clientId={clientId} propertyId={propertyId} active="commercial" />
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 80px" }} className="space-y-12">

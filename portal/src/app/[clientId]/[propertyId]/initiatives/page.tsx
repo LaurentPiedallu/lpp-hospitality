@@ -4,7 +4,7 @@ import { getProperty, getInitiatives, getActions, getLastUpdated } from "@/lib/n
 import { daysBetweenIso, sortActions } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
-import PropertyHeader from "@/components/PropertyHeader";
+import PropertyHeaderSlim from "@/components/PropertyHeaderSlim";
 import PropertyTabs from "@/components/PropertyTabs";
 import StatusBadge from "@/components/StatusBadge";
 import EmptyState from "@/components/EmptyState";
@@ -292,7 +292,10 @@ export default async function InitiativesPage({
   return (
     <PageWrapper noTopPadding>
       <NavBar session={session} transparentAtTop />
-      <PropertyHeader property={property} lastUpdated={lastUpdated} />
+      {/* Slim, photo-free header (Phase 4B rollout) — every interior tab
+          except Overview uses this now; Overview keeps the full photo hero
+          as the one deliberate first-impression moment. */}
+      <PropertyHeaderSlim property={property} lastUpdated={lastUpdated} />
       <PropertyTabs clientId={clientId} propertyId={propertyId} active="initiatives" />
 
       {/* Outer area is full tab width; the reading column is capped so card
