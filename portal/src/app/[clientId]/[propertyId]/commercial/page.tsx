@@ -1524,7 +1524,7 @@ export default async function CommercialPage({
                 "extra" record on this page, since this section has no
                 second compact slot to fold it into. */}
             {intelAll("Guest").slice(1).map((rec) => (
-              <ExtraIntelCard key={rec.id} record={rec} />
+              <ExtraIntelCard key={rec.id} record={rec} showCommentary />
             ))}
           </div>
 
