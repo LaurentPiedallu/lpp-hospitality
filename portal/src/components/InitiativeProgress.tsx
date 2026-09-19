@@ -109,14 +109,17 @@ export default function InitiativeProgress({
   const pct = Math.round((completed / total) * 100);
   const sorted = sortActions(actionsState);
 
-  // Red progress segment: share of the whole Action set that is unchecked
-  // and past its due date. Only shown when some Actions carry a due date.
-  const datedCount = actionsState.filter((a) => a.dueDateIso).length;
-  const overdueOpen = actionsState.filter(
-    (a) => a.status !== "Complete" && a.dueDateIso != null && a.dueDateIso < todayIso,
-  ).length;
+  // Whether any open Action is overdue — tints the bar's track (see below),
+  // not a second filled segment. A filled red segment sized by
+  // overdueOpen/total used to independently occupy width alongside the gold
+  // completion segment, so an Initiative with 0% complete and every open
+  // Action overdue rendered as a full-width red bar — reading as "100%,
+  // and it's bad" rather than "0% done, and it's overdue." Fill length now
+  // only ever means completion; overdue status is a track color, not width.
   const goldPct = pct;
-  const overduePct = datedCount > 0 ? Math.min(100 - goldPct, Math.round((overdueOpen / total) * 100)) : 0;
+  const hasOverdueOpen = actionsState.some(
+    (a) => a.status !== "Complete" && a.dueDateIso != null && a.dueDateIso < todayIso,
+  );
 
   const truncating = sorted.length > COLLAPSED_COUNT && !showAll;
   const visibleRows = truncating ? sorted.slice(0, COLLAPSED_COUNT) : sorted;
@@ -160,11 +163,20 @@ export default function InitiativeProgress({
         </span>
         <span style={{ fontFamily: JOST, fontSize: 10, color: "rgba(18,18,15,0.5)" }}>{pct}%</span>
       </div>
-      <div style={{ height: 3, background: "rgba(18,18,15,0.08)", borderRadius: 0, overflow: "hidden", display: "flex" }}>
+      <div
+        style={{
+          height: 3,
+          // Track tint communicates "something here is overdue" without
+          // claiming any width — the fill above is the only thing that
+          // means completion. Same red as the "Behind schedule" label pill
+          // on the card above, at low opacity since it's background, not a
+          // status assertion of its own.
+          background: hasOverdueOpen ? "rgba(192,57,43,0.15)" : "rgba(18,18,15,0.08)",
+          borderRadius: 0,
+          overflow: "hidden",
+        }}
+      >
         <div style={{ height: "100%", width: `${goldPct}%`, background: GOLD, transition: "width 0.25s ease" }} />
-        {overduePct > 0 && (
-          <div style={{ height: "100%", width: `${overduePct}%`, background: OVERDUE_RED, transition: "width 0.25s ease" }} />
-        )}
       </div>
 
       {/* Expandable actions list */}

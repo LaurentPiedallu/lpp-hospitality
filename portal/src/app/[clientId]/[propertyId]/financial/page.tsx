@@ -6,6 +6,7 @@ import { usd, pct, findMetricByKey, findMetricByName, metricSeriesForKey, findAl
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeader from "@/components/PropertyHeader";
+import PropertyHeaderSlim from "@/components/PropertyHeaderSlim";
 import PropertyTabs from "@/components/PropertyTabs";
 import SectionHeader from "@/components/SectionHeader";
 import KpiCard from "@/components/KpiCard";
@@ -563,7 +564,17 @@ export default async function FinancialPage({
     <PageWrapper noTopPadding>
       <ScrollToSection targetId={scrollTargetId} />
       <NavBar session={session} transparentAtTop />
-      <PropertyHeader property={property} lastUpdated={lastUpdated} />
+      {/* PROTOTYPE (Phase 4B) — slim, photo-free header for exactly one
+          tab/property pair (Financial Review, Lex Yard) to evaluate before
+          any broader rollout. Every other property on this same tab, and
+          every other tab, still gets the normal PropertyHeader — this
+          condition is deliberately narrow and temporary, not a pattern to
+          copy elsewhere yet. */}
+      {propertyId === "38d20475-2652-8122-8b09-f32d9c2f5f76" ? (
+        <PropertyHeaderSlim property={property} />
+      ) : (
+        <PropertyHeader property={property} lastUpdated={lastUpdated} />
+      )}
       <PropertyTabs clientId={clientId} propertyId={propertyId} active="financial" />
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 60px 80px" }} className="space-y-12">
