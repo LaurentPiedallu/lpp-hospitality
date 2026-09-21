@@ -362,6 +362,7 @@ export async function getInitiatives(propertyId: string): Promise<Initiative[]> 
       targetCompletion,
       expectedImpact: num(p, "Expected Impact"),
       nextMilestone: richText(p, "Next Milestone"),
+      theme: richText(p, "Theme"),
       // May exceed Notion's 25-item relation cap (confirmed on Lex Yard's
       // Commercial Initiative) — relationIds() re-fetches in full when so.
       actionIds: await relationIds(p, "Actions"),

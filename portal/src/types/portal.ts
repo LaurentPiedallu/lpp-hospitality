@@ -184,6 +184,10 @@ export interface Initiative {
   targetCompletion: string | null;
   expectedImpact: number;
   nextMilestone: string;
+  // A 40-60 word synthesis of why this Initiative matters, distinct from
+  // any single linked Action's own text. Confirmed real and populated on
+  // Lex Yard's current Initiatives.
+  theme: string;
   actionIds: string[];        // linked Actions relation
   completionPct: number | null; // 0-100, from Notion's Completion % rollup
 }

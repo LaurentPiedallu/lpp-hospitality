@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getProperty, getInitiatives, getActions, getLastUpdated } from "@/lib/notion-queries";
-import { daysBetweenIso, sortActions } from "@/lib/format";
+import { daysBetweenIso } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeaderSlim from "@/components/PropertyHeaderSlim";
@@ -42,7 +42,6 @@ interface InitiativeView {
   behindReason: "target" | "actions" | null;
   daysPastTarget: number;
   overdueActionCount: number;
-  topOpenAction: Action | null;
   completed: number;
   total: number;
   pct: number;
@@ -79,7 +78,6 @@ function buildView(initiative: Initiative, actions: Action[], todayIso: string):
     behindReason,
     daysPastTarget: targetOverdue ? daysBetweenIso(initiative.targetCompletion, todayIso) : 0,
     overdueActionCount: overdueActions.length,
-    topOpenAction: sortActions(openActions)[0] ?? null,
     completed,
     total,
     pct: total > 0 ? Math.round((completed / total) * 100) : 0,
@@ -96,10 +94,22 @@ function urgencyRank(v: InitiativeView): number {
   return 4;
 }
 
+// Business Priority (Critical > High > Medium > Low), independent of the
+// schedule-urgency axis above. Initiative.priority is a raw string, not a
+// union (unlike Action.priority) — notion-queries.ts defaults an unset
+// value to "Medium", so an unrecognized string here sorts last, after Low,
+// rather than being coerced into a tier it wasn't actually given.
+const PRIORITY_RANK: Record<string, number> = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+function priorityRank(priority: string): number {
+  return PRIORITY_RANK[priority] ?? 4;
+}
+
 function orderByUrgency(views: InitiativeView[]): InitiativeView[] {
   return [...views].sort(
     (a, b) =>
       urgencyRank(a) - urgencyRank(b) ||
+      priorityRank(a.initiative.priority) - priorityRank(b.initiative.priority) ||
+      b.initiative.expectedImpact - a.initiative.expectedImpact ||
       b.pct - a.pct ||
       a.initiative.title.localeCompare(b.initiative.title),
   );
@@ -110,7 +120,16 @@ function orderByUrgency(views: InitiativeView[]): InitiativeView[] {
 function buildHeadline(views: InitiativeView[]): { line: string; subline: string } {
   const y = views.length;
   const onTrack = views.filter((v) => !v.isBlocked && !v.isBehind).length;
-  const line = `${onTrack} of ${y} initiative${y === 1 ? "" : "s"} on track`;
+  // "On track" here means "not blocked or behind schedule" — true, but
+  // reads as a contradiction next to a subline saying nothing has started
+  // yet (confirmed live: a fresh batch of Not Started initiatives showed
+  // "6 of 6 on track" directly above "No initiative has started yet").
+  // Not a logic bug in either line individually, just copy that needs to
+  // name the actual state when it's this, not schedule-adherence.
+  const allNotStarted = y > 0 && views.every((v) => v.state === "not-started" && !v.isBlocked && !v.isBehind);
+  const line = allNotStarted
+    ? `${y} initiative${y === 1 ? "" : "s"} not yet started`
+    : `${onTrack} of ${y} initiative${y === 1 ? "" : "s"} on track`;
 
   const problems = views
     .filter((v) => v.isBlocked || v.isBehind)
@@ -237,12 +256,12 @@ function InitiativeCard({
         <StatusBadge label={statusLabel(view)} variant={statusVariant(view)} />
       </div>
 
-      {view.topOpenAction && (
+      {i.theme && (
         <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.6)", lineHeight: 1.5 }}>
           <span style={{ fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginRight: 8 }}>
             Focus
           </span>
-          {view.topOpenAction.title}
+          {i.theme}
         </p>
       )}
 
