@@ -546,9 +546,10 @@ export default async function FinancialPage({
   const ratioClause = (label: string, m: KpiMetric) => {
     const pos = benchmarkPosition(m.metricValue, m.benchmarkLow, m.benchmarkHigh);
     return {
+      label,
       pos,
       text: pos
-        ? `${label} at ${pct(m.metricValue)} of revenue against a ${m.benchmarkLow}–${m.benchmarkHigh}% benchmark`
+        ? `${label} at ${pct(m.metricValue)} of revenue against ${m.benchmarkLow}–${m.benchmarkHigh}%`
         : `${label} at ${pct(m.metricValue)} of revenue`,
     };
   };
@@ -588,11 +589,14 @@ export default async function FinancialPage({
     totalRevenue && laborPct && opexPct && cogsPct && netProfit
       ? (() => {
           const clauses = [ratioClause("labor", laborPct), ratioClause("OpEx", opexPct), ratioClause("cost of sales", cogsPct)];
-          const group = (pos: "above" | "within" | "below") => clauses.filter((c) => c.pos === pos).map((c) => c.text);
           const sentences = [`Total revenue was ${usd(totalRevenue.metricValue)}.`];
           for (const pos of ["above", "within", "below"] as const) {
-            const items = group(pos);
-            if (items.length > 0) sentences.push(`${capitalize(joinList(items))} ${items.length > 1 ? "sit" : "sits"} ${POSITION_WORD[pos]} benchmark.`);
+            const items = clauses.filter((c) => c.pos === pos);
+            if (items.length > 0) {
+              sentences.push(
+                `${capitalize(joinList(items.map((c) => c.label)))} ${items.length > 1 ? "run" : "runs"} ${POSITION_WORD[pos]} benchmark: ${items.map((c) => c.text).join(", ")}.`
+              );
+            }
           }
           const unbenchmarked = clauses.filter((c) => c.pos == null).map((c) => c.text);
           if (unbenchmarked.length > 0) sentences.push(`${capitalize(joinList(unbenchmarked))}.`);
