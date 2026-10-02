@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastUpdated } from "@/lib/notion-queries";
-import { usd, pct, findMetricByKey, findMetricByName, metricSeriesForKey, findAllIntelligence, findIntelligenceByFinding, extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark } from "@/lib/format";
+import { usd, pct, findMetricByKey, findFinancialComponents, isIncludingComps, benchmarkPosition, metricSeriesForKey, findAllIntelligence, findIntelligenceByFinding, extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeaderSlim from "@/components/PropertyHeaderSlim";
@@ -462,10 +462,11 @@ export default async function FinancialPage({
   // lines. Food + Beverage don't always sum to Total (comps / other
   // revenue), so DriverBreakdown against the real total with a residual,
   // not a StackedSplit that would imply they do.
-  // NOTE: the strings below are exact Notion Metric Name literals — they
-  // must move in lockstep with any upstream rename of those records.
-  const foodRevenue = findMetricByName(allMetrics, "Total Food Revenue", latest, "Revenue");
-  const beverageRevenue = findMetricByName(allMetrics, "Total Beverage Revenue", latest, "Revenue");
+  // findFinancialComponents looks these up by key + Segment (Food/Beverage,
+  // Wages Total, Taxes and Benefits, ...) first, then by the exact Metric
+  // Names older Published records carry — shared with Overview's tiles.
+  const components = findFinancialComponents(allMetrics, latest);
+  const { foodRevenue, beverageRevenue } = components;
   const revenueDrivers = [foodRevenue, beverageRevenue].filter((x): x is KpiMetric => x != null);
 
   const laborCost = byKey("total_payroll");
@@ -476,12 +477,9 @@ export default async function FinancialPage({
   // ("Wages Total" / "Payroll Taxes" / "Benefits") are kept as fallbacks
   // for any property/period that used them. Each keeps its own Metric Name
   // as the label — no re-blending into generic buckets.
-  // NOTE: the strings below are exact Notion Metric Name literals — keep
-  // them in lockstep with any upstream rename of those records.
-  const wages = findMetricByName(allMetrics, "Total Wages", latest, "Labor") ?? byKey("total_payroll", "Labor", "Wages Total");
-  const taxesAndBenefits = findMetricByName(allMetrics, "Taxes and Benefits", latest, "Labor");
-  const payrollTaxes = byKey("total_payroll", "Labor", "Payroll Taxes");
-  const benefits = byKey("total_payroll", "Labor", "Benefits");
+  // A combined Taxes and Benefits record and separate Payroll Taxes /
+  // Benefits records are alternative shapes; whichever exists is listed.
+  const { wages, taxesAndBenefits, payrollTaxes, benefits } = components;
   const laborDrivers = [wages, taxesAndBenefits, payrollTaxes, benefits].filter((x): x is KpiMetric => x != null);
 
   const cogsDollars = byKey("total_cogs");
@@ -490,10 +488,7 @@ export default async function FinancialPage({
   // total_cogs + Segment "Total" with the roll-up. These do sum exactly to
   // Total Cost of Sales in the live data, so a StackedSplit is honest here.
   // Beverage is one blended figure (beer/wine/liquor not split further).
-  // NOTE: the strings below are exact Notion Metric Name literals — keep
-  // them in lockstep with any upstream rename of those records.
-  const foodCost = findMetricByName(allMetrics, "Food Cost of Sales", latest, "COGS") ?? byKey("total_cogs", "COGS", "Food");
-  const beverageCost = findMetricByName(allMetrics, "Beverage Cost of Sales", latest, "COGS") ?? byKey("total_cogs", "COGS", "Beverage");
+  const { foodCost, beverageCost } = components;
 
   const opexDollars = byKey("opex");
   const opexPct = byKey("opex_pct");
@@ -542,53 +537,73 @@ export default async function FinancialPage({
   // populate Revenue/Labor before OpEx/Profitability exist for the same
   // period), so a single all-or-nothing gate would either hide sections
   // that do have real data or keep showing ones that don't.
+  // Copy here states only what this property's own figures show: a ratio
+  // against its real benchmark range, the sign of net profit, the largest
+  // OpEx line. Earlier versions carried Lex Yard June 2026 narrative ("the
+  // dinner shortfall", "cost control held", "a departmental loss") that
+  // rendered as fact on every property. A sentence with no data behind it
+  // is omitted rather than defaulted.
+  const ratioClause = (label: string, m: KpiMetric) => {
+    const pos = benchmarkPosition(m.metricValue, m.benchmarkLow, m.benchmarkHigh);
+    return {
+      pos,
+      text: pos
+        ? `${label} at ${pct(m.metricValue)} of revenue against a ${m.benchmarkLow}–${m.benchmarkHigh}% benchmark`
+        : `${label} at ${pct(m.metricValue)} of revenue`,
+    };
+  };
+  const POSITION_WORD = { above: "above", within: "within", below: "below" } as const;
+  const ratioConnector = (label: string, m: KpiMetric | null): string | undefined => {
+    if (!m) return undefined;
+    const pos = benchmarkPosition(m.metricValue, m.benchmarkLow, m.benchmarkHigh);
+    if (!pos) return undefined;
+    return `${label} ran at ${pct(m.metricValue)} of revenue, ${POSITION_WORD[pos]} its ${m.benchmarkLow}–${m.benchmarkHigh}% benchmark range.`;
+  };
+  const joinList = (items: string[]) =>
+    items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
   const revenueConnector = totalRevenue
     ? "The figures below are this property's own revenue numbers; the demand-side story behind them — daypart mix, guest volume — belongs to Commercial Review."
     : undefined;
-  const laborConnector = laborPct
-    ? "Following the dinner shortfall above, labor did not scale down to match the reduced volume."
-    : undefined;
-  const cogsConnector = cogsPct
-    ? "Unlike labor, food and beverage cost control held through the same volume decline."
-    : undefined;
-  // OpEx names whichever line item is actually this property's largest,
-  // read from opexLineItems (already sorted by value above) instead of
-  // asserting "Kitchen Allocation" for every property. That was previously
-  // hardcoded and happened to be correct at both properties with live OpEx
-  // data today — Kitchen Allocation is a real, dominant, hotel-shared cost
-  // at Lex Yard and Yoshoku — but was correct by coincidence, not by
-  // construction. Falls back to generic wording (no item named) when a
-  // property has an OpEx total but no itemized driver breakdown yet.
+  const laborConnector = ratioConnector("Labor", laborPct);
+  const cogsConnector = ratioConnector("Cost of sales", cogsPct);
+  // Names whichever OpEx line item is actually this property's largest,
+  // read from opexLineItems (already sorted by value above).
   const opexConnector = opexPct
-    ? opexLineItems.length > 0
-      ? `The larger structural pressure sits here — the ${opexLineItems[0].metricName} charge below does not flex with revenue the way labor or COGS do.`
-      : "The larger structural pressure sits here — the charges below do not flex with revenue the way labor or COGS do."
+    ? [
+        ratioConnector("OpEx", opexPct),
+        opexLineItems.length > 0 ? `The largest line below is ${opexLineItems[0].metricName}.` : undefined,
+      ].filter(Boolean).join(" ") || undefined
     : undefined;
   const profitabilityConnector = netProfit
-    ? "The combined effect of the revenue shortfall, labor ratio, and OpEx allocation above nets out below."
+    ? `The sections above net out to the departmental ${netProfit.metricValue < 0 ? "loss" : "profit"} below.`
     : undefined;
 
-  // Page-level synthesis — the cause-and-effect chain across sections,
-  // specific to this property/period's real dollar drivers. This is
-  // intentionally NOT built from a single Notion field the way Overview's
-  // Current Read is; there's no KPI Record or Intelligence record that
-  // synthesizes across all five sections, so this is assembled here from
-  // the same verified figures the sections below display, only connected
-  // causally rather than listed. Only renders when the core figures it
-  // depends on actually exist.
+  // Page-level synthesis — assembled from the same verified figures the
+  // sections below display: revenue, each cost ratio grouped by where it
+  // sits against its own benchmark, and net profit worded by its sign.
+  // Only renders when the core figures it depends on actually exist.
   const synthesis =
     totalRevenue && laborPct && opexPct && cogsPct && netProfit
-      ? `Total revenue landed at ${usd(totalRevenue.metricValue)} against budget, and because the property's two largest cost lines don't flex with volume, that shortfall compounded rather than simply shrinking the P&L proportionally${
-          laborCost ? `: labor cost held at ${usd(laborCost.metricValue)}` : ""
-        }${opexDollars ? ` and the largest OpEx line stayed fixed regardless of covers served` : ""}, so both consumed a far larger share of a smaller revenue base. Labor moved to ${pct(
-          laborPct.metricValue
-        )} of revenue against a ${laborPct.benchmarkLow}–${laborPct.benchmarkHigh}% benchmark, and OpEx to ${pct(
-          opexPct.metricValue
-        )} against ${opexPct.benchmarkLow}–${opexPct.benchmarkHigh}%. COGS, by contrast, held at ${pct(
-          cogsPct.metricValue
-        )}, below its ${cogsPct.benchmarkLow}–${cogsPct.benchmarkHigh}% benchmark and not a contributor to the loss. The combined effect is a ${usd(
-          Math.abs(netProfit.metricValue)
-        )} departmental loss driven by fixed costs meeting falling volume, not by cost control failing across every line.`
+      ? (() => {
+          const clauses = [ratioClause("labor", laborPct), ratioClause("OpEx", opexPct), ratioClause("cost of sales", cogsPct)];
+          const group = (pos: "above" | "within" | "below") => clauses.filter((c) => c.pos === pos).map((c) => c.text);
+          const sentences = [`Total revenue was ${usd(totalRevenue.metricValue)}.`];
+          for (const pos of ["above", "within", "below"] as const) {
+            const items = group(pos);
+            if (items.length > 0) sentences.push(`${capitalize(joinList(items))} ${items.length > 1 ? "sit" : "sits"} ${POSITION_WORD[pos]} benchmark.`);
+          }
+          const unbenchmarked = clauses.filter((c) => c.pos == null).map((c) => c.text);
+          if (unbenchmarked.length > 0) sentences.push(`${capitalize(joinList(unbenchmarked))}.`);
+          const isLoss = netProfit.metricValue < 0;
+          sentences.push(
+            `The period closed with a ${usd(Math.abs(netProfit.metricValue))} departmental ${isLoss ? "loss" : "profit"}${
+              netProfitPct ? `, ${pct(Math.abs(netProfitPct.metricValue))} of revenue` : ""
+            }.`
+          );
+          return sentences.join(" ");
+        })()
       : null;
 
   return (
@@ -663,7 +678,7 @@ export default async function FinancialPage({
                 variant={severityVariant(totalRevenue.severity)} />
             )}
             {covers && (
-              <KpiCard label={covers.metricName || "Total Revenue Covers"}
+              <KpiCard label={`${covers.metricName || "Total Revenue Covers"}${isIncludingComps(covers) ? " (incl. comps)" : ""}`}
                 value={covers.metricValue.toLocaleString()}
                 variant="neutral" />
             )}
@@ -676,8 +691,9 @@ export default async function FinancialPage({
               // Food and Beverage Average Check Excluding Comps") — keeps
               // the qualifying "excl. comps" dimension, drops only the
               // redundant "Total Food and Beverage" the Revenue section
-              // already implies.
-              <KpiCard label="Average Check (excl. comps)" value={usd(avgCheck.metricValue)}
+              // already implies. Falls back to the comps-inclusive record
+              // (and says so) when the period has no comps-excluded one.
+              <KpiCard label={isIncludingComps(avgCheck) ? "Average Check (incl. comps)" : "Average Check (excl. comps)"} value={usd(avgCheck.metricValue)}
                 variant={severityVariant(avgCheck.severity)} />
             )}
           </div>

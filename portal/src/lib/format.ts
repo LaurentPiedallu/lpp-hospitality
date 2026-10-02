@@ -228,6 +228,11 @@ export const CANONICAL_METRIC_NAME: Record<string, string> = {
   // "Food Average Check Including Comps" ($57.50) — kept as breakdown
   // lines, never the headline.
   avg_check: "Total Food and Beverage Average Check Excluding Comps",
+  // Keys introduced by the one-Total-per-key tagging rule. Each should only
+  // ever carry one Segment "Total" record, but they're pinned so the guard
+  // test covers them like every other roll-up.
+  total_expenses: "Total Expenses",
+  gross_profit_pct: "Gross Profit Percentage",
 };
 
 // Legacy LPP Metric Key values that call sites still pass but no live KPI
@@ -240,35 +245,80 @@ export const KEY_ALIAS: Record<string, string> = {
   covers: "total_covers_period",
 };
 
-// From a set of KPI Records that already share LPP Metric Key + Segment
-// (+ period, + optional category), return the one true roll-up. When the
-// key has a known canonical total name and exactly one candidate matches it
-// (case-insensitive, trimmed), that record wins; otherwise the first
-// candidate is returned unchanged — so single-candidate keys and keys with
-// no known collision are completely unaffected.
-//
-// The fall-through (>1 candidate, no unique canonical match) is the exact
-// failure mode this function exists to prevent — a bare first-match on a
-// collision. It stays reachable (a new roll-up key, an upstream Metric Name
-// rename, or two records sharing the canonical name), so it logs loudly
-// rather than picking silently. The warning is un-gated: a silently-wrong
-// KPI in production is worse than a log line, and it only fires on a
-// genuine unresolved ambiguity, which is rare.
-export function resolveCanonicalRollup(candidates: KpiMetric[], key: string): KpiMetric | null {
-  if (candidates.length <= 1) return candidates[0] ?? null;
+// Segment a record is filed under — a blank/null Segment counts as "Total".
+// Segment is a second axis added after a lot of KPI Records already existed
+// and were Published, and blank-means-Total was a deliberate backward-
+// compatibility choice so nothing already Published needed to change.
+function segmentOf(m: KpiMetric): string {
+  return m.segment || "Total";
+}
+
+// Keys whose headline figure is defined as EXCLUDING comps. When a period
+// has no such record (only a comps-inclusive one, Segment "Including
+// Comps"), the resolver falls back to that record and callers label it
+// "incl. comps" — see isIncludingComps. Confirmed on Lex Yard's July 2026
+// upload: covers and average check arrive only as Including Comps.
+const COMPS_FALLBACK_KEYS = new Set(["avg_check", "total_covers_period"]);
+export const INCLUDING_COMPS_SEGMENT = "Including Comps";
+
+// True when a resolved headline is the comps-inclusive fallback record
+// rather than the comps-excluded headline — the UI must say "incl. comps".
+export function isIncludingComps(m: KpiMetric | null | undefined): boolean {
+  return m != null && m.segment === INCLUDING_COMPS_SEGMENT;
+}
+
+function canonicalMatch(pool: KpiMetric[], key: string): KpiMetric | null {
   const canonicalName = CANONICAL_METRIC_NAME[key];
-  if (canonicalName) {
-    const target = canonicalName.toLowerCase();
-    const exact = candidates.filter((m) => (m.metricName || "").trim().toLowerCase() === target);
-    if (exact.length === 1) return exact[0];
+  if (!canonicalName) return null;
+  const target = canonicalName.toLowerCase();
+  const exact = pool.filter((m) => (m.metricName || "").trim().toLowerCase() === target);
+  return exact.length === 1 ? exact[0] : null;
+}
+
+// From the KPI Records that share one LPP Metric Key + period (+ optional
+// category), across every Segment, return the single record for `segment`
+// (default "Total", the headline). Works with both tagging conventions:
+//
+//   New tagging — Segment "Total" sits on exactly one record per (property,
+//   period, key); components carry their own Segment (Food, Beverage,
+//   Wages Total, Including Comps, ...). Step 1 picks it directly.
+//
+//   Old tagging — the pipeline put the roll-up AND its sub-components all
+//   on Segment "Total" (Lex Yard June 2026: Total Revenue / Total Food
+//   Revenue / Total Beverage Revenue). Step 2 picks the roll-up by its
+//   exact CANONICAL_METRIC_NAME.
+//
+// Then, for avg_check / total_covers_period headlines only, step 3 falls
+// back to the Segment "Including Comps" record (see isIncludingComps).
+//
+// The last fall-through (>1 candidate, nothing unique) is the exact failure
+// mode this function exists to prevent — a bare first-match on a collision.
+// It stays reachable (a new roll-up key, an upstream Metric Name rename, or
+// two records sharing the canonical name), so it logs loudly rather than
+// picking silently.
+export function resolveCanonicalRollup(
+  candidates: KpiMetric[],
+  key: string,
+  segment: string = "Total"
+): KpiMetric | null {
+  const pool = candidates.filter((m) => segmentOf(m) === segment);
+  if (pool.length === 1) return pool[0];
+  if (pool.length > 1) {
+    const canonical = canonicalMatch(pool, key);
+    if (canonical) return canonical;
   }
+  if (segment === "Total" && COMPS_FALLBACK_KEYS.has(key)) {
+    const inclComps = candidates.filter((m) => m.segment === INCLUDING_COMPS_SEGMENT);
+    if (inclComps.length === 1) return inclComps[0];
+  }
+  if (pool.length === 0) return null;
   console.warn(
-    `[resolveCanonicalRollup] ${candidates.length} records share key "${key}" + segment; ` +
-      `no unique CANONICAL_METRIC_NAME match — using "${candidates[0].metricName}". ` +
-      `Candidates: ${candidates.map((c) => `${c.metricName}=${c.metricValue}`).join(" | ")}. ` +
+    `[resolveCanonicalRollup] ${pool.length} records share key "${key}" + segment "${segment}"; ` +
+      `no unique CANONICAL_METRIC_NAME match — using "${pool[0].metricName}". ` +
+      `Candidates: ${pool.map((c) => `${c.metricName}=${c.metricValue}`).join(" | ")}. ` +
       `Add "${key}" to CANONICAL_METRIC_NAME in lib/format.ts.`
   );
-  return candidates[0];
+  return pool[0];
 }
 
 // Looks up a single KPI Record by its canonical LPP Metric Key for a
@@ -280,18 +330,10 @@ export function resolveCanonicalRollup(candidates: KpiMetric[], key: string): Kp
 // exists under Guest Experience as a survey sample size, distinct from the
 // real total under Revenue).
 //
-// Segment defaults to "Total" — most call sites want the headline figure,
-// not a daypart/wage-type/COGS-type slice. A record with a blank/null
-// Segment is treated as Total too: Segment is a second axis added after a
-// lot of KPI Records already existed and were Published, and blank-means-
-// Total was a deliberate backward-compatibility choice so nothing already
-// Published needed to change. Pass an explicit segment (e.g. "Breakfast",
-// "Food", "Wages Total") to get a specific slice instead.
-//
-// When several records still share key + period + category + segment (the
-// roll-up plus its sub-components, all tagged Segment "Total" upstream),
-// resolveCanonicalRollup picks the real total by Metric Name rather than
-// letting Notion's storage order decide.
+// Segment defaults to "Total" — the headline figure (blank Segment counts as
+// Total). Pass an explicit segment (e.g. "Breakfast", "Food", "Wages
+// Total") to get a specific slice instead. resolveCanonicalRollup does the
+// picking — see its comment for how both tagging conventions resolve.
 export function findMetricByKey(
   metrics: KpiMetric[],
   key: string,
@@ -304,21 +346,21 @@ export function findMetricByKey(
     (m) =>
       m.lppMetricKey === resolvedKey &&
       m.periodStart === periodStart &&
-      (!category || m.category === category) &&
-      (m.segment ?? "Total") === segment
+      (!category || m.category === category)
   );
-  return resolveCanonicalRollup(candidates, resolvedKey);
+  return resolveCanonicalRollup(candidates, resolvedKey, segment);
 }
 
-// All-period series for one LPP Metric Key, for trend charts. Applies the
-// same key alias + Segment "Total" filter + canonical-name disambiguation
-// as findMetricByKey, once per period — so a key that carries a roll-up
-// plus sub-component siblings in the same period (total_revenue,
-// total_covers_period, avg_check) contributes ONE point per period, not one
-// per sibling. Passing the raw filtered list to a trend chart instead gives
-// it several points sharing an x value and a malformed axis (the same
-// symptom the earlier category+unit trend fix chased, still reachable this
-// way).
+// All-period series for one LPP Metric Key, for trend charts. Resolves the
+// headline once per period exactly like findMetricByKey — so a key that
+// carries a roll-up plus sub-component siblings in the same period
+// contributes ONE point per period, not one per sibling (several points
+// sharing an x value gave the trend charts a malformed axis).
+//
+// Comps-inclusive fallback points (see isIncludingComps) are dropped when
+// the series also has comps-excluded points, so one line never mixes the
+// two definitions (Lex Yard: June 7,040 revenue covers vs July 12,405
+// covers incl. comps would read as a 76% jump that isn't real).
 export function metricSeriesForKey(
   metrics: KpiMetric[],
   key: string,
@@ -332,18 +374,129 @@ export function metricSeriesForKey(
         .map((m) => m.periodStart)
     ),
   ];
-  return periods
-    .map((p) => {
-      const candidates = metrics.filter(
-        (m) =>
-          m.lppMetricKey === resolvedKey &&
-          m.periodStart === p &&
-          (!category || m.category === category) &&
-          (m.segment ?? "Total") === "Total"
-      );
-      return resolveCanonicalRollup(candidates, resolvedKey);
-    })
+  const series = periods
+    .map((p) => findMetricByKey(metrics, resolvedKey, p, category))
     .filter((m): m is KpiMetric => m != null);
+  const hasExclComps = series.some((m) => !isIncludingComps(m));
+  return hasExclComps ? series.filter((m) => !isIncludingComps(m)) : series;
+}
+
+// A sub-component of a roll-up (Food revenue, Beverage cost of sales, Total
+// Wages, ...). Looks up by key + its own Segment first (the current tagging
+// rule), then falls back to the exact Metric Names older Published records
+// carry on Segment "Total" (Lex Yard June 2026). The names are exact Notion
+// Metric Name literals — they must move in lockstep with any upstream
+// rename of those records, until those records are re-tagged.
+export function findComponent(
+  metrics: KpiMetric[],
+  key: string,
+  segment: string,
+  legacyNames: string[],
+  periodStart: string | null,
+  category?: string
+): KpiMetric | null {
+  const bySegment = findMetricByKey(metrics, key, periodStart, category, segment);
+  if (bySegment) return bySegment;
+  for (const name of legacyNames) {
+    const byName = findMetricByName(metrics, name, periodStart, category);
+    if (byName) return byName;
+  }
+  return null;
+}
+
+export interface FinancialComponents {
+  foodRevenue: KpiMetric | null;
+  beverageRevenue: KpiMetric | null;
+  foodCost: KpiMetric | null;
+  beverageCost: KpiMetric | null;
+  wages: KpiMetric | null;
+  // The combined Taxes and Benefits record, when one exists.
+  taxesAndBenefits: KpiMetric | null;
+  payrollTaxes: KpiMetric | null;
+  benefits: KpiMetric | null;
+  // Taxes and Benefits as one figure: the combined record, else Payroll
+  // Taxes + Benefits summed when both exist, else null.
+  taxesAndBenefitsValue: number | null;
+}
+
+// Every roll-up sub-component Overview and Financial Review break out, for
+// one period — one shared lookup so the two pages can't drift apart.
+export function findFinancialComponents(metrics: KpiMetric[], periodStart: string | null): FinancialComponents {
+  const c = (key: string, segment: string, names: string[], category: string) =>
+    findComponent(metrics, key, segment, names, periodStart, category);
+  const taxesAndBenefits = c("total_payroll", "Taxes and Benefits", ["Taxes and Benefits"], "Labor");
+  const payrollTaxes = findMetricByKey(metrics, "total_payroll", periodStart, "Labor", "Payroll Taxes");
+  const benefits = findMetricByKey(metrics, "total_payroll", periodStart, "Labor", "Benefits");
+  return {
+    foodRevenue: c("total_revenue", "Food", ["Total Food Revenue"], "Revenue"),
+    beverageRevenue: c("total_revenue", "Beverage", ["Total Beverage Revenue"], "Revenue"),
+    foodCost: c("total_cogs", "Food", ["Food Cost of Sales"], "COGS"),
+    beverageCost: c("total_cogs", "Beverage", ["Beverage Cost of Sales"], "COGS"),
+    wages: c("total_payroll", "Wages Total", ["Total Wages"], "Labor"),
+    taxesAndBenefits,
+    payrollTaxes,
+    benefits,
+    taxesAndBenefitsValue: taxesAndBenefits
+      ? taxesAndBenefits.metricValue
+      : payrollTaxes && benefits
+        ? payrollTaxes.metricValue + benefits.metricValue
+        : null,
+  };
+}
+
+// Where a value sits against a real benchmark range — null when there's no
+// real benchmark (see hasRealBenchmark), so copy built on it can be omitted.
+export function benchmarkPosition(
+  value: number,
+  low: number | null | undefined,
+  high: number | null | undefined
+): "below" | "within" | "above" | null {
+  if (!hasRealBenchmark(low, high)) return null;
+  if (value < (low as number)) return "below";
+  if (value > (high as number)) return "above";
+  return "within";
+}
+
+// Survey response count for one period: the survey_count key (current
+// tagging), else the exact names older records carry under "unclassified"
+// ("Survey Count" on Lex Yard / Peacock Alley, "Survey Response Count" on
+// Yoshoku).
+const SURVEY_COUNT_NAMES = ["Survey Count", "Survey Response Count"];
+export function findSurveyCount(metrics: KpiMetric[], periodStart: string | null): KpiMetric | null {
+  const byKey = findMetricByKey(metrics, "survey_count", periodStart);
+  if (byKey) return byKey;
+  for (const name of SURVEY_COUNT_NAMES) {
+    const byName = findMetricByName(metrics, name, periodStart);
+    if (byName) return byName;
+  }
+  return null;
+}
+
+// This period's survey count against the property's own most recent earlier
+// period that has one. Null when either side is missing — callers must then
+// say nothing about a change in survey volume.
+export function surveyVolumeChange(
+  metrics: KpiMetric[],
+  periodStart: string | null
+): { current: number; prior: number; priorPeriod: string; changePct: number } | null {
+  if (!periodStart) return null;
+  const current = findSurveyCount(metrics, periodStart);
+  if (!current) return null;
+  const earlier = [...new Set(metrics.map((m) => m.periodStart).filter((p): p is string => !!p && p < periodStart))]
+    .sort()
+    .reverse();
+  for (const p of earlier) {
+    const prior = findSurveyCount(metrics, p);
+    if (prior && prior.metricValue > 0) {
+      return {
+        current: current.metricValue,
+        prior: prior.metricValue,
+        priorPeriod: p,
+        changePct: ((current.metricValue - prior.metricValue) / prior.metricValue) * 100,
+      };
+    }
+  }
+  return null;
 }
 
 // Exact Metric Name lookup within a period (+ optional category). For the

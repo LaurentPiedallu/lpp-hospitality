@@ -4,7 +4,7 @@ import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastU
 import {
   usd, pct, compact, buildTrendData, looksLikeIndividualStaffMetric, findMetricByKey,
   metricSeriesForKey, extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark,
-  parseDaypartPattern, formatPeriod, findIntelligenceByFinding, findAllIntelligence,
+  parseDaypartPattern, formatPeriod, findIntelligenceByFinding, findAllIntelligence, surveyVolumeChange, benchmarkPosition, isIncludingComps,
   CANONICAL_DAY_ORDER, CANONICAL_DAYPART_ORDER,
 } from "@/lib/format";
 import type { DaypartCoversEntry } from "@/lib/format";
@@ -97,6 +97,9 @@ const CORE_SUBMETRIC_PARENT: Record<string, string> = {
 // caption.
 const GUEST_OUTCOME_SHORT: Record<string, string> = {
   "Likelihood to Recommend": "Recommend",
+  // Peacock Alley's spelling of the same record — kept in step with
+  // Overview's guest outcome lookup.
+  "Likelihood to Recommend Score": "Recommend",
   "Guest Sentiment Score": "Sentiment",
 };
 
@@ -1047,13 +1050,14 @@ export default async function CommercialPage({
     );
   }
 
-  // Survey volume — a real Published KPI Record (75 for this period), but
-  // the only source for the month-over-month comparison (122 in May, a
-  // 38% decline) is the Guest Intelligence record's own prose: no May
-  // "Survey Count" KPI Record exists to diff against. Quoted here as
-  // confirmed real data rather than recomputed from KPI Records alone.
-  // Moved above guestHeadlineSummary, which now reads it too.
-  const surveyCountMetric = currentMetrics.find((m) => m.metricName === "Survey Count") ?? null;
+  // Survey volume vs this property's own most recent earlier period with a
+  // survey count record (lib/format.ts surveyVolumeChange). Null when
+  // there's no prior record, and then nothing is said about a change. This
+  // replaces a hardcoded "declined 38% ... vs. 122 responses" sentence that
+  // quoted Lex Yard's May figure and rendered on any property with a
+  // "Survey Count" record (Peacock Alley's 118 read as a 38% decline).
+  const surveyChange = surveyVolumeChange(allMetrics, latest);
+  const surveyDeclined = surveyChange != null && surveyChange.changePct < 0;
 
   // Headline next to the score. Previously a hardcoded boolean over raw KPI
   // severities (guestRatings.every(...) === "Healthy"), which ignored
@@ -1062,7 +1066,7 @@ export default async function CommercialPage({
   // the survey-volume decline (see the caveat sentence and Commentary
   // below, both sourced from this same record), and the old sentence never
   // reflected that argument at all. Sourced live off guestIntelligence's
-  // real Severity + the real surveyCountMetric figure instead, in the same
+  // real Severity + the computed surveyChange figures instead, in the same
   // "interpolate live values into hand-authored prose" convention this
   // page's own Commercial Synthesis paragraph already uses above — not a
   // paste of Current Read (that renders in full via the no-longer-hidden
@@ -1074,8 +1078,8 @@ export default async function CommercialPage({
       ? null
       : guestIntelligence?.severity === "Healthy"
         ? "Every Guest Experience score is Healthy this period, from core product ratings through advocacy and loyalty signals."
-        : surveyCountMetric
-          ? `Every score reads Healthy this period, but survey volume has fallen to ${surveyCountMetric.metricValue.toLocaleString()} responses — confidence in these numbers is weakening right when it's needed most to validate recovery.`
+        : surveyDeclined
+          ? `Survey volume fell to ${surveyChange.current.toLocaleString()} responses from ${surveyChange.prior.toLocaleString()} in ${formatPeriod(surveyChange.priorPeriod)}, so read this period's scores with less confidence.`
           : "Guest Experience scores remain strong overall this period, though not every dimension reads Healthy — see the tiers below.";
 
   // KPI lookup by canonical LPP Metric Key + Segment (see Segment on
@@ -1211,9 +1215,25 @@ export default async function CommercialPage({
   // on its own once the real avg_check benchmark record gets Published
   // upstream — no frontend change needed when that happens.
   const totalOpportunityValue = commercialOpportunities.reduce((s, o) => s + o.estimatedAnnualImpact, 0);
+  // States only what this property's own figures show: the overall guest
+  // score, where the average check sits against its real benchmark range
+  // (omitted when there's no real benchmark), and the opportunity total.
+  // Earlier copy carried Lex Yard June 2026 narrative ("remains
+  // exceptional", "dinner running well below plan", "hotel upsell
+  // placement") and asserted the check "trails" its floor without
+  // comparing the two numbers.
+  const avgCheckPosition = avgCheckMetric
+    ? benchmarkPosition(avgCheckMetric.metricValue, avgCheckMetric.benchmarkLow, avgCheckMetric.benchmarkHigh)
+    : null;
   const synthesis =
     overallRating && avgCheckMetric?.benchmarkLow != null && totalOpportunityValue > 0
-      ? `Guest sentiment remains exceptional at ${overallRating.metricValue.toFixed(1)} out of 100, but that goodwill isn't yet fully converted into revenue: average check of ${usd(avgCheckMetric.metricValue)} trails the ${usd(avgCheckMetric.benchmarkLow)} full-service benchmark floor, and the shortfall traces to volume rather than pricing — dinner, the highest-check daypart, is running well below plan. The opportunities below turn specific, verified guest-experience strengths — near-perfect cleanliness and hospitality scores, high likelihood-to-recommend — into ${compact(totalOpportunityValue)} of identified annual upside, from hotel upsell placement to loyalty conversion and dinner volume recovery.`
+      ? [
+          `The overall guest score is ${overallRating.metricValue.toFixed(1)} out of 100.`,
+          avgCheckPosition
+            ? `Average check${isIncludingComps(avgCheckMetric) ? " incl. comps" : ""} of ${usd(avgCheckMetric.metricValue)} sits ${avgCheckPosition} the ${usd(avgCheckMetric.benchmarkLow)}–${usd(avgCheckMetric.benchmarkHigh as number)} benchmark range.`
+            : null,
+          `The opportunities below add up to ${compact(totalOpportunityValue)} of identified annual upside.`,
+        ].filter(Boolean).join(" ")
       : null;
 
   return (
@@ -1510,9 +1530,11 @@ export default async function CommercialPage({
                 )}
               </div>
             )}
-            {surveyCountMetric && (
+            {surveyChange && (
               <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.35)" }}>
-                Survey volume declined 38% in {formatPeriod(latest)} ({surveyCountMetric.metricValue.toLocaleString()} vs. 122 responses) — confidence in the scores above should be read with that in mind.
+                {Math.round(surveyChange.changePct) === 0
+                  ? `Survey volume held at ${surveyChange.current.toLocaleString()} responses in ${formatPeriod(latest)}, against ${surveyChange.prior.toLocaleString()} in ${formatPeriod(surveyChange.priorPeriod)}.`
+                  : `Survey volume ${surveyDeclined ? "declined" : "rose"} ${Math.abs(Math.round(surveyChange.changePct))}% in ${formatPeriod(latest)}, ${surveyChange.current.toLocaleString()} responses against ${surveyChange.prior.toLocaleString()} in ${formatPeriod(surveyChange.priorPeriod)}${surveyDeclined ? ", so read the scores above with that in mind" : ""}.`}
               </p>
             )}
             {/* Additional Guest-category records beyond guestIntelligence

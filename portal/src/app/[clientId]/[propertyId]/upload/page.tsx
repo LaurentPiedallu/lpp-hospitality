@@ -138,13 +138,16 @@ export default async function UploadPage({
   const { clientId, propertyId } = await params;
   if (session.role !== "admin" && session.clientId !== clientId) redirect("/dashboard");
 
-  const [property, briefs, uploads, lastUpdated] = await Promise.all([
+  const [property, clientBriefs, uploads, lastUpdated] = await Promise.all([
     getProperty(propertyId, clientId),
     getBriefs(clientId),
     getUploads(clientId, propertyId),
     getLastUpdated(propertyId, clientId),
   ]);
   if (!property) notFound();
+
+  // getBriefs is client-scoped; this tab lists only this property's Briefs.
+  const briefs = clientBriefs.filter((b) => b.propertyId === propertyId);
 
   const activeUploads   = uploads.filter((u) => u.status !== "Archived");
   const archivedUploads = uploads.filter((u) => u.status === "Archived");
