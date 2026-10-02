@@ -7,7 +7,8 @@ import {
   getPublishedBriefs,
 } from "@/lib/notion-queries";
 import { deriveHealth } from "@/lib/health";
-import { usd, pct, compact, formatPeriod, splitIntoParagraphs, firstSentence, parseTextLines, maxIso, findMetricByKey, findMetricByName } from "@/lib/format";
+import { usd, pct, compact, formatPeriod, splitIntoParagraphs, firstSentence, parseTextLines, maxIso, findMetricByKey, findFinancialComponents, componentLines, COMPONENT_LABEL } from "@/lib/format";
+import type { ComponentKey } from "@/lib/format";
 import { selectTopPriorities, type TopPriority } from "@/lib/priorities";
 import { PRIORITY_TAB_BY_CATEGORY, INTEL_CATEGORY_TAB } from "@/lib/deep-links";
 import NavBar from "@/components/NavBar";
@@ -505,25 +506,24 @@ export default async function PropertyPage({
   // granular sibling records that share the tile's LPP Metric Key + Segment
   // "Total" with the roll-up (Food vs Beverage revenue, Food vs Beverage
   // cost of sales, Wages vs Taxes & Benefits), the same records
-  // resolveCanonicalRollup steps past for the headline. Each line keeps its
-  // own Metric Name; money shown compact. Empty list -> tile shows no
-  // breakdown, exactly as before.
-  // NOTE: `names` passed by callers below are exact Notion Metric Name
-  // literals — they must move in lockstep with any upstream rename of the
-  // corresponding records.
-  function metricBreakdown(names: string[], category: string): { label: string; value: string }[] {
-    return names
-      .map((n) => findMetricByName(allMetrics as KpiMetric[], n, latestDataPeriod, category))
-      .filter((m): m is KpiMetric => m != null)
-      .map((m) => ({
-        // Drop only a leading "Total " on this compact tile (the tile
-        // header already carries the category) — the qualifying dimension
-        // ("Food Revenue", "Beverage Cost of Sales") is always kept. Full
-        // Metric Name is used verbatim on Financial Review.
-        label: m.metricName.replace(/^Total\s+/i, ""),
-        value: compact(m.metricValue),
-      }));
+  // resolveCanonicalRollup steps past for the headline. Empty list -> tile
+  // shows no breakdown, exactly as before. Records come from findFinancialComponents
+  // (key + Segment first, legacy exact Metric Names second), the same
+  // lookup Financial Review uses; labels come from COMPONENT_LABEL so every
+  // property reads identically. Money shown compact.
+  const components = findFinancialComponents(allMetrics as KpiMetric[], latestDataPeriod);
+  function metricBreakdown(keys: ComponentKey[]): { label: string; value: string }[] {
+    return componentLines(components, keys).map((l) => ({ label: l.label, value: compact(l.value) }));
   }
+  // Payroll tile: Wages, then Taxes and benefits as one line — the
+  // combined record, or Payroll Taxes + Benefits summed when only those
+  // two separate records exist.
+  const payrollBreakdown = [
+    ...metricBreakdown(["wages"]),
+    ...(components.taxesAndBenefitsValue != null
+      ? [{ label: COMPONENT_LABEL.taxesAndBenefits, value: compact(components.taxesAndBenefitsValue) }]
+      : []),
+  ];
 
   // Prior-period value for a canonical metric key, for the inline
   // Sparkline (Portal-Wide refinement, cross-cutting) — real data only
@@ -567,7 +567,7 @@ export default async function PropertyPage({
           valueColor: "#12120F",
           // "revenue covers" — kpi.covers resolves to "Total Revenue
           // Covers" (comps excluded), not the larger "Total Covers Period".
-          subLine: kpi.covers != null ? `${kpi.covers.toLocaleString()} revenue covers` : null,
+          subLine: kpi.covers != null ? `${kpi.covers.toLocaleString()} ${kpi.coversIncludesComps ? "covers incl. comps" : "revenue covers"}` : null,
           interpretation: revenueInterpretation,
           variance: (() => {
             const target = metricTarget("total_revenue");
@@ -576,7 +576,7 @@ export default async function PropertyPage({
             return { text: `${diff >= 0 ? "+" : "−"}${compact(Math.abs(diff))} vs budget`, favorable: diff >= 0 };
           })(),
           sparkline: kpi.revenue != null && metricPrior("total_revenue") != null ? [metricPrior("total_revenue")!, kpi.revenue] : null,
-          breakdown: metricBreakdown(["Total Food Revenue", "Total Beverage Revenue"], "Revenue"),
+          breakdown: metricBreakdown(["foodRevenue", "beverageRevenue"]),
         },
         {
           label: "Labor",
@@ -592,7 +592,7 @@ export default async function PropertyPage({
             return { text: `${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)} pts vs budget`, favorable: diff <= 0 };
           })(),
           sparkline: kpi.laborPct != null && metricPrior("labor_pct") != null ? [metricPrior("labor_pct")!, kpi.laborPct] : null,
-          breakdown: metricBreakdown(["Total Wages", "Taxes and Benefits"], "Labor"),
+          breakdown: payrollBreakdown,
         },
         {
           // "COGS", not "Food COGS" — cogs_pct / total_cogs are the blended
@@ -612,7 +612,7 @@ export default async function PropertyPage({
             return { text: `${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)} pts vs budget`, favorable: diff <= 0 };
           })(),
           sparkline: kpi.cogsPct != null && metricPrior("cogs_pct") != null ? [metricPrior("cogs_pct")!, kpi.cogsPct] : null,
-          breakdown: metricBreakdown(["Food Cost of Sales", "Beverage Cost of Sales"], "COGS"),
+          breakdown: metricBreakdown(["foodCost", "beverageCost"]),
         },
         {
           label: "Net Profit",
@@ -716,16 +716,20 @@ export default async function PropertyPage({
   // same allMetrics this whole section already reads, so the numbers
   // stay in sync with Commercial automatically rather than being
   // hand-copied.
-  const GUEST_OUTCOME_SHORT: Record<string, string> = {
-    "Likelihood to Recommend": "Recommend",
-    "Guest Sentiment Score": "Sentiment",
-  };
-  const guestOutcomeStats = Object.entries(GUEST_OUTCOME_SHORT)
-    .map(([name, label]) => ({
+  // Each label accepts every live spelling of its record's name (Peacock
+  // Alley's is "Likelihood to Recommend Score"); first match wins.
+  const GUEST_OUTCOME_NAMES: [string[], string][] = [
+    [["Likelihood to Recommend", "Likelihood to Recommend Score"], "Recommend"],
+    [["Guest Sentiment Score"], "Sentiment"],
+  ];
+  const guestOutcomeStats = GUEST_OUTCOME_NAMES
+    .map(([names, label]) => ({
       label,
-      value: (allMetrics as KpiMetric[]).find(
-        (m) => m.metricName === name && m.category === "Guest Experience" && m.unit === "Rating" && m.periodStart === latestDataPeriod
-      )?.metricValue ?? null,
+      value: names
+        .map((name) => (allMetrics as KpiMetric[]).find(
+          (m) => m.metricName === name && m.category === "Guest Experience" && m.unit === "Rating" && m.periodStart === latestDataPeriod
+        ))
+        .find((m) => m != null)?.metricValue ?? null,
     }))
     .filter((s): s is { label: string; value: number } => s.value != null);
 

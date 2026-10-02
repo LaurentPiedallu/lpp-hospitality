@@ -32,7 +32,10 @@ export type LppMetricKey =
   | "labor_pct" | "cogs_pct" | "net_profit_pct"
   | "opex" | "opex_pct"
   | "guest_overall" | "guest_food" | "guest_service" | "guest_ambiance"
-  | "revpash";
+  | "revpash"
+  // One-Total-per-key tagging rule: concepts that used to share a key's
+  // Segment "Total" with the headline now get their own key.
+  | "gross_profit" | "gross_profit_pct" | "total_expenses" | "survey_count";
 
 // KPI Records are one row per metric — we work with them individually
 export interface KpiMetric {
@@ -75,6 +78,9 @@ export interface KpiSummary {
   period: string;          // ISO date of Reporting Period start
   revenue: number | null;
   covers: number | null;
+  // True when `covers` is the comps-inclusive fallback record (no
+  // comps-excluded headline exists for the period) — label "incl. comps".
+  coversIncludesComps: boolean;
   avgSpend: number | null;
   laborDollars: number | null;
   laborPct: number | null;

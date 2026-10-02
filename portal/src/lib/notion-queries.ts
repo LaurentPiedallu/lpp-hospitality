@@ -8,7 +8,7 @@ import {
   updateSelectProperty, getPage,
 } from "./notion-fetch";
 import { NOTION_DBS } from "./notion-ids";
-import { maxIso, resolveCanonicalRollup, KEY_ALIAS } from "./format";
+import { maxIso, resolveCanonicalRollup, isIncludingComps, KEY_ALIAS } from "./format";
 import type {
   Client, Property, KpiMetric, KpiSummary, Action, Opportunity,
   Risk, Intelligence, Initiative, Brief, Benchmark, Upload,
@@ -137,18 +137,21 @@ export function buildKpiSummary(metrics: KpiMetric[]): KpiSummary | null {
   // the same disambiguation findMetricByKey uses. Without it the Overview
   // Financial Snapshot showed $154K Beverage revenue as "Revenue" and
   // $152,723 Taxes-and-Benefits as the Labor dollar figure.
-  const byKey = (key: string, category?: string) => {
+  //
+  // Candidates span every Segment: resolveCanonicalRollup itself picks the
+  // Segment "Total" record, and for covers falls back to the "Including
+  // Comps" record when no comps-excluded headline exists (flagged below).
+  const metricFor = (key: string, category?: string) => {
     const resolvedKey = KEY_ALIAS[key] ?? key;
     return resolveCanonicalRollup(
       current.filter(
-        (m) =>
-          m.lppMetricKey === resolvedKey &&
-          (!category || m.category === category) &&
-          (m.segment ?? "Total") === "Total"
+        (m) => m.lppMetricKey === resolvedKey && (!category || m.category === category)
       ),
       resolvedKey
-    )?.metricValue ?? null;
+    );
   };
+  const byKey = (key: string, category?: string) => metricFor(key, category)?.metricValue ?? null;
+  const coversMetric = metricFor("covers", "Revenue");
 
   // Derive worst financial severity
   const severityRank: Record<Severity, number> = {
@@ -161,7 +164,8 @@ export function buildKpiSummary(metrics: KpiMetric[]): KpiSummary | null {
   return {
     period: latestPeriod ?? "",
     revenue:         byKey("total_revenue"),
-    covers:          byKey("covers", "Revenue"),
+    covers:          coversMetric?.metricValue ?? null,
+    coversIncludesComps: isIncludingComps(coversMetric),
     avgSpend:        byKey("avg_spend"),
     laborDollars:    byKey("total_payroll"),
     laborPct:        byKey("labor_pct"),
