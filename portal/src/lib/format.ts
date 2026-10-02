@@ -457,6 +457,55 @@ export function benchmarkPosition(
   return "within";
 }
 
+// Client-facing copy helpers. House style for generated sentences: no
+// dashes joining clauses or ranges, no parentheses, no minus sign before a
+// percentage, numbers always formatted.
+
+function plainNumber(n: number): string {
+  return Number.isInteger(n) ? n.toLocaleString("en-US") : n.toFixed(1);
+}
+
+// "34 to 40%" or "$90 to $160" — a benchmark range written out in words.
+export function benchmarkRange(low: number | null | undefined, high: number | null | undefined, unit: "%" | "$"): string {
+  if (low == null || high == null) return "";
+  return unit === "$" ? `${usd(low)} to ${usd(high)}` : `${plainNumber(low)} to ${plainNumber(high)}%`;
+}
+
+// "negative 86.5%" rather than "-86.5%".
+export function signedPctWords(value: number): string {
+  return value < 0 ? `negative ${pct(Math.abs(value))}` : pct(value);
+}
+
+// One label per sub-component, from its Segment, so every property reads
+// identically whatever its records' Metric Names say.
+export const COMPONENT_LABEL = {
+  foodRevenue: "Food revenue",
+  beverageRevenue: "Beverage revenue",
+  foodCost: "Food cost of sales",
+  beverageCost: "Beverage cost of sales",
+  wages: "Wages",
+  taxesAndBenefits: "Taxes and benefits",
+  payrollTaxes: "Payroll taxes",
+  benefits: "Benefits",
+} as const;
+export type ComponentKey = keyof typeof COMPONENT_LABEL;
+
+// The present components among `keys`, labelled by COMPONENT_LABEL.
+export function componentLines(c: FinancialComponents, keys: ComponentKey[]): { label: string; value: number }[] {
+  return keys.flatMap((k) => {
+    const m = c[k];
+    return m ? [{ label: COMPONENT_LABEL[k], value: m.metricValue }] : [];
+  });
+}
+
+// OpEx line item label: sentence case, trailing "Expense" dropped, so Lex
+// Yard's "Kitchen Allocation Expense" and Yoshoku's "Kitchen Allocation"
+// both read "Kitchen allocation".
+export function opexLineLabel(metricName: string): string {
+  const base = metricName.trim().replace(/\s+Expenses?$/i, "");
+  return base.charAt(0).toUpperCase() + base.slice(1).toLowerCase();
+}
+
 // Survey response count for one period: the survey_count key (current
 // tagging), else the exact names older records carry under "unclassified"
 // ("Survey Count" on Lex Yard / Peacock Alley, "Survey Response Count" on

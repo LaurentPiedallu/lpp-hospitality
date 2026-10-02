@@ -185,3 +185,27 @@ test("survey volume change needs the property's own prior survey record", () => 
   assert.equal(change?.priorPeriod, JUNE);
   assert.equal(Math.round(change!.changePct), -25);
 });
+
+test("copy helpers: ranges in words, negative percentages in words, clean OpEx labels", async () => {
+  const { benchmarkRange, signedPctWords, opexLineLabel } = await import("./format.ts");
+  assert.equal(benchmarkRange(34, 40, "%"), "34 to 40%");
+  assert.equal(benchmarkRange(26.5, 32, "%"), "26.5 to 32%");
+  assert.equal(benchmarkRange(90, 160, "$"), "$90 to $160");
+  assert.equal(signedPctWords(-86.5), "negative 86.5%");
+  assert.equal(signedPctWords(12), "12.0%");
+  assert.equal(opexLineLabel("Kitchen Allocation Expense"), "Kitchen allocation");
+  assert.equal(opexLineLabel("Kitchen Allocation"), "Kitchen allocation");
+  assert.equal(opexLineLabel("Plants and Decorations"), "Plants and decorations");
+});
+
+test("componentLines labels by component, never by Metric Name", async () => {
+  const { componentLines } = await import("./format.ts");
+  const peacock = [
+    rec("total_cogs", "Food", "Cost of Sales - Food", 67985, "COGS"),
+    rec("total_cogs", "Beverage", "Cost of Sales - Beverage", 55381, "COGS"),
+  ];
+  assert.deepEqual(componentLines(findFinancialComponents(peacock, JUNE), ["foodCost", "beverageCost"]), [
+    { label: "Food cost of sales", value: 67985 },
+    { label: "Beverage cost of sales", value: 55381 },
+  ]);
+});

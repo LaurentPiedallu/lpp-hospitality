@@ -4,7 +4,7 @@ import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastU
 import {
   usd, pct, compact, buildTrendData, looksLikeIndividualStaffMetric, findMetricByKey,
   metricSeriesForKey, extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark,
-  parseDaypartPattern, formatPeriod, findIntelligenceByFinding, findAllIntelligence, surveyVolumeChange, benchmarkPosition, isIncludingComps,
+  parseDaypartPattern, formatPeriod, findIntelligenceByFinding, findAllIntelligence, surveyVolumeChange, benchmarkPosition, benchmarkRange, isIncludingComps,
   CANONICAL_DAY_ORDER, CANONICAL_DAYPART_ORDER,
 } from "@/lib/format";
 import type { DaypartCoversEntry } from "@/lib/format";
@@ -1077,10 +1077,10 @@ export default async function CommercialPage({
     guestRatings.length === 0
       ? null
       : guestIntelligence?.severity === "Healthy"
-        ? "Every Guest Experience score is Healthy this period, from core product ratings through advocacy and loyalty signals."
+        ? "Every Guest Experience score was Healthy this period, from core product ratings through advocacy and loyalty signals."
         : surveyDeclined
           ? `Survey volume fell to ${surveyChange.current.toLocaleString()} responses from ${surveyChange.prior.toLocaleString()} in ${formatPeriod(surveyChange.priorPeriod)}, so read this period's scores with less confidence.`
-          : "Guest Experience scores remain strong overall this period, though not every dimension reads Healthy — see the tiers below.";
+          : "Not every Guest Experience dimension was Healthy this period. See the tiers below.";
 
   // KPI lookup by canonical LPP Metric Key + Segment (see Segment on
   // KpiMetric / findMetricByKey in lib/format.ts). Segment defaults to
@@ -1228,9 +1228,9 @@ export default async function CommercialPage({
   const synthesis =
     overallRating && avgCheckMetric?.benchmarkLow != null && totalOpportunityValue > 0
       ? [
-          `The overall guest score is ${overallRating.metricValue.toFixed(1)} out of 100.`,
+          `The overall guest score was ${overallRating.metricValue.toFixed(1)} out of 100.`,
           avgCheckPosition
-            ? `Average check${isIncludingComps(avgCheckMetric) ? " incl. comps" : ""} of ${usd(avgCheckMetric.metricValue)} sits ${avgCheckPosition} the ${usd(avgCheckMetric.benchmarkLow)}–${usd(avgCheckMetric.benchmarkHigh as number)} benchmark range.`
+            ? `Average check${isIncludingComps(avgCheckMetric) ? " including comps" : ""} of ${usd(avgCheckMetric.metricValue)} was ${avgCheckPosition} the ${benchmarkRange(avgCheckMetric.benchmarkLow, avgCheckMetric.benchmarkHigh, "$")} benchmark range.`
             : null,
           `The opportunities below add up to ${compact(totalOpportunityValue)} of identified annual upside.`,
         ].filter(Boolean).join(" ")

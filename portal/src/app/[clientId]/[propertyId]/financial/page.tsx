@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastUpdated } from "@/lib/notion-queries";
-import { usd, pct, findMetricByKey, findFinancialComponents, isIncludingComps, benchmarkPosition, metricSeriesForKey, findAllIntelligence, findIntelligenceByFinding, extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark } from "@/lib/format";
+import { usd, pct, findMetricByKey, findFinancialComponents, isIncludingComps, benchmarkPosition, benchmarkRange, signedPctWords, opexLineLabel, componentLines, COMPONENT_LABEL, metricSeriesForKey, findAllIntelligence, findIntelligenceByFinding, extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark } from "@/lib/format";
 import NavBar from "@/components/NavBar";
 import PageWrapper from "@/components/PageWrapper";
 import PropertyHeaderSlim from "@/components/PropertyHeaderSlim";
@@ -148,7 +148,7 @@ function DriverBreakdown({
       </div>
       {residual > 0 && residualLabel && (
         <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.35)", marginTop: 14 }}>
-          Plus {usd(residual)} in {residualLabel} not itemized in the source data.
+          {residualLabel} of {usd(residual)} is not broken out in the source report.
         </p>
       )}
     </div>
@@ -543,29 +543,24 @@ export default async function FinancialPage({
   // dinner shortfall", "cost control held", "a departmental loss") that
   // rendered as fact on every property. A sentence with no data behind it
   // is omitted rather than defaulted.
-  const ratioClause = (label: string, m: KpiMetric) => {
-    const pos = benchmarkPosition(m.metricValue, m.benchmarkLow, m.benchmarkHigh);
-    return {
-      label,
-      pos,
-      text: pos
-        ? `${label} at ${pct(m.metricValue)} of revenue against ${m.benchmarkLow}–${m.benchmarkHigh}%`
-        : `${label} at ${pct(m.metricValue)} of revenue`,
-    };
-  };
-  const POSITION_WORD = { above: "above", within: "within", below: "below" } as const;
+  const ratioClause = (label: string, m: KpiMetric) => ({
+    label,
+    pos: benchmarkPosition(m.metricValue, m.benchmarkLow, m.benchmarkHigh),
+    value: pct(m.metricValue),
+    range: benchmarkRange(m.benchmarkLow, m.benchmarkHigh, "%"),
+  });
   const ratioConnector = (label: string, m: KpiMetric | null): string | undefined => {
     if (!m) return undefined;
-    const pos = benchmarkPosition(m.metricValue, m.benchmarkLow, m.benchmarkHigh);
-    if (!pos) return undefined;
-    return `${label} ran at ${pct(m.metricValue)} of revenue, ${POSITION_WORD[pos]} its ${m.benchmarkLow}–${m.benchmarkHigh}% benchmark range.`;
+    const c = ratioClause(label, m);
+    if (!c.pos) return undefined;
+    return `${label} ran at ${c.value} of revenue, ${c.pos} its ${c.range} benchmark range.`;
   };
   const joinList = (items: string[]) =>
     items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
   const revenueConnector = totalRevenue
-    ? "The figures below are this property's own revenue numbers; the demand-side story behind them — daypart mix, guest volume — belongs to Commercial Review."
+    ? "These are the property's own revenue figures. Daypart mix and guest volume are covered in Commercial Review."
     : undefined;
   const laborConnector = ratioConnector("Labor", laborPct);
   const cogsConnector = ratioConnector("Cost of sales", cogsPct);
@@ -574,7 +569,9 @@ export default async function FinancialPage({
   const opexConnector = opexPct
     ? [
         ratioConnector("OpEx", opexPct),
-        opexLineItems.length > 0 ? `The largest line below is ${opexLineItems[0].metricName}.` : undefined,
+        opexLineItems.length > 0
+          ? `${opexLineLabel(opexLineItems[0].metricName)} is the largest line at ${usd(opexLineItems[0].metricValue)}.`
+          : undefined,
       ].filter(Boolean).join(" ") || undefined
     : undefined;
   const profitabilityConnector = netProfit
@@ -592,18 +589,24 @@ export default async function FinancialPage({
           const sentences = [`Total revenue was ${usd(totalRevenue.metricValue)}.`];
           for (const pos of ["above", "within", "below"] as const) {
             const items = clauses.filter((c) => c.pos === pos);
-            if (items.length > 0) {
+            if (items.length === 1) {
+              const [c] = items;
+              sentences.push(`${capitalize(c.label)} ran ${pos} benchmark at ${c.value} of revenue against ${c.range}.`);
+            } else if (items.length > 1) {
               sentences.push(
-                `${capitalize(joinList(items.map((c) => c.label)))} ${items.length > 1 ? "run" : "runs"} ${POSITION_WORD[pos]} benchmark: ${items.map((c) => c.text).join(", ")}.`
+                `${capitalize(joinList(items.map((c) => c.label)))} ran ${pos} benchmark: ${joinList(
+                  items.map((c, i) => `${c.label} at ${c.value}${i === 0 ? " of revenue" : ""} against ${c.range}`)
+                )}.`
               );
             }
           }
-          const unbenchmarked = clauses.filter((c) => c.pos == null).map((c) => c.text);
-          if (unbenchmarked.length > 0) sentences.push(`${capitalize(joinList(unbenchmarked))}.`);
+          for (const c of clauses.filter((x) => x.pos == null)) {
+            sentences.push(`${capitalize(c.label)} was ${c.value} of revenue.`);
+          }
           const isLoss = netProfit.metricValue < 0;
           sentences.push(
             `The period closed with a ${usd(Math.abs(netProfit.metricValue))} departmental ${isLoss ? "loss" : "profit"}${
-              netProfitPct ? `, ${pct(Math.abs(netProfitPct.metricValue))} of revenue` : ""
+              netProfitPct ? `, a margin of ${signedPctWords(netProfitPct.metricValue)}` : ""
             }.`
           );
           return sentences.join(" ");
@@ -705,8 +708,8 @@ export default async function FinancialPage({
             <DriverBreakdown
               title="Revenue by Type"
               total={totalRevenue.metricValue}
-              items={revenueDrivers.map((d) => ({ label: d.metricName, value: d.metricValue }))}
-              residualLabel="other revenue (comps, non-F&B)"
+              items={componentLines(components, ["foodRevenue", "beverageRevenue"])}
+              residualLabel="Other revenue"
             />
           )}
           {/* Deep link to Commercial Review's own ownership of the
@@ -790,8 +793,8 @@ export default async function FinancialPage({
               <DriverBreakdown
                 title="Labor Cost Drivers"
                 total={laborCost.metricValue}
-                items={laborDrivers.map((d) => ({ label: d.metricName, value: d.metricValue }))}
-                residualLabel="other payroll costs"
+                items={componentLines(components, ["wages", "taxesAndBenefits", "payrollTaxes", "benefits"])}
+                residualLabel="Other payroll cost"
               />
             )}
           </div>
@@ -863,8 +866,8 @@ export default async function FinancialPage({
               <StackedSplit
                 title="Cost of Sales by Type"
                 segments={[
-                  { label: foodCost.metricName, value: foodCost.metricValue, color: "#B8935A" },
-                  { label: beverageCost.metricName, value: beverageCost.metricValue, color: "#12120F" },
+                  { label: COMPONENT_LABEL.foodCost, value: foodCost.metricValue, color: "#B8935A" },
+                  { label: COMPONENT_LABEL.beverageCost, value: beverageCost.metricValue, color: "#12120F" },
                 ]}
               />
             )}
@@ -946,15 +949,15 @@ export default async function FinancialPage({
               <SingleDriverStat
                 title="Operating Expense Drivers"
                 total={opexDollars.metricValue}
-                item={{ label: opexLineItems[0].metricName, value: opexLineItems[0].metricValue }}
+                item={{ label: opexLineLabel(opexLineItems[0].metricName), value: opexLineItems[0].metricValue }}
               />
             )}
             {opexLineItems.length >= 2 && opexDollars && (
               <DriverBreakdown
                 title="Operating Expense Drivers"
                 total={opexDollars.metricValue}
-                items={opexLineItems.map((d) => ({ label: d.metricName, value: d.metricValue }))}
-                residualLabel="other operating costs"
+                items={opexLineItems.map((d) => ({ label: opexLineLabel(d.metricName), value: d.metricValue }))}
+                residualLabel="Other operating cost"
               />
             )}
           </div>

@@ -7,7 +7,8 @@ import {
   getPublishedBriefs,
 } from "@/lib/notion-queries";
 import { deriveHealth } from "@/lib/health";
-import { usd, pct, compact, formatPeriod, splitIntoParagraphs, firstSentence, parseTextLines, maxIso, findMetricByKey, findFinancialComponents } from "@/lib/format";
+import { usd, pct, compact, formatPeriod, splitIntoParagraphs, firstSentence, parseTextLines, maxIso, findMetricByKey, findFinancialComponents, componentLines, COMPONENT_LABEL } from "@/lib/format";
+import type { ComponentKey } from "@/lib/format";
 import { selectTopPriorities, type TopPriority } from "@/lib/priorities";
 import { PRIORITY_TAB_BY_CATEGORY, INTEL_CATEGORY_TAB } from "@/lib/deep-links";
 import NavBar from "@/components/NavBar";
@@ -505,36 +506,22 @@ export default async function PropertyPage({
   // granular sibling records that share the tile's LPP Metric Key + Segment
   // "Total" with the roll-up (Food vs Beverage revenue, Food vs Beverage
   // cost of sales, Wages vs Taxes & Benefits), the same records
-  // resolveCanonicalRollup steps past for the headline. Each line keeps its
-  // own Metric Name; money shown compact. Empty list -> tile shows no
-  // breakdown, exactly as before. Records come from findFinancialComponents
+  // resolveCanonicalRollup steps past for the headline. Empty list -> tile
+  // shows no breakdown, exactly as before. Records come from findFinancialComponents
   // (key + Segment first, legacy exact Metric Names second), the same
-  // lookup Financial Review uses.
+  // lookup Financial Review uses; labels come from COMPONENT_LABEL so every
+  // property reads identically. Money shown compact.
   const components = findFinancialComponents(allMetrics as KpiMetric[], latestDataPeriod);
-  function metricBreakdown(records: (KpiMetric | null)[]): { label: string; value: string }[] {
-    return records
-      .filter((m): m is KpiMetric => m != null)
-      .map((m) => ({
-        // Drop only a leading "Total " on this compact tile (the tile
-        // header already carries the category) — the qualifying dimension
-        // ("Food Revenue", "Beverage Cost of Sales") is always kept. Full
-        // Metric Name is used verbatim on Financial Review.
-        label: m.metricName.replace(/^Total\s+/i, ""),
-        value: compact(m.metricValue),
-      }));
+  function metricBreakdown(keys: ComponentKey[]): { label: string; value: string }[] {
+    return componentLines(components, keys).map((l) => ({ label: l.label, value: compact(l.value) }));
   }
-  // Payroll tile: Wages, then Taxes and Benefits as one line — the
+  // Payroll tile: Wages, then Taxes and benefits as one line — the
   // combined record, or Payroll Taxes + Benefits summed when only those
   // two separate records exist.
   const payrollBreakdown = [
-    ...metricBreakdown([components.wages]),
+    ...metricBreakdown(["wages"]),
     ...(components.taxesAndBenefitsValue != null
-      ? [{
-          label: components.taxesAndBenefits
-            ? components.taxesAndBenefits.metricName.replace(/^Total\s+/i, "")
-            : "Taxes and Benefits",
-          value: compact(components.taxesAndBenefitsValue),
-        }]
+      ? [{ label: COMPONENT_LABEL.taxesAndBenefits, value: compact(components.taxesAndBenefitsValue) }]
       : []),
   ];
 
@@ -589,7 +576,7 @@ export default async function PropertyPage({
             return { text: `${diff >= 0 ? "+" : "−"}${compact(Math.abs(diff))} vs budget`, favorable: diff >= 0 };
           })(),
           sparkline: kpi.revenue != null && metricPrior("total_revenue") != null ? [metricPrior("total_revenue")!, kpi.revenue] : null,
-          breakdown: metricBreakdown([components.foodRevenue, components.beverageRevenue]),
+          breakdown: metricBreakdown(["foodRevenue", "beverageRevenue"]),
         },
         {
           label: "Labor",
@@ -625,7 +612,7 @@ export default async function PropertyPage({
             return { text: `${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)} pts vs budget`, favorable: diff <= 0 };
           })(),
           sparkline: kpi.cogsPct != null && metricPrior("cogs_pct") != null ? [metricPrior("cogs_pct")!, kpi.cogsPct] : null,
-          breakdown: metricBreakdown([components.foodCost, components.beverageCost]),
+          breakdown: metricBreakdown(["foodCost", "beverageCost"]),
         },
         {
           label: "Net Profit",
