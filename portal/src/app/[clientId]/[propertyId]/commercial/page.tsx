@@ -4,7 +4,7 @@ import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastU
 import {
   usd, pct, compact, buildTrendData, looksLikeIndividualStaffMetric, findMetricByKey,
   metricSeriesForKey, extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark,
-  parseDaypartPattern, formatPeriod, findIntelligenceByFinding, findAllIntelligence, surveyVolumeChange, benchmarkPosition, benchmarkRange, isIncludingComps,
+  parseDaypartPattern, formatPeriod, findIntelligenceByFinding, findAllIntelligence, surveyVolumeChange, guestDimensionSentence, benchmarkPosition, benchmarkRange, isIncludingComps,
   CANONICAL_DAY_ORDER, CANONICAL_DAYPART_ORDER,
 } from "@/lib/format";
 import type { DaypartCoversEntry } from "@/lib/format";
@@ -1080,7 +1080,7 @@ export default async function CommercialPage({
         ? "Every Guest Experience score was Healthy this period, from core product ratings through advocacy and loyalty signals."
         : surveyDeclined
           ? `Survey volume fell to ${surveyChange.current.toLocaleString()} responses from ${surveyChange.prior.toLocaleString()} in ${formatPeriod(surveyChange.priorPeriod)}, so read this period's scores with less confidence.`
-          : "Not every Guest Experience dimension was Healthy this period. See the tiers below.";
+          : guestDimensionSentence(allMetrics, latest);
 
   // KPI lookup by canonical LPP Metric Key + Segment (see Segment on
   // KpiMetric / findMetricByKey in lib/format.ts). Segment defaults to

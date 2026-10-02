@@ -506,6 +506,31 @@ export function opexLineLabel(metricName: string): string {
   return base.charAt(0).toUpperCase() + base.slice(1).toLowerCase();
 }
 
+// Guest headline for a period whose guest scores aren't uniformly Healthy:
+// names which core dimensions held at healthy levels and which scored
+// below target, from each dimension record's own Severity. Null when the
+// period has none of the three records.
+const GUEST_DIMENSIONS: [string, string][] = [
+  ["service", "guest_service"],
+  ["ambiance", "guest_ambiance"],
+  ["food", "guest_food"],
+];
+export function guestDimensionSentence(metrics: KpiMetric[], periodStart: string | null): string | null {
+  const present = GUEST_DIMENSIONS
+    .map(([label, key]) => ({ label, m: findMetricByKey(metrics, key, periodStart) }))
+    .filter((d): d is { label: string; m: KpiMetric } => d.m != null);
+  if (present.length === 0) return null;
+  const join = (items: string[]) =>
+    items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const held = present.filter((d) => d.m.severity === "Healthy").map((d) => d.label);
+  const below = present.filter((d) => d.m.severity !== "Healthy").map((d) => d.label);
+  const all = present.length > 1 ? " all" : "";
+  if (below.length === 0) return `${cap(join(held))}${all} held at healthy levels this period.`;
+  if (held.length === 0) return `${cap(join(below))}${all} scored below target this period.`;
+  return `${cap(join(held))} held at healthy levels; ${join(below)} scored below target this period.`;
+}
+
 // Survey response count for one period: the survey_count key (current
 // tagging), else the exact names older records carry under "unclassified"
 // ("Survey Count" on Lex Yard / Peacock Alley, "Survey Response Count" on

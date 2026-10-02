@@ -570,7 +570,7 @@ export default async function FinancialPage({
     ? [
         ratioConnector("OpEx", opexPct),
         opexLineItems.length > 0
-          ? `${opexLineLabel(opexLineItems[0].metricName)} is the largest line at ${usd(opexLineItems[0].metricValue)}.`
+          ? `${opexLineLabel(opexLineItems[0].metricName)} was the largest line at ${usd(opexLineItems[0].metricValue)}.`
           : undefined,
       ].filter(Boolean).join(" ") || undefined
     : undefined;

@@ -209,3 +209,19 @@ test("componentLines labels by component, never by Metric Name", async () => {
     { label: "Beverage cost of sales", value: 55381 },
   ]);
 });
+
+test("guest headline names which dimensions held and which fell below", async () => {
+  const { guestDimensionSentence } = await import("./format.ts");
+  const g = (key: string, severity: string) =>
+    ({ ...rec(key, "Total", key, 90, "Guest Experience"), severity } as KpiMetric);
+  assert.equal(
+    guestDimensionSentence([g("guest_service", "Healthy"), g("guest_ambiance", "Healthy"), g("guest_food", "Monitor")], JUNE),
+    "Service and ambiance held at healthy levels; food scored below target this period."
+  );
+  assert.equal(
+    guestDimensionSentence([g("guest_service", "Healthy"), g("guest_ambiance", "Healthy"), g("guest_food", "Healthy")], JUNE),
+    "Service, ambiance and food all held at healthy levels this period."
+  );
+  assert.equal(guestDimensionSentence([g("guest_food", "Monitor")], JUNE), "Food scored below target this period.");
+  assert.equal(guestDimensionSentence([], JUNE), null);
+});
