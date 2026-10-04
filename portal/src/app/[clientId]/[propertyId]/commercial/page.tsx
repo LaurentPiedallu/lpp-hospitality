@@ -743,7 +743,8 @@ function dinnerConfigEfficiencyNote(
   if (winner.covers >= loser.covers) return null;
 
   const coversRatio = Math.round((winner.covers / loser.covers) * 100);
-  return `${winner.label} runs a higher RevPASH, ${revpashFmt(winner.revpash)} against ${revpashFmt(loser.revpash)}, despite carrying only ${coversRatio}% of the covers per service, ${winner.covers.toFixed(0)} against ${loser.covers.toFixed(0)}. The lower-volume format is already the more seat-efficient one per available seat hour. Filling more of it, not just growing dinner volume overall, is the lever.`;
+  const sentenceStart = winner.label.charAt(0).toUpperCase() + winner.label.slice(1);
+  return `${sentenceStart} runs a higher RevPASH than ${loser.label}, ${revpashFmt(winner.revpash)} against ${revpashFmt(loser.revpash)}, despite carrying only ${coversRatio}% of the covers per service, ${winner.covers.toFixed(0)} against ${loser.covers.toFixed(0)}. The lower-volume format is already the more seat-efficient one per available seat hour. Filling more of it, not just growing dinner volume overall, is the lever.`;
 }
 
 function RevpashBars({ items }: { items: { label: string; value: number }[] }) {
@@ -1172,16 +1173,16 @@ export default async function CommercialPage({
   // config's own avg_covers_per_service KPI Record (Category
   // "Reservations", Segment "Dinner Bar Only" / "Dinner Both Floors").
   // dinnerConfigEfficiencyNote does the actual comparison; this just
-  // hands it the two segments' real metrics and labels (reusing
-  // REVPASH_LABELS as the single source of truth for the label strings).
+  // hands it the two segments' real metrics and their running-text names
+  // (REVPASH_LABELS are card headings, not sentence fragments).
   const dinnerEfficiencyNote = dinnerConfigEfficiencyNote(
     {
-      label: REVPASH_LABELS["Dinner Bar Only"],
+      label: "bar-only dinner on Monday and Sunday",
       revpash: revpashEntries.find((e) => e.segment === "Dinner Bar Only")?.metric ?? null,
       covers: byKey("avg_covers_per_service", "Reservations", "Dinner Bar Only"),
     },
     {
-      label: REVPASH_LABELS["Dinner Both Floors"],
+      label: "two-floor dinner Tuesday to Saturday",
       revpash: revpashEntries.find((e) => e.segment === "Dinner Both Floors")?.metric ?? null,
       covers: byKey("avg_covers_per_service", "Reservations", "Dinner Both Floors"),
     }
