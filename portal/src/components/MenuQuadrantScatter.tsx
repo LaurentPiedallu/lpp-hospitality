@@ -96,7 +96,7 @@ export default function MenuQuadrantScatter({
     return (
       <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", padding: "40px 20px", textAlign: "center" }}>
         <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.4)" }}>
-          Not enough data yet to plot menu shape — check back once this batch has more items published.
+          Not enough data yet to plot menu shape. Check back once this batch has more items published.
         </p>
       </div>
     );
@@ -203,7 +203,7 @@ export default function MenuQuadrantScatter({
       </ResponsiveContainer>
       {pendingCount > 0 && (
         <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.35)", textAlign: "center", padding: "0 0 14px" }}>
-          {pendingCount} item{pendingCount === 1 ? "" : "s"} pending — not enough data to plot, shown in the table below.
+          {pendingCount} item{pendingCount === 1 ? "" : "s"} pending. {pendingCount === 1 ? "It is" : "They are"} listed in the table below until there is enough data to plot.
         </p>
       )}
     </div>

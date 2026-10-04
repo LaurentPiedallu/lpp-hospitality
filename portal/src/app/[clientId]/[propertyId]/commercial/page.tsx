@@ -135,12 +135,12 @@ function coreCardAnalysis(mainMetric: KpiMetric, subMetrics: KpiMetric[]): strin
   if (subMetrics.length === 1) {
     const sub = subMetrics[0];
     const subShort = CORE_SUBMETRIC_SHORT[sub.metricName] ?? sub.metricName.toLowerCase();
-    return `${pillar} scores ${mainVal}, with ${subShort} rated ${sub.metricValue.toFixed(1)}, consistent across the board.`;
+    return `${pillar} scored ${mainVal} and ${subShort} ${sub.metricValue.toFixed(1)}, consistent across the board.`;
   }
   const values = subMetrics.map((s) => s.metricValue);
   const min = Math.min(...values);
   const max = Math.max(...values);
-  return `${pillar} scores ${mainVal}, backed by ${subMetrics.length} supporting scores ranging ${min.toFixed(1)} to ${max.toFixed(1)}, a sign of consistently strong execution.`;
+  return `${pillar} scored ${mainVal}, backed by ${subMetrics.length} supporting scores ranging ${min.toFixed(1)} to ${max.toFixed(1)}, a sign of consistently strong execution.`;
 }
 
 // Opportunity Category values that belong on this tab — pulled from the
@@ -269,7 +269,7 @@ function SundayEconomicsCard({
             <StatusBadge label={tuesdayIntel.severity} variant={severityVariant(tuesdayIntel.severity)} />
           </div>
           <p>
-            Sunday is the weakest day on the calendar for both formats it runs — brunch averages just 46 covers and bar-only dinner comes in at 93, the softest read of the week for each — while Tuesday, the softest night of the two-floor dinner block, adds a third recurring low-volume service to the same trough.
+            Sunday is the weakest day on the calendar for both formats it runs. Brunch averages just 46 covers and bar-only dinner comes in at 93, the softest read of the week for each. Tuesday, the softest night of the two-floor dinner block, adds a third recurring low-volume service to the same trough.
           </p>
         </div>
       </CalloutBlock>
@@ -743,7 +743,7 @@ function dinnerConfigEfficiencyNote(
   if (winner.covers >= loser.covers) return null;
 
   const coversRatio = Math.round((winner.covers / loser.covers) * 100);
-  return `${winner.label} runs a higher RevPASH (${revpashFmt(winner.revpash)} vs. ${revpashFmt(loser.revpash)}) than ${loser.label}, despite carrying only ${coversRatio}% of its covers per service (${winner.covers.toFixed(0)} vs. ${loser.covers.toFixed(0)}) - the lower-volume format is already the more seat-efficient one per available seat hour. Filling more of it, not just growing dinner volume overall, is the lever.`;
+  return `${winner.label} runs a higher RevPASH, ${revpashFmt(winner.revpash)} against ${revpashFmt(loser.revpash)}, despite carrying only ${coversRatio}% of the covers per service, ${winner.covers.toFixed(0)} against ${loser.covers.toFixed(0)}. The lower-volume format is already the more seat-efficient one per available seat hour. Filling more of it, not just growing dinner volume overall, is the lever.`;
 }
 
 function RevpashBars({ items }: { items: { label: string; value: number }[] }) {

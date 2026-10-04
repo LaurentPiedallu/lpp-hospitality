@@ -1210,7 +1210,7 @@ export default async function PropertyPage({
           >
             {unpublishedFinancialData && (
               <div style={{ marginBottom: 16, padding: "10px 16px", background: "rgba(192,57,43,0.06)", border: "1px solid rgba(192,57,43,0.15)", fontFamily: JOST, fontSize: 13, color: "#C0392B" }}>
-                Admin only: financial data exists in Notion for this property but isn&apos;t Published — it won&apos;t appear until published.
+                Admin only: financial data exists in Notion for this property but isn&apos;t Published. It won&apos;t appear until published.
               </div>
             )}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

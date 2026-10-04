@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         from: "LPP Hospitality Portal <portal@lpphospitality.com>",
         to: [email],
-        subject: "Your sign-in link — LPP Hospitality Portal",
+        subject: "Your sign-in link: LPP Hospitality Portal",
         html: `
           <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:40px 24px;color:#111">
             <p style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#9ca3af;margin-bottom:8px">LPP Hospitality</p>

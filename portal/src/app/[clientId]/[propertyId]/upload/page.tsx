@@ -32,8 +32,11 @@ const UPLOAD_VARIANT: Record<UploadStatus, "gray" | "amber" | "green" | "red"> =
 // ─── Brief row ──────────────────────────────────────────────────────────────
 
 function BriefCard({ brief }: { brief: Brief }) {
-  const publishedLabel = brief.publishedDateStart ? formatPeriod(brief.publishedDateStart) : "—";
-  const periodLabel    = brief.reportingPeriodStart ? formatPeriod(brief.reportingPeriodStart) : null;
+  // Each part shows only when its date exists; no placeholder dash.
+  const metaLine = [
+    brief.publishedDateStart ? `Published ${formatPeriod(brief.publishedDateStart)}` : null,
+    brief.reportingPeriodStart ? `Period: ${formatPeriod(brief.reportingPeriodStart)}` : null,
+  ].filter(Boolean).join(" · ");
 
   const content = (
     <div
@@ -50,7 +53,7 @@ function BriefCard({ brief }: { brief: Brief }) {
     >
       <div style={{ minWidth: 0 }}>
         <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(18,18,15,0.35)", marginBottom: 6 }}>
-          Published {publishedLabel}{periodLabel && ` · Period: ${periodLabel}`}
+          {metaLine}
         </p>
         <h3 style={{ fontFamily: SERIF, fontSize: "1.2rem", fontWeight: 400, color: "#12120F" }}>{brief.title}</h3>
         {brief.executiveSummary && (
@@ -185,15 +188,15 @@ export default async function UploadPage({
           </p>
           <ul className="space-y-2">
             {[
-              ["P&L / Income statement", "Monthly or period-end PDF or Excel"],
-              ["Labor reports",          "Scheduling system exports — CSV or Excel"],
-              ["POS sales data",         "Daily/weekly exports from your POS"],
-              ["Guest feedback",         "Review exports, survey results"],
-              ["Any other data",         "If you're not sure, upload it and add a note"],
+              ["P&L / Income statement", "monthly or period-end PDF or Excel"],
+              ["Labor reports",          "scheduling system exports, CSV or Excel"],
+              ["POS sales data",         "daily or weekly exports from your POS"],
+              ["Guest feedback",         "review exports and survey results"],
+              ["Any other data",         "if you're not sure, upload it and add a note"],
             ].map(([label, desc]) => (
               <li key={label} style={{ display: "flex", gap: 10, fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.55)" }}>
                 <span style={{ color: "#B8935A" }}>→</span>
-                <span><span style={{ color: "#12120F" }}>{label}</span> — {desc}</span>
+                <span><span style={{ color: "#12120F" }}>{label}</span>: {desc}</span>
               </li>
             ))}
           </ul>

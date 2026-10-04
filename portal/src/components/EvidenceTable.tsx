@@ -119,7 +119,7 @@ export default function EvidenceTable({
           >
             {showAll
               ? "Show only diverging metrics"
-              : `Show all metrics (${metrics.length})`}
+              : `Show all ${metrics.length} metrics`}
           </button>
         </div>
       )}
