@@ -466,9 +466,13 @@ function plainNumber(n: number): string {
 }
 
 // "34 to 40%" or "$90 to $160" — a benchmark range written out in words.
-export function benchmarkRange(low: number | null | undefined, high: number | null | undefined, unit: "%" | "$"): string {
+// Used for every benchmark range label in the UI; any unit other than "$"
+// or "%" (Rating, Count, Days...) reads as plain numbers.
+export function benchmarkRange(low: number | null | undefined, high: number | null | undefined, unit: string): string {
   if (low == null || high == null) return "";
-  return unit === "$" ? `${usd(low)} to ${usd(high)}` : `${plainNumber(low)} to ${plainNumber(high)}%`;
+  if (unit === "$") return `${usd(low)} to ${usd(high)}`;
+  if (unit === "%") return `${plainNumber(low)} to ${plainNumber(high)}%`;
+  return `${plainNumber(low)} to ${plainNumber(high)}`;
 }
 
 // "negative 86.5%" rather than "-86.5%".
@@ -816,4 +820,84 @@ export function buildTrendData(
       value: m.metricValue,
       label: formatPeriod(m.periodStart),
     }));
+}
+
+// ─── Guest headline ──────────────────────────────────────────────────────────
+// The one-line lede next to Commercial Review's guest score, in order:
+//   1. a core dimension (service, ambiance, food) scored below target:
+//      name which held and which didn't (guestDimensionSentence);
+//   2. survey volume fell against the property's own prior survey record;
+//   3. every dimension held but a Guest finding for the period is flagged:
+//      say so, then name the most severe finding as the one to watch;
+//   4. every dimension held and nothing is flagged.
+// Null when there's neither dimension data nor a flagged finding.
+
+const WATCH_SEVERITY_RANK: Record<string, number> = {
+  Critical: 4, "Action Required": 3, Monitor: 2, Validate: 1,
+};
+
+// The most severe non-Healthy Guest finding for the period. Ties keep the
+// first one returned (Notion order, as `intelligence` arrives).
+export function guestWatchItem(intelligence: Intelligence[], periodStart: string | null): Intelligence | null {
+  let best: Intelligence | null = null;
+  for (const i of intelligence) {
+    if (i.category !== "Guest" || i.periodStart !== periodStart || i.severity === "Healthy") continue;
+    if (!best || (WATCH_SEVERITY_RANK[i.severity] ?? 0) > (WATCH_SEVERITY_RANK[best.severity] ?? 0)) best = i;
+  }
+  return best;
+}
+
+// "Overall guest score of 97..." -> "overall guest score of 97...", leaving
+// an all-caps first word (an acronym) alone.
+function lowerFirst(s: string): string {
+  return /^[A-Z][a-z]/.test(s) ? s.charAt(0).toLowerCase() + s.slice(1) : s;
+}
+
+export function guestHeadline(
+  metrics: KpiMetric[],
+  intelligence: Intelligence[],
+  periodStart: string | null,
+  surveyChange: { current: number; prior: number; priorPeriod: string; changePct: number } | null = null
+): string | null {
+  const present = GUEST_DIMENSIONS
+    .map(([label, key]) => ({ label, m: findMetricByKey(metrics, key, periodStart) }))
+    .filter((d): d is { label: string; m: KpiMetric } => d.m != null);
+  if (present.some((d) => d.m.severity !== "Healthy")) return guestDimensionSentence(metrics, periodStart);
+  if (surveyChange && surveyChange.changePct < 0) {
+    return `Survey volume fell to ${surveyChange.current.toLocaleString()} responses from ${surveyChange.prior.toLocaleString()} in ${formatPeriod(surveyChange.priorPeriod)}, so read this period's scores with less confidence.`;
+  }
+  const watch = guestWatchItem(intelligence, periodStart);
+  if (watch) {
+    const title = lowerFirst(watch.finding.trim()).replace(/[.\s]+$/, "");
+    const labels = present.map((d) => d.label);
+    const held = labels.length === 0
+      ? ""
+      : `${labels.length > 1
+          ? `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]} all`
+          : labels[0]} held at healthy levels. `;
+    const sentence = `${held}The one to watch: ${title}.`;
+    return sentence.charAt(0).toUpperCase() + sentence.slice(1);
+  }
+  if (present.length === 0) return null;
+  return "Every guest score held at healthy levels this period.";
+}
+
+// A record's Metric Name made fit for a UI label, for the places that can
+// only show the record's own name (Evidence tables, guest sub-scores):
+// no spaced hyphens, no parentheses, no reporting-month suffix.
+//   "Total Covers - June 2026"                    -> "Total Covers"
+//   "Cost of Sales - Food"                        -> "Cost of Sales, Food"
+//   "Food and Beverage Average Check (Inc Comps)" -> "Food and Beverage Average Check Including Comps"
+//   "Departmental Profit/(Loss) Percentage"       -> "Departmental Profit or Loss Percentage"
+const MONTH_SUFFIX = /\s+-\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\s*$/;
+export function displayMetricName(name: string): string {
+  return name
+    .replace(MONTH_SUFFIX, "")
+    .replace(/\/\(Loss\)/gi, " or Loss")
+    .replace(/\((?:Inc\.?|Incl\.?|Including) Comps\)/gi, "Including Comps")
+    .replace(/\((?:Exc\.?|Excl\.?|Excluding) Comps\)/gi, "Excluding Comps")
+    .replace(/\s+[-–—]\s+/g, ", ")
+    .replace(/[()]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }

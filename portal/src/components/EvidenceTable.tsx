@@ -9,7 +9,7 @@
 //   2. this toggle        — "of those, just the ones that diverge, or all"
 
 import { useState } from "react";
-import { usd, pct, hasRealBenchmark } from "@/lib/format";
+import { usd, pct, hasRealBenchmark, displayMetricName, benchmarkRange } from "@/lib/format";
 import StatusBadge from "@/components/StatusBadge";
 import type { KpiMetric, Severity } from "@/types/portal";
 
@@ -77,7 +77,7 @@ export default function EvidenceTable({
             {rows.map((m) => (
               <tr key={m.id} className="border-b border-gray-50 last:border-0">
                 <td className="px-5 py-2.5 text-gray-700 align-top">
-                  {m.metricName || m.kpiRecord}
+                  {displayMetricName(m.metricName || m.kpiRecord)}
                   {showsRationale(m) && (
                     <p className="text-xs text-gray-500 leading-relaxed">{m.interpretation}</p>
                   )}
@@ -87,7 +87,7 @@ export default function EvidenceTable({
                 </td>
                 <td className="px-5 py-2.5 text-right text-gray-400 text-xs align-top">
                   {hasRealBenchmark(m.benchmarkLow, m.benchmarkHigh)
-                    ? `${m.benchmarkLow}–${m.benchmarkHigh}${m.unit}`
+                    ? benchmarkRange(m.benchmarkLow, m.benchmarkHigh, m.unit)
                     : "—"}
                 </td>
                 <td className="px-5 py-2.5 text-right align-top">
@@ -119,7 +119,7 @@ export default function EvidenceTable({
           >
             {showAll
               ? "Show only diverging metrics"
-              : `Show all metrics (${metrics.length})`}
+              : `Show all ${metrics.length} metrics`}
           </button>
         </div>
       )}

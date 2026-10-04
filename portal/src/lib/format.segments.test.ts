@@ -225,3 +225,79 @@ test("guest headline names which dimensions held and which fell below", async ()
   assert.equal(guestDimensionSentence([g("guest_food", "Monitor")], JUNE), "Food scored below target this period.");
   assert.equal(guestDimensionSentence([], JUNE), null);
 });
+
+// ─── Guest headline ──────────────────────────────────────────────────────────
+const dim = (key: string, severity: string) =>
+  ({ ...rec(key, "Total", key, 95, "Guest Experience"), severity } as KpiMetric);
+const finding = (finding: string, severity: string, category = "Guest", periodStart = JUNE) =>
+  ({ id: finding, finding, severity, category, periodStart } as unknown as import("../types/portal.ts").Intelligence);
+const allHealthy = [dim("guest_service", "Healthy"), dim("guest_ambiance", "Healthy"), dim("guest_food", "Healthy")];
+
+test("guest headline: all dimensions healthy + flagged Guest finding names the most severe one to watch", async () => {
+  const { guestHeadline } = await import("./format.ts");
+  const intel = [
+    finding("Survey volume of 25 is low", "Monitor"),
+    finding("Event sentiment score of 63 signals a material experience gap during events", "Action Required"),
+    finding("Breakfast check is strong", "Healthy"),
+    finding("Kitchen allocation is high", "Critical", "Financial"),
+    finding("Old guest issue", "Critical", "Guest", "2026-03-01"),
+  ];
+  assert.equal(
+    guestHeadline(allHealthy, intel, JUNE),
+    "Service, ambiance and food all held at healthy levels. The one to watch: event sentiment score of 63 signals a material experience gap during events."
+  );
+  // Ties keep the first one returned.
+  const tied = [finding("Overall guest score of 97 is excellent with survey volume declining", "Monitor"), finding("Second", "Monitor")];
+  assert.equal(
+    guestHeadline(allHealthy, tied, JUNE),
+    "Service, ambiance and food all held at healthy levels. The one to watch: overall guest score of 97 is excellent with survey volume declining."
+  );
+});
+
+test("guest headline: a below-target dimension keeps the dimension sentence, flagged findings or not", async () => {
+  const { guestHeadline } = await import("./format.ts");
+  const yoshoku = [dim("guest_service", "Healthy"), dim("guest_ambiance", "Healthy"), dim("guest_food", "Monitor")];
+  assert.equal(
+    guestHeadline(yoshoku, [finding("Survey volume of 25 is low", "Monitor")], JUNE),
+    "Service and ambiance held at healthy levels; food scored below target this period."
+  );
+});
+
+test("guest headline: all healthy with nothing flagged", async () => {
+  const { guestHeadline } = await import("./format.ts");
+  const intel = [finding("Scores are excellent", "Healthy"), finding("Other category", "Monitor", "Commercial")];
+  assert.equal(guestHeadline(allHealthy, intel, JUNE), "Every guest score held at healthy levels this period.");
+});
+
+test("guest headline: no guest data", async () => {
+  const { guestHeadline } = await import("./format.ts");
+  assert.equal(guestHeadline([], [], JUNE), null);
+  // A flagged finding alone still names the watch item.
+  assert.equal(guestHeadline([], [finding("Event sentiment is low", "Monitor")], JUNE), "The one to watch: event sentiment is low.");
+});
+
+test("guest headline: a survey-volume drop beats the watch item when dimensions held", async () => {
+  const { guestHeadline } = await import("./format.ts");
+  assert.equal(
+    guestHeadline(allHealthy, [finding("Anything", "Monitor")], JUNE, { current: 75, prior: 122, priorPeriod: "2026-05-01", changePct: -38.5 }),
+    "Survey volume fell to 75 responses from 122 in May 2026, so read this period's scores with less confidence."
+  );
+});
+
+test("displayMetricName strips spaced hyphens, parentheses and month suffixes", async () => {
+  const { displayMetricName } = await import("./format.ts");
+  assert.equal(displayMetricName("Total Covers - June 2026"), "Total Covers");
+  assert.equal(displayMetricName("Lunch Covers - June 2026"), "Lunch Covers");
+  assert.equal(displayMetricName("Cost of Sales - Food"), "Cost of Sales, Food");
+  assert.equal(displayMetricName("Front-of-House Server Score - Overall"), "Front-of-House Server Score, Overall");
+  assert.equal(displayMetricName("Food and Beverage Average Check (Inc Comps)"), "Food and Beverage Average Check Including Comps");
+  assert.equal(displayMetricName("Departmental Profit/(Loss) Percentage"), "Departmental Profit or Loss Percentage");
+  assert.equal(displayMetricName("Service Score"), "Service Score");
+});
+
+test("benchmarkRange writes every unit as X to Y", async () => {
+  const { benchmarkRange } = await import("./format.ts");
+  assert.equal(benchmarkRange(18, 25, "%"), "18 to 25%");
+  assert.equal(benchmarkRange(90, 160, "$"), "$90 to $160");
+  assert.equal(benchmarkRange(80, 100, "Rating"), "80 to 100");
+});

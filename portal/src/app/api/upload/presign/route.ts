@@ -206,7 +206,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error("R2 upload failed:", err);
-    return NextResponse.json({ error: "File storage failed — please try again" }, { status: 500 });
+    return NextResponse.json({ error: "File storage failed. Please try again." }, { status: 500 });
   }
 
   // 1b. Excel files can't be read by the extraction pipeline as-is — convert

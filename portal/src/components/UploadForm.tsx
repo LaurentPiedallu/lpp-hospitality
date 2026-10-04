@@ -305,6 +305,9 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
 
   return (
     <div className="space-y-5">
+      <p style={{ fontFamily: JOST, fontSize: 12, color: "rgba(18,18,15,0.5)" }}>
+        Fields marked <span style={{ color: "#C0392B" }}>*</span> are required.
+      </p>
       {/* Drop zone */}
       <div
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -346,7 +349,7 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
         ) : (
           <div>
             <p style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.22em", textTransform: "uppercase", color: GOLD, marginBottom: 8 }}>
-              Upload file
+              Upload file <span style={{ color: "#C0392B" }}>*</span>
             </p>
             <p style={{ fontFamily: SERIF, fontSize: "1.1rem", color: "#12120F", marginBottom: 6 }}>
               Click to browse or drag and drop
@@ -392,7 +395,7 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
         </div>
         <div>
           <label style={labelStyle}>
-            Upload type <span style={{ color: "rgba(18,18,15,0.35)", textTransform: "none", letterSpacing: 0 }}>(optional)</span>
+            Upload type
           </label>
           <select value={uploadType} onChange={(e) => setUploadType(e.target.value)} style={selectStyle}>
             <option value="">Select type…</option>
@@ -406,7 +409,7 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
       {/* Reporting Period */}
       <div>
         <label style={labelStyle}>
-          Reporting period <span style={{ color: "rgba(18,18,15,0.35)", textTransform: "none", letterSpacing: 0 }}>(optional)</span>
+          Reporting period
         </label>
         <input
           type="month"
@@ -419,13 +422,13 @@ export default function UploadForm({ clientId, propertyId, onSuccess }: UploadFo
       {/* Notes */}
       <div>
         <label style={labelStyle}>
-          Notes <span style={{ color: "rgba(18,18,15,0.35)", textTransform: "none", letterSpacing: 0 }}>(optional)</span>
+          Notes
         </label>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
-          placeholder="e.g. March P&L — includes adjusted labor numbers"
+          placeholder="For example, March P&L with adjusted labor numbers"
           className="placeholder:text-[rgba(18,18,15,0.3)]"
           style={{ ...selectStyle, resize: "none" }}
         />

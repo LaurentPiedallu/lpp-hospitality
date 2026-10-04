@@ -211,7 +211,7 @@ export default function BenchmarkRangeBar({
       {/* Labels */}
       <div className="flex items-baseline justify-between" style={{ marginTop: 10, gap: 12 }}>
         <span style={{ fontFamily: JOST, fontSize: 9, letterSpacing: "0.04em", color: "rgba(18,18,15,0.35)" }}>
-          range {endpoint(low, unit)}–{endpoint(high, unit)}
+          range {endpoint(low, unit)} to {endpoint(high, unit)}
           {targetLeft != null ? ` · target ${endpoint(target as number, unit)}` : ""}
         </span>
         <span

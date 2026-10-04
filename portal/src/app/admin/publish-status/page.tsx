@@ -141,8 +141,8 @@ export default async function PublishStatusPage() {
         <p style={{ fontFamily: JOST, fontSize: 13, color: "rgba(18,18,15,0.5)", lineHeight: 1.8, maxWidth: 620, marginBottom: 32 }}>
           Per property, the most recent reporting period with any content, whether it&apos;s
           actually ready to show a client, and whether every Action is linked to an Initiative
-          that actually belongs to the same property. Reload this page to refresh — nothing
-          here is live-polled.
+          that actually belongs to the same property. Reload this page to refresh. Nothing
+          here updates automatically.
         </p>
 
         <div style={{ background: "#FFFFFF", border: "1px solid rgba(18,18,15,0.08)", borderRadius: 0, overflow: "hidden" }}>

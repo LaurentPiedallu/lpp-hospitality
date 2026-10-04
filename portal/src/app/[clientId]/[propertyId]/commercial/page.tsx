@@ -4,7 +4,7 @@ import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastU
 import {
   usd, pct, compact, buildTrendData, looksLikeIndividualStaffMetric, findMetricByKey,
   metricSeriesForKey, extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark,
-  parseDaypartPattern, formatPeriod, findIntelligenceByFinding, findAllIntelligence, surveyVolumeChange, guestDimensionSentence, benchmarkPosition, benchmarkRange, isIncludingComps,
+  parseDaypartPattern, formatPeriod, findIntelligenceByFinding, findAllIntelligence, surveyVolumeChange, guestHeadline, displayMetricName, benchmarkPosition, benchmarkRange, isIncludingComps,
   CANONICAL_DAY_ORDER, CANONICAL_DAYPART_ORDER,
 } from "@/lib/format";
 import type { DaypartCoversEntry } from "@/lib/format";
@@ -135,12 +135,12 @@ function coreCardAnalysis(mainMetric: KpiMetric, subMetrics: KpiMetric[]): strin
   if (subMetrics.length === 1) {
     const sub = subMetrics[0];
     const subShort = CORE_SUBMETRIC_SHORT[sub.metricName] ?? sub.metricName.toLowerCase();
-    return `${pillar} scores ${mainVal}, with ${subShort} rated ${sub.metricValue.toFixed(1)} - consistent across the board.`;
+    return `${pillar} scored ${mainVal} and ${subShort} ${sub.metricValue.toFixed(1)}, consistent across the board.`;
   }
   const values = subMetrics.map((s) => s.metricValue);
   const min = Math.min(...values);
   const max = Math.max(...values);
-  return `${pillar} scores ${mainVal}, backed by ${subMetrics.length} supporting scores ranging ${min.toFixed(1)} to ${max.toFixed(1)} - consistently strong execution.`;
+  return `${pillar} scored ${mainVal}, backed by ${subMetrics.length} supporting scores ranging ${min.toFixed(1)} to ${max.toFixed(1)}, a sign of consistently strong execution.`;
 }
 
 // Opportunity Category values that belong on this tab — pulled from the
@@ -269,7 +269,7 @@ function SundayEconomicsCard({
             <StatusBadge label={tuesdayIntel.severity} variant={severityVariant(tuesdayIntel.severity)} />
           </div>
           <p>
-            Sunday is the weakest day on the calendar for both formats it runs — brunch averages just 46 covers and bar-only dinner comes in at 93, the softest read of the week for each — while Tuesday, the softest night of the two-floor dinner block, adds a third recurring low-volume service to the same trough.
+            Sunday is the weakest day on the calendar for both formats it runs. Brunch averages just 46 covers and bar-only dinner comes in at 93, the softest read of the week for each. Tuesday, the softest night of the two-floor dinner block, adds a third recurring low-volume service to the same trough.
           </p>
         </div>
       </CalloutBlock>
@@ -652,7 +652,7 @@ function GuestTierGroup({
           return (
             <div key={g.id} style={emphasize ? { borderLeft: `3px solid ${GOLD}` } : undefined}>
               <ThemeCard
-                label={g.metricName || g.kpiRecord}
+                label={displayMetricName(g.metricName || g.kpiRecord)}
                 value={g.metricValue}
                 max={g.benchmarkHigh ?? 100}
                 subMetrics={extras?.subMetrics}
@@ -743,7 +743,8 @@ function dinnerConfigEfficiencyNote(
   if (winner.covers >= loser.covers) return null;
 
   const coversRatio = Math.round((winner.covers / loser.covers) * 100);
-  return `${winner.label} runs a higher RevPASH (${revpashFmt(winner.revpash)} vs. ${revpashFmt(loser.revpash)}) than ${loser.label}, despite carrying only ${coversRatio}% of its covers per service (${winner.covers.toFixed(0)} vs. ${loser.covers.toFixed(0)}) - the lower-volume format is already the more seat-efficient one per available seat hour. Filling more of it, not just growing dinner volume overall, is the lever.`;
+  const sentenceStart = winner.label.charAt(0).toUpperCase() + winner.label.slice(1);
+  return `${sentenceStart} runs a higher RevPASH than ${loser.label}, ${revpashFmt(winner.revpash)} against ${revpashFmt(loser.revpash)}, despite carrying only ${coversRatio}% of the covers per service, ${winner.covers.toFixed(0)} against ${loser.covers.toFixed(0)}. The lower-volume format is already the more seat-efficient one per available seat hour. Filling more of it, not just growing dinner volume overall, is the lever.`;
 }
 
 function RevpashBars({ items }: { items: { label: string; value: number }[] }) {
@@ -1006,7 +1007,7 @@ export default async function CommercialPage({
   // on Peacock Alley: "No guest feedback yet" directly contradicts this
   // connector's own premise on the same page).
   const volumeConversionConnector = overallRating
-    ? "That guest-experience strength doesn't yet fully convert into dinner volume — the breakdown below shows where."
+    ? "That guest-experience strength doesn't yet fully convert into dinner volume. The breakdown below shows where."
     : undefined;
 
   // The one Guest-category Intelligence record for this period — reused
@@ -1073,14 +1074,16 @@ export default async function CommercialPage({
   // Commentary toggle below) or Why It Matters (already its own paragraph
   // directly beneath this headline), just a short lede consistent with
   // both without repeating either verbatim.
+  //
+  // guestHeadline (lib/format.ts) picks the sentence: a below-target
+  // dimension first, then a survey-volume drop, then, when every dimension
+  // held, the most severe flagged Guest finding as "the one to watch" (Lex
+  // Yard and Peacock Alley June 2026 read all-healthy while their Guest
+  // findings were flagged, which hid the actual issue).
   const guestHeadlineSummary =
     guestRatings.length === 0
       ? null
-      : guestIntelligence?.severity === "Healthy"
-        ? "Every Guest Experience score was Healthy this period, from core product ratings through advocacy and loyalty signals."
-        : surveyDeclined
-          ? `Survey volume fell to ${surveyChange.current.toLocaleString()} responses from ${surveyChange.prior.toLocaleString()} in ${formatPeriod(surveyChange.priorPeriod)}, so read this period's scores with less confidence.`
-          : guestDimensionSentence(allMetrics, latest);
+      : guestHeadline(allMetrics, allIntelligence as Intelligence[], latest, surveyChange);
 
   // KPI lookup by canonical LPP Metric Key + Segment (see Segment on
   // KpiMetric / findMetricByKey in lib/format.ts). Segment defaults to
@@ -1141,8 +1144,8 @@ export default async function CommercialPage({
     Breakfast: "Breakfast",
     Lunch: "Lunch",
     Brunch: "Brunch",
-    "Dinner Bar Only": "Dinner — Bar Only (Mon/Sun)",
-    "Dinner Both Floors": "Dinner — Both Floors (Tue–Sat)",
+    "Dinner Bar Only": "Bar-Only Dinner, Monday and Sunday",
+    "Dinner Both Floors": "Two-Floor Dinner, Tuesday to Saturday",
   };
   const REVPASH_SEGMENTS = Object.keys(REVPASH_LABELS);
   const revpashEntries = REVPASH_SEGMENTS.map((seg) => ({
@@ -1170,16 +1173,16 @@ export default async function CommercialPage({
   // config's own avg_covers_per_service KPI Record (Category
   // "Reservations", Segment "Dinner Bar Only" / "Dinner Both Floors").
   // dinnerConfigEfficiencyNote does the actual comparison; this just
-  // hands it the two segments' real metrics and labels (reusing
-  // REVPASH_LABELS as the single source of truth for the label strings).
+  // hands it the two segments' real metrics and their running-text names
+  // (REVPASH_LABELS are card headings, not sentence fragments).
   const dinnerEfficiencyNote = dinnerConfigEfficiencyNote(
     {
-      label: REVPASH_LABELS["Dinner Bar Only"],
+      label: "bar-only dinner on Monday and Sunday",
       revpash: revpashEntries.find((e) => e.segment === "Dinner Bar Only")?.metric ?? null,
       covers: byKey("avg_covers_per_service", "Reservations", "Dinner Bar Only"),
     },
     {
-      label: REVPASH_LABELS["Dinner Both Floors"],
+      label: "two-floor dinner Tuesday to Saturday",
       revpash: revpashEntries.find((e) => e.segment === "Dinner Both Floors")?.metric ?? null,
       covers: byKey("avg_covers_per_service", "Reservations", "Dinner Both Floors"),
     }
@@ -1399,7 +1402,7 @@ export default async function CommercialPage({
             {channelMetrics.slice(0, 2).map((c) => (
               <KpiCard
                 key={c.id}
-                label={c.metricName || c.kpiRecord}
+                label={displayMetricName(c.metricName || c.kpiRecord)}
                 value={c.unit === "%" ? pct(c.metricValue) : c.unit === "$" ? usd(c.metricValue) : c.metricValue.toLocaleString()}
                 variant={severityVariant(c.severity)}
               />
@@ -1438,7 +1441,7 @@ export default async function CommercialPage({
         {hasCapacitySection && (
           <CommercialSection
             id="seat-efficiency"
-            heading="Seat Efficiency — RevPASH"
+            heading="Seat Efficiency: RevPASH"
             connector="The dinner shortfall above is also a capacity-efficiency question: Revenue Per Available Seat Hour shows which daypart and dinner configuration converts capacity into revenue most efficiently."
             intelligence={null}
             metrics={revpashMetrics}
@@ -1524,7 +1527,7 @@ export default async function CommercialPage({
                 )}
                 {guestIntelligence?.suggestedDecision && (
                   <p style={{ fontFamily: JOST, fontSize: 12.5, color: "rgba(18,18,15,0.55)", lineHeight: 1.6 }}>
-                    <span style={{ color: "rgba(18,18,15,0.35)" }}>Recommendation — </span>
+                    <span style={{ color: "rgba(18,18,15,0.35)" }}>Recommendation: </span>
                     {guestIntelligence.suggestedDecision}
                   </p>
                 )}
@@ -1557,7 +1560,7 @@ export default async function CommercialPage({
             extrasFor={(m) => {
               const subMetrics = coreSubMetricsFor(m.metricName);
               return {
-                subMetrics: subMetrics.map((s) => ({ label: s.metricName || s.kpiRecord, value: s.metricValue })),
+                subMetrics: subMetrics.map((s) => ({ label: displayMetricName(s.metricName || s.kpiRecord), value: s.metricValue })),
                 analysis: coreCardAnalysis(m, subMetrics),
               };
             }}
