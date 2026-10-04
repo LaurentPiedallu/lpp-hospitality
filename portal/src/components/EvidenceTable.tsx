@@ -9,7 +9,7 @@
 //   2. this toggle        — "of those, just the ones that diverge, or all"
 
 import { useState } from "react";
-import { usd, pct, hasRealBenchmark, displayMetricName } from "@/lib/format";
+import { usd, pct, hasRealBenchmark, displayMetricName, benchmarkRange } from "@/lib/format";
 import StatusBadge from "@/components/StatusBadge";
 import type { KpiMetric, Severity } from "@/types/portal";
 
@@ -87,7 +87,7 @@ export default function EvidenceTable({
                 </td>
                 <td className="px-5 py-2.5 text-right text-gray-400 text-xs align-top">
                   {hasRealBenchmark(m.benchmarkLow, m.benchmarkHigh)
-                    ? `${m.benchmarkLow}–${m.benchmarkHigh}${m.unit}`
+                    ? benchmarkRange(m.benchmarkLow, m.benchmarkHigh, m.unit)
                     : "—"}
                 </td>
                 <td className="px-5 py-2.5 text-right align-top">

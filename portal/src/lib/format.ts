@@ -466,9 +466,13 @@ function plainNumber(n: number): string {
 }
 
 // "34 to 40%" or "$90 to $160" — a benchmark range written out in words.
-export function benchmarkRange(low: number | null | undefined, high: number | null | undefined, unit: "%" | "$"): string {
+// Used for every benchmark range label in the UI; any unit other than "$"
+// or "%" (Rating, Count, Days...) reads as plain numbers.
+export function benchmarkRange(low: number | null | undefined, high: number | null | undefined, unit: string): string {
   if (low == null || high == null) return "";
-  return unit === "$" ? `${usd(low)} to ${usd(high)}` : `${plainNumber(low)} to ${plainNumber(high)}%`;
+  if (unit === "$") return `${usd(low)} to ${usd(high)}`;
+  if (unit === "%") return `${plainNumber(low)} to ${plainNumber(high)}%`;
+  return `${plainNumber(low)} to ${plainNumber(high)}`;
 }
 
 // "negative 86.5%" rather than "-86.5%".

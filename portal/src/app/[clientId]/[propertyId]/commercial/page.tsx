@@ -135,12 +135,12 @@ function coreCardAnalysis(mainMetric: KpiMetric, subMetrics: KpiMetric[]): strin
   if (subMetrics.length === 1) {
     const sub = subMetrics[0];
     const subShort = CORE_SUBMETRIC_SHORT[sub.metricName] ?? sub.metricName.toLowerCase();
-    return `${pillar} scores ${mainVal}, with ${subShort} rated ${sub.metricValue.toFixed(1)} - consistent across the board.`;
+    return `${pillar} scores ${mainVal}, with ${subShort} rated ${sub.metricValue.toFixed(1)}, consistent across the board.`;
   }
   const values = subMetrics.map((s) => s.metricValue);
   const min = Math.min(...values);
   const max = Math.max(...values);
-  return `${pillar} scores ${mainVal}, backed by ${subMetrics.length} supporting scores ranging ${min.toFixed(1)} to ${max.toFixed(1)} - consistently strong execution.`;
+  return `${pillar} scores ${mainVal}, backed by ${subMetrics.length} supporting scores ranging ${min.toFixed(1)} to ${max.toFixed(1)}, a sign of consistently strong execution.`;
 }
 
 // Opportunity Category values that belong on this tab — pulled from the
@@ -1006,7 +1006,7 @@ export default async function CommercialPage({
   // on Peacock Alley: "No guest feedback yet" directly contradicts this
   // connector's own premise on the same page).
   const volumeConversionConnector = overallRating
-    ? "That guest-experience strength doesn't yet fully convert into dinner volume — the breakdown below shows where."
+    ? "That guest-experience strength doesn't yet fully convert into dinner volume. The breakdown below shows where."
     : undefined;
 
   // The one Guest-category Intelligence record for this period — reused
@@ -1143,8 +1143,8 @@ export default async function CommercialPage({
     Breakfast: "Breakfast",
     Lunch: "Lunch",
     Brunch: "Brunch",
-    "Dinner Bar Only": "Dinner — Bar Only (Mon/Sun)",
-    "Dinner Both Floors": "Dinner — Both Floors (Tue–Sat)",
+    "Dinner Bar Only": "Bar-Only Dinner, Monday and Sunday",
+    "Dinner Both Floors": "Two-Floor Dinner, Tuesday to Saturday",
   };
   const REVPASH_SEGMENTS = Object.keys(REVPASH_LABELS);
   const revpashEntries = REVPASH_SEGMENTS.map((seg) => ({
@@ -1440,7 +1440,7 @@ export default async function CommercialPage({
         {hasCapacitySection && (
           <CommercialSection
             id="seat-efficiency"
-            heading="Seat Efficiency — RevPASH"
+            heading="Seat Efficiency: RevPASH"
             connector="The dinner shortfall above is also a capacity-efficiency question: Revenue Per Available Seat Hour shows which daypart and dinner configuration converts capacity into revenue most efficiently."
             intelligence={null}
             metrics={revpashMetrics}
@@ -1526,7 +1526,7 @@ export default async function CommercialPage({
                 )}
                 {guestIntelligence?.suggestedDecision && (
                   <p style={{ fontFamily: JOST, fontSize: 12.5, color: "rgba(18,18,15,0.55)", lineHeight: 1.6 }}>
-                    <span style={{ color: "rgba(18,18,15,0.35)" }}>Recommendation — </span>
+                    <span style={{ color: "rgba(18,18,15,0.35)" }}>Recommendation: </span>
                     {guestIntelligence.suggestedDecision}
                   </p>
                 )}

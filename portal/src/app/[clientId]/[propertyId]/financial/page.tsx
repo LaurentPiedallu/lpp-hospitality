@@ -776,7 +776,7 @@ export default async function FinancialPage({
                 )}
                 {laborPct?.benchmarkLow != null && (
                   <KpiCard label="Benchmark Range"
-                    value={`${laborPct.benchmarkLow}–${laborPct.benchmarkHigh}%`}
+                    value={benchmarkRange(laborPct.benchmarkLow, laborPct.benchmarkHigh, "%")}
                     variant="neutral" />
                 )}
                 {laborPct?.targetValue != null && (
@@ -849,7 +849,7 @@ export default async function FinancialPage({
                 )}
                 {cogsPct?.benchmarkLow != null && (
                   <KpiCard label="Benchmark Range"
-                    value={`${cogsPct.benchmarkLow}–${cogsPct.benchmarkHigh}%`}
+                    value={benchmarkRange(cogsPct.benchmarkLow, cogsPct.benchmarkHigh, "%")}
                     variant="neutral" />
                 )}
                 {cogsPct?.targetValue != null && (
@@ -937,7 +937,7 @@ export default async function FinancialPage({
                 )}
                 {opexPct?.benchmarkLow != null && (
                   <KpiCard label="Benchmark Range"
-                    value={`${opexPct.benchmarkLow}–${opexPct.benchmarkHigh}%`}
+                    value={benchmarkRange(opexPct.benchmarkLow, opexPct.benchmarkHigh, "%")}
                     variant="neutral" />
                 )}
               </div>
@@ -1007,7 +1007,7 @@ export default async function FinancialPage({
                   )}
                   {netProfitPct?.benchmarkLow != null && (
                     <p style={{ fontFamily: JOST, fontSize: 11, color: "rgba(242,237,228,0.55)", marginTop: 8 }}>
-                      Benchmark {netProfitPct.benchmarkLow}–{netProfitPct.benchmarkHigh}%
+                      Benchmark {benchmarkRange(netProfitPct.benchmarkLow, netProfitPct.benchmarkHigh, "%")}
                     </p>
                   )}
                 </div>

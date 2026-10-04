@@ -294,3 +294,10 @@ test("displayMetricName strips spaced hyphens, parentheses and month suffixes", 
   assert.equal(displayMetricName("Departmental Profit/(Loss) Percentage"), "Departmental Profit or Loss Percentage");
   assert.equal(displayMetricName("Service Score"), "Service Score");
 });
+
+test("benchmarkRange writes every unit as X to Y", async () => {
+  const { benchmarkRange } = await import("./format.ts");
+  assert.equal(benchmarkRange(18, 25, "%"), "18 to 25%");
+  assert.equal(benchmarkRange(90, 160, "$"), "$90 to $160");
+  assert.equal(benchmarkRange(80, 100, "Rating"), "80 to 100");
+});
