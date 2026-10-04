@@ -681,11 +681,11 @@ export default async function FinancialPage({
           {opCoverageIntel && <ExtraIntelCard record={opCoverageIntel} showCommentary />}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {totalRevenue && (
-              <KpiCard label={totalRevenue.metricName} value={usd(totalRevenue.metricValue)}
+              <KpiCard label="Total revenue" value={usd(totalRevenue.metricValue)}
                 variant={severityVariant(totalRevenue.severity)} />
             )}
             {covers && (
-              <KpiCard label={`${covers.metricName || "Total Revenue Covers"}${isIncludingComps(covers) ? " (incl. comps)" : ""}`}
+              <KpiCard label={isIncludingComps(covers) ? "Total covers including comps" : "Total covers"}
                 value={covers.metricValue.toLocaleString()}
                 variant="neutral" />
             )}
@@ -694,13 +694,10 @@ export default async function FinancialPage({
                 variant={severityVariant(avgSpend.severity)} />
             )}
             {avgCheck && (
-              // Light formatting pass over the record's own name ("Total
-              // Food and Beverage Average Check Excluding Comps") — keeps
-              // the qualifying "excl. comps" dimension, drops only the
-              // redundant "Total Food and Beverage" the Revenue section
-              // already implies. Falls back to the comps-inclusive record
-              // (and says so) when the period has no comps-excluded one.
-              <KpiCard label={isIncludingComps(avgCheck) ? "Average Check (incl. comps)" : "Average Check (excl. comps)"} value={usd(avgCheck.metricValue)}
+              // Fixed labels, never the record's Metric Name, so every property
+              // reads the same. The headline means excluding comps; the
+              // comps-inclusive fallback record says so in words.
+              <KpiCard label={isIncludingComps(avgCheck) ? "Average check including comps" : "Average check"} value={usd(avgCheck.metricValue)}
                 variant={severityVariant(avgCheck.severity)} />
             )}
           </div>

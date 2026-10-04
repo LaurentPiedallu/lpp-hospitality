@@ -567,7 +567,7 @@ export default async function PropertyPage({
           valueColor: "#12120F",
           // "revenue covers" — kpi.covers resolves to "Total Revenue
           // Covers" (comps excluded), not the larger "Total Covers Period".
-          subLine: kpi.covers != null ? `${kpi.covers.toLocaleString()} ${kpi.coversIncludesComps ? "covers incl. comps" : "revenue covers"}` : null,
+          subLine: kpi.covers != null ? `${kpi.covers.toLocaleString()} ${kpi.coversIncludesComps ? "covers including comps" : "revenue covers"}` : null,
           interpretation: revenueInterpretation,
           variance: (() => {
             const target = metricTarget("total_revenue");

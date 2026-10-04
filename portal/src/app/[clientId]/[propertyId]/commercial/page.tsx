@@ -4,7 +4,7 @@ import { getProperty, getKpiMetrics, getIntelligence, getOpportunities, getLastU
 import {
   usd, pct, compact, buildTrendData, looksLikeIndividualStaffMetric, findMetricByKey,
   metricSeriesForKey, extractIndividualStaffNames, mentionsIndividualStaff, hasRealBenchmark,
-  parseDaypartPattern, formatPeriod, findIntelligenceByFinding, findAllIntelligence, surveyVolumeChange, guestDimensionSentence, benchmarkPosition, benchmarkRange, isIncludingComps,
+  parseDaypartPattern, formatPeriod, findIntelligenceByFinding, findAllIntelligence, surveyVolumeChange, guestHeadline, displayMetricName, benchmarkPosition, benchmarkRange, isIncludingComps,
   CANONICAL_DAY_ORDER, CANONICAL_DAYPART_ORDER,
 } from "@/lib/format";
 import type { DaypartCoversEntry } from "@/lib/format";
@@ -652,7 +652,7 @@ function GuestTierGroup({
           return (
             <div key={g.id} style={emphasize ? { borderLeft: `3px solid ${GOLD}` } : undefined}>
               <ThemeCard
-                label={g.metricName || g.kpiRecord}
+                label={displayMetricName(g.metricName || g.kpiRecord)}
                 value={g.metricValue}
                 max={g.benchmarkHigh ?? 100}
                 subMetrics={extras?.subMetrics}
@@ -1073,14 +1073,16 @@ export default async function CommercialPage({
   // Commentary toggle below) or Why It Matters (already its own paragraph
   // directly beneath this headline), just a short lede consistent with
   // both without repeating either verbatim.
+  //
+  // guestHeadline (lib/format.ts) picks the sentence: a below-target
+  // dimension first, then a survey-volume drop, then, when every dimension
+  // held, the most severe flagged Guest finding as "the one to watch" (Lex
+  // Yard and Peacock Alley June 2026 read all-healthy while their Guest
+  // findings were flagged, which hid the actual issue).
   const guestHeadlineSummary =
     guestRatings.length === 0
       ? null
-      : guestIntelligence?.severity === "Healthy"
-        ? "Every Guest Experience score was Healthy this period, from core product ratings through advocacy and loyalty signals."
-        : surveyDeclined
-          ? `Survey volume fell to ${surveyChange.current.toLocaleString()} responses from ${surveyChange.prior.toLocaleString()} in ${formatPeriod(surveyChange.priorPeriod)}, so read this period's scores with less confidence.`
-          : guestDimensionSentence(allMetrics, latest);
+      : guestHeadline(allMetrics, allIntelligence as Intelligence[], latest, surveyChange);
 
   // KPI lookup by canonical LPP Metric Key + Segment (see Segment on
   // KpiMetric / findMetricByKey in lib/format.ts). Segment defaults to
@@ -1399,7 +1401,7 @@ export default async function CommercialPage({
             {channelMetrics.slice(0, 2).map((c) => (
               <KpiCard
                 key={c.id}
-                label={c.metricName || c.kpiRecord}
+                label={displayMetricName(c.metricName || c.kpiRecord)}
                 value={c.unit === "%" ? pct(c.metricValue) : c.unit === "$" ? usd(c.metricValue) : c.metricValue.toLocaleString()}
                 variant={severityVariant(c.severity)}
               />
@@ -1557,7 +1559,7 @@ export default async function CommercialPage({
             extrasFor={(m) => {
               const subMetrics = coreSubMetricsFor(m.metricName);
               return {
-                subMetrics: subMetrics.map((s) => ({ label: s.metricName || s.kpiRecord, value: s.metricValue })),
+                subMetrics: subMetrics.map((s) => ({ label: displayMetricName(s.metricName || s.kpiRecord), value: s.metricValue })),
                 analysis: coreCardAnalysis(m, subMetrics),
               };
             }}

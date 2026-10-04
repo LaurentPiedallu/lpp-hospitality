@@ -9,7 +9,7 @@
 //   2. this toggle        — "of those, just the ones that diverge, or all"
 
 import { useState } from "react";
-import { usd, pct, hasRealBenchmark } from "@/lib/format";
+import { usd, pct, hasRealBenchmark, displayMetricName } from "@/lib/format";
 import StatusBadge from "@/components/StatusBadge";
 import type { KpiMetric, Severity } from "@/types/portal";
 
@@ -77,7 +77,7 @@ export default function EvidenceTable({
             {rows.map((m) => (
               <tr key={m.id} className="border-b border-gray-50 last:border-0">
                 <td className="px-5 py-2.5 text-gray-700 align-top">
-                  {m.metricName || m.kpiRecord}
+                  {displayMetricName(m.metricName || m.kpiRecord)}
                   {showsRationale(m) && (
                     <p className="text-xs text-gray-500 leading-relaxed">{m.interpretation}</p>
                   )}
