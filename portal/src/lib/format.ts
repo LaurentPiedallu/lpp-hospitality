@@ -214,8 +214,8 @@ export const CANONICAL_METRIC_NAME: Record<string, string> = {
   labor_pct: "Total Payroll, Taxes and Benefits Percentage",
   opex: "Total Other Operating Expenses",
   opex_pct: "Total Other Operating Expenses Percentage",
-  net_profit: "Departmental Profit/(Loss)",
-  net_profit_pct: "Departmental Profit/(Loss) Percentage",
+  net_profit: "Departmental Profit/(Loss)", // copy-style: data (exact Notion Metric Name)
+  net_profit_pct: "Departmental Profit/(Loss) Percentage", // copy-style: data (exact Notion Metric Name)
   // Covers: the revenue-generating cover count ("Total Revenue Covers" =
   // 7,040 for Lex Yard June — reconciles with Total Revenue ÷ avg check:
   // 608,445 / 7,040 ≈ 86.43). Siblings tagged Segment "Total": "Total

@@ -959,6 +959,7 @@ export default async function CommercialPage({
   // the render loop) so both records are available together regardless of
   // where each lands in intelAll("Commercial")'s impact-ranked order.
   const TUESDAY_SUNDAY_BRUNCH_FINDING = "Tuesday dinner is the softest two-floor night; Sunday brunch averages just 46 covers";
+  // copy-style: data (exact Notion Finding title, matched not displayed)
   const SUNDAY_BARONLY_FINDING = "Sunday dinner (bar-only) is the lightest segment at 93-cover avg";
   const commercialIntelAll = intelAll("Commercial");
   const sundayEconomicsTuesdayIntel = commercialIntelAll.find((r) => r.finding === TUESDAY_SUNDAY_BRUNCH_FINDING) ?? null;
