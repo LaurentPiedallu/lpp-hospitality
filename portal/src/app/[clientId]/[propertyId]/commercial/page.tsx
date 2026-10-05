@@ -959,11 +959,15 @@ export default async function CommercialPage({
   // the render loop) so both records are available together regardless of
   // where each lands in intelAll("Commercial")'s impact-ranked order.
   const TUESDAY_SUNDAY_BRUNCH_FINDING = "Tuesday dinner is the softest two-floor night; Sunday brunch averages just 46 covers";
-  // copy-style: data (exact Notion Finding title, matched not displayed)
-  const SUNDAY_BARONLY_FINDING = "Sunday dinner (bar-only) is the lightest segment at 93-cover avg";
+  // The Sunday bar-only record is matched by its Notion page ID rather than
+  // its Finding title, so editing the title in Notion can't silently break
+  // the consolidation. It has no Related KPIs to key on instead. The ID is
+  // Lex Yard's June 2026 record; a later period's record is a new page and
+  // won't match, the same period scoping the title match had.
+  const SUNDAY_BARONLY_INTEL_ID = "3cb20475-2652-8104-ac4f-df38b7e5eebc";
   const commercialIntelAll = intelAll("Commercial");
   const sundayEconomicsTuesdayIntel = commercialIntelAll.find((r) => r.finding === TUESDAY_SUNDAY_BRUNCH_FINDING) ?? null;
-  const sundayEconomicsBarOnlyIntel = commercialIntelAll.find((r) => r.finding === SUNDAY_BARONLY_FINDING) ?? null;
+  const sundayEconomicsBarOnlyIntel = commercialIntelAll.find((r) => r.id === SUNDAY_BARONLY_INTEL_ID) ?? null;
 
   // Individual staff names detected from this property's own KPI Records
   // (see extractIndividualStaffNames in lib/format.ts) — used below to keep
@@ -1329,7 +1333,7 @@ export default async function CommercialPage({
           {commercialIntelAll.flatMap((rec, idx) => {
             const nodes: React.ReactNode[] = [];
 
-            if (rec.finding === SUNDAY_BARONLY_FINDING) {
+            if (rec.id === SUNDAY_BARONLY_INTEL_ID) {
               // Absorbed into SundayEconomicsCard at Tuesday's slot below,
               // unless Tuesday's own record doesn't exist this period — in
               // that case, render Sunday bar-only's real card on its own

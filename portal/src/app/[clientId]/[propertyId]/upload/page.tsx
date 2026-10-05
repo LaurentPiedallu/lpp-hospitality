@@ -256,7 +256,7 @@ export default async function UploadPage({
           {archivedUploads.length > 0 && (
             <details className="bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden">
               <summary className="px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-500 flex items-center justify-between select-none hover:bg-gray-50 transition">
-                <span>Archived files ({archivedUploads.length})</span>
+                <span>{archivedUploads.length} archived file{archivedUploads.length === 1 ? "" : "s"}</span>
                 <span className="text-gray-400 text-xs">▼</span>
               </summary>
               <div className="border-t border-gray-50 overflow-x-auto">

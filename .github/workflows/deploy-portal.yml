@@ -25,6 +25,10 @@ jobs:
         working-directory: portal
         run: npm ci
 
+      - name: Test
+        working-directory: portal
+        run: npm test
+
       - name: Build (OpenNext + Cloudflare)
         working-directory: portal
         env:

@@ -71,7 +71,7 @@ export default function MenuCogsComparison({
         })}
         <div style={{ minWidth: 110, borderLeft: "1px solid rgba(18,18,15,0.08)", paddingLeft: 20 }}>
           <p style={{ fontFamily: JOST, fontSize: 10, color: "rgba(18,18,15,0.4)", marginBottom: 4 }}>
-            Blended (Financial Review)
+            Blended, per Financial Review
           </p>
           <p style={{ fontFamily: JOST, fontSize: 18, fontWeight: 500, color: "#12120F" }}>{pct(blendedCogsPct)}</p>
         </div>
