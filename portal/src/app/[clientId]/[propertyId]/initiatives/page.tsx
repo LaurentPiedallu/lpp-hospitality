@@ -341,7 +341,7 @@ export default async function InitiativesPage({
         {archivedViews.length > 0 && (
           <details className="group bg-white rounded-none border border-[rgba(18,18,15,0.08)] overflow-hidden">
             <summary className="list-none [&::-webkit-details-marker]:hidden px-5 py-3.5 cursor-pointer text-sm font-medium text-gray-500 flex items-center justify-between select-none hover:bg-gray-50 transition">
-              <span>Archived ({archivedViews.length})</span>
+              <span>{archivedViews.length} archived</span>
               <svg
                 width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"
                 className="text-gray-400 transition-transform duration-200 group-open:rotate-90"

@@ -113,9 +113,9 @@ export default function MenuItemsTable({
           <label style={{ fontFamily: JOST, fontSize: 11, color: "rgba(18,18,15,0.45)", display: "flex", alignItems: "center", gap: 8 }}>
             Category
             <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} style={selectStyle}>
-              <option value="All">All ({items.length})</option>
+              <option value="All">All · {items.length}</option>
               {categoriesPresent.map((c) => (
-                <option key={c} value={c}>{menuCategoryLabel(c)} ({items.filter((i) => i.category === c).length})</option>
+                <option key={c} value={c}>{menuCategoryLabel(c)} · {items.filter((i) => i.category === c).length}</option>
               ))}
             </select>
           </label>
@@ -125,7 +125,7 @@ export default function MenuItemsTable({
           <select value={quadrantFilter} onChange={(e) => setQuadrantFilter(e.target.value)} style={selectStyle}>
             <option value="All">All</option>
             {quadrantsPresent.map((q) => (
-              <option key={q} value={q}>{q} ({items.filter((i) => i.quadrant === q).length})</option>
+              <option key={q} value={q}>{q} · {items.filter((i) => i.quadrant === q).length}</option>
             ))}
           </select>
         </label>

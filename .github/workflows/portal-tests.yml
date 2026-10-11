@@ -1,0 +1,32 @@
+name: Portal Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "portal/**"
+      - ".github/workflows/portal-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: portal/package-lock.json
+
+      - name: Install dependencies
+        working-directory: portal
+        run: npm ci
+
+      - name: Test
+        working-directory: portal
+        run: npm test
+
+      - name: Type-check
+        working-directory: portal
+        run: npx tsc --noEmit -p .
